@@ -569,7 +569,7 @@ RedBullTV,http://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master_6660.m3u
  先锋乒羽,http://221.198.174.113:8888/rtp/225.1.1.219:5002?Cf=cfss.cc 
  先锋乒羽,http://sunny2017.forver.one:31115/stream/channelid/1504810567?profile=pass 
  CCTV-05,http://ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221226019/index.m3u8 
- CCTV-05,,http://hikvision.city:880/CCTV-5.m3u8 
+ CCTV-05,http://hikvision.city:880/CCTV-5.m3u8 
  CCTV+5+,http://ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221225603/index.m3u8 
  五星体育,http://dp.sxtv.top:88/live/bestv.php?id=wxty 
  五星体育,http://61.173.95.181:4022/rtp/239.45.3.210:5140?Cf=cfss.cc 
