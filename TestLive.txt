@@ -279,21 +279,86 @@ CETV-4,http://ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221225783/index.m3u8
 鹤岗新闻综合 8M1080,http://ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221226534/index.m3u8
 漠河综合频道,http://ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221226535/index.m3u8
 
-港澳台,#genre#
+斯玛特港澳台,#genre#
+
+TVBS News 新闻台,http://ku9.fr.to/smt.php?id=tvbs_n
+TVBS 欢乐台 （备份）,http://ku9.fr.to/smt.php?id=tvbshuanle_twn
+中天新闻 HD,http://ku9.fr.to/smt.php?id=ctinews
+中天娱乐 CTI Entertaiment,http://ku9.fr.to/smt.php?id=ctient
+中天综合 CTI Metro,http://ku9.fr.to/smt.php?id=ctizhonghe
+中天亚洲台,http://ku9.fr.to/smt.php?id=ctiasia_twn
+台视 TTV HD,http://ku9.fr.to/smt.php?id=ttv_taiwan
+台视新闻台,http://ku9.fr.to/smt.php?id=ttvnews_twn
+台视综合台,http://ku9.fr.to/smt.php?id=ttvzhonghe_twn
+中视 HD,http://ku9.fr.to/smt.php?id=zhongshihd_twn
+中视新闻台,http://ku9.fr.to/smt.php?id=zhongshinews_twn
+民视 HD,http://ku9.fr.to/smt.php?id=ftvhd_taiwan
+民视新闻台 FTV News,http://ku9.fr.to/smt.php?id=ftvnew_taiwan
+民视台湾台,http://ku9.fr.to/smt.php?id=ftvtaiwan_twn
+华视 CTS HD,http://ku9.fr.to/smt.php?id=ctshd_twn
+公视 CTV,http://ku9.fr.to/smt.php?id=ctv_taiwan
+八大第一 GTV First,http://ku9.fr.to/smt.php?id=badafirst
+八大综合 GTV Metro,http://ku9.fr.to/smt.php?id=badazhonghe
+八大戏剧 GTV Drama,http://ku9.fr.to/smt.php?id=badadrama
+八大娱乐 GTV Entertainment,http://ku9.fr.to/smt.php?id=badaentertain
+HBO_HD,http://ku9.fr.to/smt.php?id=hbohd_twn
+HBO_HITS,http://ku9.fr.to/smt.php?id=hbohits_twn
+Hollywood Movies,http://ku9.fr.to/smt.php?id=hollywoodmovies_twn
+三立台湾 Sanli Taiwan,http://ku9.fr.to/smt.php?id=sanlitaiwan
+三立戏剧台,http://ku9.fr.to/smt.php?id=sanlixiju_twn
+三立综合 Sanli Metro,http://ku9.fr.to/smt.php?id=sanlizhonghe
+三立都会台,http://ku9.fr.to/smt.php?id=sanlidouhui
+东森新闻 ETTV News,http://ku9.fr.to/smt.php?id=ettvnews
+东森综合 ETTV Metro,http://ku9.fr.to/smt.php?id=ettvzhonghe
+东森戏剧 ETTV Drama,http://ku9.fr.to/smt.php?id=ettvdrama
+东森财经新闻 ETTV Business,http://ku9.fr.to/smt.php?id=ettvcaijing_twn
+寰宇财经,http://ku9.fr.to/smt.php?id=huanyutaiwan_twn
+寰宇新闻台,http://ku9.fr.to/smt.php?id=huanyuxinwen_twn
+大爱1台,http://ku9.fr.to/smt.php?id=daai_twn
+非凡新闻台,http://ku9.fr.to/smt.php?id=feifannews_twn
+龙华戏剧 Lunghua Drama,http://ku9.fr.to/smt.php?id=lunghuaxiju_twn
+龙华戏剧台,http://ku9.fr.to/smt.php?id=lunghuaxiju_twn
+龙华经典台,http://ku9.fr.to/smt.php?id=lunghuajingdian_twn
+AXN Taiwan,http://ku9.fr.to/smt.php?id=axn_twn
+靖天国际台,http://ku9.fr.to/smt.php?id=jingtianintl_twn
+纬来日本台,http://ku9.fr.to/smt.php?id=videolandjapan
+纬来电影台,http://ku9.fr.to/smt.php?id=videolandmovie_twn
+纬来体育台,http://ku9.fr.to/smt.php?id=videolandsport
+纬来综合台,http://ku9.fr.to/smt.php?id=videolandzonghe
+纬来精彩,http://ku9.fr.to/smt.php?id=videolandspecial_twn
+好消息 2,http://ku9.fr.to/smt.php?id=goods_twn
+大爱2台,http://ku9.fr.to/smt.php?id=catchplay_twn
+亚洲美食,http://ku9.fr.to/smt.php?id=afc_twn
+美食星球,http://ku9.fr.to/smt.php?id=foodplanet_twn
+亚洲旅游 TLC Asia,http://ku9.fr.to/smt.php?id=tlc_twn
+东森电影 ETTV Movie,http://ku9.fr.to/smt.php?id=ettvmovie
+阿里郎 Arirang,http://ku9.fr.to/smt.php?id=arirang_twn
+博斯运动 1,http://ku9.fr.to/smt.php?id=bosisport1_twn
+博斯运动 2,http://ku9.fr.to/smt.php?id=bosisport2_twn
+博斯高球2 HD,http://ku9.fr.to/smt.php?id=bosigolf2_twn
+博斯网球 HD,http://ku9.fr.to/smt.php?id=bositennis_twn
+东森洋片 ETTV Western,http://ku9.fr.to/smt.php?id=ettvwestern
+龙华洋片 Lunghua Western,http://ku9.fr.to/smt.php?id=lunghuawestern_twn
+博斯无限,http://ku9.fr.to/smt.php?id=bosiunlimited_twn
+MTV Live,http://ku9.fr.to/smt.php?id=mtvhd_twn
+龙详时代,http://ku9.fr.to/smt.php?id=lungxiangtime_twn
+EYETV 旅游,http://ku9.fr.to/smt.php?id=eyetvtravel_twn
+靖天卡通台,http://ku9.fr.to/smt.php?id=jingtiancartoon_twn
+EYETV 戏剧,http://ku9.fr.to/smt.php?id=eyetvxiju_twn
+卫视中文台 Star Movies Chinese,http://ku9.fr.to/smt.php?id=weishichinese_twn
+东森幼幼 Yoyo TV,http://ku9.fr.to/smt.php?id=yoyo_twn
+卫视电影台,http://ku9.fr.to/smt.php?id=weishimovie_twn
+美亚电影,http://ku9.fr.to/smt.php?id=meiyamovie_twn
+爱尔达影剧台,http://ku9.fr.to/smt.php?id=eltayingju_twn
+爱尔达综合台,http://ku9.fr.to/smt.php?id=eltazonghe_twn
+星卫电影,http://ku9.fr.to/smt.php?id=xingwei_movie
+爱尔达影剧,http://ku9.fr.to/smt.php?id=eltayingju_twn
+爱尔达体育2台,http://ku9.fr.to/smt.php?id=eltasport2_twn
+爱尔达体育3台,http://ku9.fr.to/smt.php?id=eltasport3_twn
+AFC 亚洲旅游台,http://ku9.fr.to/smt.php?id=asiatravel_twn
 
 
 
-
-TVBPlus,http://ha.jmied.com/aa/aa.m3u8?auth_key=1661958232-0-0-114df08fce17ecb21f6bf42de85e7600
-广电翡翠台,http://60.30.198.43:5080/香蕉哥/广电翡翠/hls.m3u8
-TVB星河台,http://113.64.145.100:8081/hls/135/index.m3u8#http://113.64.145.61:8081/hls/135/index.m3u8#http://php.jdshipin.com:8880/jydx.php?id=135
-TVB无线新闻,http://137.175.30.127:9080/hls/inews.m3u8
-TVB星河台,https://edge6a.v2h-cdn.com/xinghe/xinghe.stream/chunklist.m3u8
-TVB翡翠台,http://60.30.198.43:5080/香蕉哥/tvb翡翠/hls.m3u8
-TVB翡翠台,http://60.30.198.43:5080/香蕉哥/tvb翡翠2/hls.m3u8
-TVB星河台,http://v2h.jdshipin.com/xinghe/xinghe.stream/chunklist.m3u8
-TVB娱乐新闻台,https://v2h.jdshipin.com/enew/enew.stream/chunklist.m3u8
-TVB+,https://ha.jmied.com/aa/aa.flv?auth_key=1661958232-0-0-3d9174957759709f8b53448167c0b6f6
 
 
 ⭐NewTV⭐,#genre#
