@@ -1306,32 +1306,6 @@ NewTV炫舞未来,http://39.134.66.66/PLTV/88888888/224/3221225646/index.m3u8
 NewTV超级电视剧,http://39.134.66.66/PLTV/88888888/224/3221225637/index.m3u8
 
 
-⭐经典⭐,#genre#
-经典功夫,http://live.dxms.top/dwy/jdgf.php 
-经典功夫,http://live.dxms.top/dwy/jdgf1.php 
-经典电影,http://live.dxms.top/dwy/jddyt.php 
-经典影视,http://live.dxms.top/dwy/jdyst.php 
-龙腾功夫,http://live.dxms.top/dwy/ltgft.php 
-龙腾功夫,http://live.dxms.top/dwy/ltgft1.php 
-星光视界,http://ali.hlspull.yximgs.com/live/zxcvbnm9852.flv 经典怀旧,http://live.dxms.top/dwy/jdhj.php 
-经典台剧,http://live.dxms.top/dwy/jdtj.php 
-经典台剧,http://cfss.cc/cdn/yy/1355260662.flv 
-军旅剧场,http://live.dxms.top/dwy/jljc.php 
-经典剧场,http://live.dxms.top/dwy/jdjc.php 
-宫廷剧场,http://live.dxms.top/dwy/gtjc.php 
-经典清剧,http://live.dxms.top/dwy/jdqj.php 
-经典天龙,http://live.dxms.top/dwy/jdtl.php 
-金庸剧场,http://live.dxms.top/dwy/jyjc.php 
-星光视界,http://live.dxms.top/dwy/xgsj.php 
-经典三国,http://live.dxms.top/dwy/jdsg.php 
-经典三国,http://live.dxms.top/dwy/jdsg1.php 
-经典红楼,http://live.dxms.top/dwy/jdhl.php 
-怀旧剧场,http://live.dxms.top/dwy/hjjc.php 
-经典港片,http://live.dxms.top/dwy/jdgp.php 
-经典喜剧,http://live.dxms.top/dwy/jdxj1.php 
-经典喜剧,http://live.dxms.top/dwy/jdxj.php 
-回忆影院,http://live.dxms.top/dwy/hyyy.php
-
 体育频道,#genre# 
 纬来篮球,http://hls.szsummer.cn/live/446035/playlist.m3u8?k=32f9ec7c13e4b390289143a8e1b2a898&t=1840341130 
 纬来篮球,https://cloud.yumixiu768.com/tmp/123.m3u8 
