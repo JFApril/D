@@ -288,11 +288,8 @@ cs03,http://88b9da48.kazmazpaz.ru/iptv/PC2MFCVYAB7B85/6170/manifest.m3u8
 cs04,http://88b9da48.kazmazpaz.ru/iptv/PC2MFCVYAB7B85/6215/manifest.m3u8
 cs05,http://88b9da48.kazmazpaz.ru/iptv/PC2MFCVYAB7B85/6285/manifest.m3u8
 cs06,https://csm-e-eb.csm.tubi.video/csm/extlive/tubiprd01,Cloudfront-Fox-Soul-SCTE.m3u8
-cs07,http://206.212.244.71:8080/live/4wVQA7/625159/215664.m3u8
-cs08,http://206.212.244.71:8080/live/4wVQA7/625159/215726.m3u8
-cs09,http://206.212.244.71:8080/live/4wVQA7/625159/215576.m3u8
-cs10,https://89.187.167.247/xxl.stream/chunks.m3u8
-cs11,http://7955e15a.rostelekom.xyz/iptv/L58NZSUP5Z4Z98/11034/index.m3u8
+
+
 
 
 💝中国移动ITV👉移动,#genre#
