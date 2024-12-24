@@ -1605,6 +1605,7 @@ NewTV超级电视剧,http://39.134.66.66/PLTV/88888888/224/3221225637/index.m3u8
 
 
 体育频道,#genre# 
+CCTV8k,http://223.105.252.57/PLTV/3/224/3221228165/index.m3u8?servicetype=1
 纬来篮球,http://hls.szsummer.cn/live/446035/playlist.m3u8?k=32f9ec7c13e4b390289143a8e1b2a898&t=1840341130 
 纬来篮球,https://cloud.yumixiu768.com/tmp/123.m3u8 
 纬来篮球,https://epg.pw/stream/65161be2ecd7c7b2e054dbac30922b2673b4eff6497b77c71bb81215aa826cc4.m3u8 
