@@ -29,7 +29,7 @@ CETV-2,http://111.225.93.57:8800/hls/95/index.m3u8
 CETV-2,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001226/index.m3u8
 CETV-3,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001309/index.m3u8?virtualDomain=yinhe.live_hls.zte.com
 CETV-4,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001348/index.m3u8
-
+哔哩25晚会,https://caoshiyizhongzhiwu.vip-tptv.xyz/bilibili/1231?platform=hls&line=first&quality=4
 卫视频道,#genre#
 安徽卫视,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001037/index.m3u8
 北京卫视,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001029/index.m3u8
