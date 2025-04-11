@@ -301,7 +301,7 @@ BAND NEWS,https://stream1.freetv.fun/band-news-1.m3u8
 
 💝移动ITV👉,#genre#
 纯享4K,http://php.jdshipin.com/itv6.php?cid=ystenlive&id=1000000004000011651
-CCTV1,http://php.jdshipin.com/itv6.php?cid=ystenlive&id=1000000001000018602
+CCTV1,http://php.jdshipin.com/TVOD/iptv.php?cid=ystenlive&id=1000000001000018602
 CCTV2,http://php.jdshipin.com/itv6.php?cid=ystenlive&id=1000000001000023315
 CCTV3,http://php.jdshipin.com/itv6.php?cid=ystenlive&id=1000000001000011218
 CCTV4,http://php.jdshipin.com/itv6.php?cid=ystenlive&id=1000000002000031664
