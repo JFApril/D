@@ -1,3 +1,4 @@
+//E-flow web test
 var a=document.getElementsByName("details-control")
 for(i=0;i<a.length;i++){
 a[i].click()
@@ -10,7 +11,7 @@ do{
 }while(j<b.length)
 
 
-
+//taobao test
 var widget = id("com.taobao.taobao:id/count_down_timer_view_container").findOne(200);
 if (widget) {
     // 长按控件的中心点
@@ -25,7 +26,7 @@ if (widget) {
     click(px1 + 100, py1 - 244);
     sleep(200);
     id("com.taobao.taobao:id/uik_mdButtonDefaultPositive").findOne(200).click();
-    toastLog("已删除聊天页喷倒计时");
+    toastLog("已删除倒计时");
 } else {
-    toastLog("未找到聊天页喷倒计时");  
+    toastLog("未找到倒计时");  
 }
