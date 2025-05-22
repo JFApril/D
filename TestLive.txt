@@ -303,7 +303,7 @@ BAND NEWS,https://stream1.freetv.fun/band-news-1.m3u8
 鳳凰衛視香港,http://ali.hlspull.yximgs.com/live/qwt_fhhk.flv
 鳳凰衛視香港,http://47.239.163.171/HDTV/QQ群1047470024.php?id=5
 香港有线新闻,http://47.239.163.171/HDTV/QQ群1047470024.php?id=6
-TVB翡翠,http://ali.hlspull.yximgs.com/live/qwt_feicui.flv
+//TVB翡翠,http://ali.hlspull.yximgs.com/live/qwt_feicui.flv
 TVB無綫新聞,http://47.239.163.171/HDTV/QQ群1047470024.php?id=8
 TVB無綫新聞,http://47.239.163.171/HDTV/QQ群1047470024.php?id=9
 TVB明珠,http://47.239.163.171/HDTV/QQ群1047470024.php?id=10
