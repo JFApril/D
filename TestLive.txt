@@ -1266,8 +1266,7 @@ CGT法语咪咕,http://goo.bkpcp.top/mg/cgtnf
 咪咕直播36,http://[2409:8087:5e00:24::2d]:6610/000000001000/1/3000000020000011520/index.m3u8?channel-id=FifastbLive&amp;Contentid=3000000020000011520&amp;livemode=1&amp;stbId=YanG-1989
 咪咕直播37,http://[2409:8087:5e00:24::2d]:6610/000000001000/1/3000000020000011521/index.m3u8?channel-id=FifastbLive&amp;Contentid=3000000020000011521&amp;livemode=1&amp;stbId=YanG-1989
 咪咕直播38,http://[2409:8087:5e00:24::2d]:6610/000000001000/1/3000000020000011522/index.m3u8?channel-id=FifastbLive&amp;Contentid=3000000020000011522&amp;livemode=1&amp;stbId=YanG-1989
-1 group-title=,http://hms2924nc1972666636.live.aikan.miguvideo.com/wh7f454c46tw1590536221_1219061924/envivo_v/2018/SD/gansu/1000/01.m3u8?msisdn=guest&amp;Channel_ID=0119_04102000-99000_400300000040002&amp;client_ip=139.198.127.250&amp;timestamp=20230816073740&amp;ContentId=531261933&amp;timezone=UTC&amp;mtv_session=c42270b736c7f7ad784d63391d3520bc&amp;HlsSubType=1&amp;HlsProfileId=1&amp;nphaid=0&amp;encrypt=9de29b7faceedf77d9b5796d2c8448a3&amp;咪咕$LR•IPV4『线路100』
-1 group-title=,http://hms2844nc1972666628.live.aikan.miguvideo.com/wh7f454c46tw1590245808_-2084121214/envivo_x/2018/SD/ningxia/1000/01.m3u8?msisdn=guest&amp;Channel_ID=0119_04102000-99000_400300000040002&amp;client_ip=139.198.127.250&amp;timestamp=20230816073740&amp;ContentId=531261057&amp;timezone=UTC&amp;mtv_session=83a38128827a852ce1724296852f857e&amp;HlsSubType=1&amp;HlsProfileId=1&amp;nphaid=0&amp;encrypt=17f4b89974b2ed1e654453d44f9968b1&amp;咪咕$LR•IPV4『线路113』
+
 CCTV-01咪咕,http://47.117.76.76:7001/hahahaha/ys/zb.php?id=cctv1
 CCTV-02咪咕,http://47.117.76.76:7001/hahahaha/ys/zb.php?id=cctv2
 CCTV-03咪咕,http://47.117.76.76:7001/hahahaha/ys/zb.php?id=cctv3
