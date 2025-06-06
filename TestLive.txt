@@ -459,37 +459,7 @@ AXN,http://122.117.71.103:8557/http/61.222.53.250:8081/hls/71/813/ch43.m3u8
 CINEMAX,http://122.117.71.103:8558/http/61.222.53.250:8081/hls/71/813/ch42.m3u8
 美亞電影TW,p3p://167.114.175.6:55331/62883c4f000a4ca3c722d5ec04fb74e7
 
-🌹极速香港,#genre#
-凤凰中文台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=G1LJOI&tk=TrIGlsAWO8NY
-凤凰资讯台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=zgmL70&tk=TrIGlsAWO8NY
-凤凰香港台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=v6IsCZ&tk=TrIGlsAWO8NY
-翡翠台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=2xFXJy&tk=TrIGlsAWO8NY
-无线新闻台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=ZMheQ8&tk=TrIGlsAWO8NY
-TVB Plus,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=H1reZm&tk=TrIGlsAWO8NY
-TVB剧集台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=gSRFCs&tk=TrIGlsAWO8NY
-TVBJ1,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=aeAcPY&tk=TrIGlsAWO8NY
-黄金翡翠台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=MO8bKU&tk=TrIGlsAWO8NY
-TVB生活台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=0UUY79&tk=TrIGlsAWO8NY
-TVB功夫台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=Rm1oHA&tk=TrIGlsAWO8NY
-TVB星河台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=rHjlCW&tk=TrIGlsAWO8NY
-黄金华剧台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=ekccE4&tk=TrIGlsAWO8NY
-PopC电影台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=dK8UNw&tk=TrIGlsAWO8NY
-Now新闻台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=SptPCb&tk=TrIGlsAWO8NY
-Now爆谷台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=w24mpA&tk=TrIGlsAWO8NY
-Now星影台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=B86OhD&tk=TrIGlsAWO8NY
-Now华剧台,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=GvsPG9&tk=TrIGlsAWO8NY
-CM+,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=NZvGfM&tk=TrIGlsAWO8NY
-E乐,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=R6qgNA&tk=TrIGlsAWO8NY
-佳乐,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=1ZFfF9&tk=TrIGlsAWO8NY
-🌹极速台湾,#genre#
-中天新闻,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=eV0TzF&tk=TrIGlsAWO8NY
-寰宇新闻,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=1khosX&tk=TrIGlsAWO8NY
-中视新闻,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=TBvkyw&tk=TrIGlsAWO8NY
-TVBS HD,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=yx4CHp&tk=TrIGlsAWO8NY
-🌹极速电影,#genre#
-星空卫视,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=9APvFc&tk=TrIGlsAWO8NY
-凤凰电影,http://kkk.888.3116598.xyz/api.php?n=HKTV&id=ZWLBZT&tk=TrIGlsAWO8NY
-极限电影台,被删除http://kkk.888.3116598.xyz/api.php?n=HKTV&id=2qq7vP&tk=TrIGlsAWO8NY被删除
+
 
 
 💓港澳台📶,#genre#
