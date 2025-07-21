@@ -1363,44 +1363,7 @@ Bein 6 Sports,http://weixin.qq.home.kg/smtv.php?id=bein6_mega
 Bein 7 Sports,http://weixin.qq.home.kg/smtv.php?id=bein7_mega
 Rugby Pass TV,http://weixin.qq.home.kg/smtv.php?id=Rugbypasstv
 BolaArena 2,http://weixin.qq.home.kg/smtv.php?id=Bolaarena2
-印度 Indian,#genre#
-Sun TV HD,http://weixin.qq.home.kg/smtv.php?id=Suntv
-Star Vijay,http://weixin.qq.home.kg/smtv.php?id=Starvijay
-Colors Tamil,http://weixin.qq.home.kg/smtv.php?id=Colorstam_mega
-Sun Music,http://weixin.qq.home.kg/smtv.php?id=Sunmusic
-Astro Sunlife,http://weixin.qq.home.kg/smtv.php?id=Sunlife
-Astro Vaanavil,http://weixin.qq.home.kg/smtv.php?id=Vaanavil
-Zee Tamil,http://weixin.qq.home.kg/smtv.php?id=Zeetamil
-Zee Business,http://weixin.qq.home.kg/smtv.php?id=Zeebusiness
-News 18 Tamil,http://weixin.qq.home.kg/smtv.php?id=news18tamil_raj
-Adithya,http://weixin.qq.home.kg/smtv.php?id=Adithya
-Makkal TV,http://weixin.qq.home.kg/smtv.php?id=Makkaltv
-Zee Action,http://weixin.qq.home.kg/smtv.php?id=Zeeaction
-Astro KTV,http://weixin.qq.home.kg/smtv.php?id=Astroktv
-Zee TV HD,http://weixin.qq.home.kg/smtv.php?id=Zeetvhd
-Zee Cinema HD,http://weixin.qq.home.kg/smtv.php?id=Zeecinemahd
-Color HD,http://weixin.qq.home.kg/smtv.php?id=Colorhd
-Starplus HD,http://weixin.qq.home.kg/smtv.php?id=Starplushd
-Picture HD,http://weixin.qq.home.kg/smtv.php?id=Npicture
-Zee News,http://weixin.qq.home.kg/smtv.php?id=Zeenews
-Asianet,http://weixin.qq.home.kg/smtv.php?id=asianet_raj
-Asianet News,http://weixin.qq.home.kg/smtv.php?id=asianetnews_raj
-Times Now,http://weixin.qq.home.kg/smtv.php?id=timesnow_mega
-BBC Earth Tamil,http://weixin.qq.home.kg/smtv.php?id=bbcearthtam_raj
-Discovery World Tamil,http://weixin.qq.home.kg/smtv.php?id=discoveryworldtam_raj
-History Tamil,http://weixin.qq.home.kg/smtv.php?id=historytam_raj
-NatGeo Tamil,http://weixin.qq.home.kg/smtv.php?id=natgeotamil_raj
-Natgeo Wild Tamil,http://weixin.qq.home.kg/smtv.php?id=natgeowildtamil_raj
-Discovery Kids Tamil,http://weixin.qq.home.kg/smtv.php?id=discoverykidtamil_raj
-Discovery Tamil,http://weixin.qq.home.kg/smtv.php?id=discoverytamil_raj
-Sony Yay Tamil,http://weixin.qq.home.kg/smtv.php?id=sonyyaytam_raj
-Sun TV India,http://weixin.qq.home.kg/smtv.php?id=suntv_raj
-Starmaa HD,http://weixin.qq.home.kg/smtv.php?id=starmaa_raj
-Starmaa Movies HD,http://weixin.qq.home.kg/smtv.php?id=starmaamovies_raj
-Bollyone,http://weixin.qq.home.kg/smtv.php?id=Bollyone
-Astro Sunmusic,http://weixin.qq.home.kg/smtv.php?id=Sunmusic
-Sony Pix HD,http://weixin.qq.home.kg/smtv.php?id=sonypix_mega
-Vijay Super,http://weixin.qq.home.kg/smtv.php?id=vijaysuper_raj
+
 ❤️電影 Movie,#genre#
 AXN,http://weixin.qq.home.kg/smtv.php?id=axn_twn
 Animax,http://weixin.qq.home.kg/smtv.php?id=Animax
@@ -1723,50 +1686,8 @@ Vasantham,http://haoyunlai.serv00.net/Smartv-1.php?id=Vasantham
 Vasantham(備用),http://haoyunlai.serv00.net/Smartv-1.php?id=Vasantham_mega
 CNA,http://haoyunlai.serv00.net/Smartv-1.php?id=cna
 CNA(備用),http://haoyunlai.serv00.net/Smartv-1.php?id=cna_twn
-印尼 Indonesia,#genre#
-TVRI National,http://haoyunlai.serv00.net/Smartv-1.php?id=TVRI
-RCTI,http://haoyunlai.serv00.net/Smartv-1.php?id=Rcti
-Kompass TV,http://haoyunlai.serv00.net/Smartv-1.php?id=Kompass
-Berita Satu,http://haoyunlai.serv00.net/Smartv-1.php?id=BeritaSatu_eko
-Indosiar HD,http://haoyunlai.serv00.net/Smartv-1.php?id=Indosiar
-AnTV,http://haoyunlai.serv00.net/Smartv-1.php?id=Antv
-MNC TV,http://haoyunlai.serv00.net/Smartv-1.php?id=Mnctv
-Trans 7,http://haoyunlai.serv00.net/Smartv-1.php?id=Trans7_eko
-Transtv,http://haoyunlai.serv00.net/Smartv-1.php?id=Transtv
-JTV,http://haoyunlai.serv00.net/Smartv-1.php?id=JTV_eko
-Metro TV,http://haoyunlai.serv00.net/Smartv-1.php?id=metrotv_eko
-Cinemax,http://haoyunlai.serv00.net/Smartv-1.php?id=Cinemax
-SCTV,http://haoyunlai.serv00.net/Smartv-1.php?id=SCTV
-Tvone,http://haoyunlai.serv00.net/Smartv-1.php?id=Tvone
-TVMU,http://haoyunlai.serv00.net/Smartv-1.php?id=TVMU_eko
-GTV,http://haoyunlai.serv00.net/Smartv-1.php?id=Gtv
-RTV,http://haoyunlai.serv00.net/Smartv-1.php?id=Rtv
-Jak TV,http://haoyunlai.serv00.net/Smartv-1.php?id=JakTV
-iNews TV,http://haoyunlai.serv00.net/Smartv-1.php?id=Inewstv
-Daai TV,http://haoyunlai.serv00.net/Smartv-1.php?id=DaaiTV
-Net TV,http://haoyunlai.serv00.net/Smartv-1.php?id=NetTV
-Animax,http://haoyunlai.serv00.net/Smartv-1.php?id=Animax
-EWTN,http://haoyunlai.serv00.net/Smartv-1.php?id=Ewtn
-AlQuran AlKareem,http://haoyunlai.serv00.net/Smartv-1.php?id=AlQuran
-Tawaf TV,http://haoyunlai.serv00.net/Smartv-1.php?id=TawafTV
-Vision Prime,http://haoyunlai.serv00.net/Smartv-1.php?id=VisionPrime
-Muslim TV,http://haoyunlai.serv00.net/Smartv-1.php?id=MuslimTV
-Music TV,http://haoyunlai.serv00.net/Smartv-1.php?id=MusicTV
-Lifestyle&Fashion,http://haoyunlai.serv00.net/Smartv-1.php?id=Lifestyle
-Entertain,http://haoyunlai.serv00.net/Smartv-1.php?id=Entertain
-Hits,http://haoyunlai.serv00.net/Smartv-1.php?id=Hits
-Warner TV,http://haoyunlai.serv00.net/Smartv-1.php?id=WarnerTV
-SCM,http://haoyunlai.serv00.net/Smartv-1.php?id=Weishimovie
-Thrill,http://haoyunlai.serv00.net/Smartv-1.php?id=Thrill
-Fight Sports,http://haoyunlai.serv00.net/Smartv-1.php?id=Fs
-Beinsports 2 HD,http://haoyunlai.serv00.net/Smartv-1.php?id=Bein2hd
-Hits Movie,http://haoyunlai.serv00.net/Smartv-1.php?id=Hitsmovie
-One,http://haoyunlai.serv00.net/Smartv-1.php?id=One_mega
-tvN Movie,http://haoyunlai.serv00.net/Smartv-1.php?id=Tvnmovie
-Celestial Movies HD,http://haoyunlai.serv00.net/Smartv-1.php?id=Celestialindo
-Rock Actions,http://haoyunlai.serv00.net/Smartv-1.php?id=Rockaction
-Rock Entertainment,http://haoyunlai.serv00.net/Smartv-1.php?id=Rockentertain
-香港 Hongkong,#genre#
+
+❤️香港 Hongkong,#genre#
 J2(備用),http://haoyunlai.serv00.net/Smartv-1.php?id=j2_hkdavid
 J2,http://haoyunlai.serv00.net/Smartv-1.php?id=j2_twn
 RHK 31,http://haoyunlai.serv00.net/Smartv-1.php?id=rhk31_twn
@@ -1818,7 +1739,7 @@ CCTV-17,http://haoyunlai.serv00.net/Smartv-1.php?id=cctv17
 東方衛視,http://haoyunlai.serv00.net/Smartv-1.php?id=dongfangweishi_twn
 CGTN,http://haoyunlai.serv00.net/Smartv-1.php?id=CGTN
 鳳凰資訊,http://haoyunlai.serv00.net/Smartv-1.php?id=phoenixinfo_hd
-體育 Sports,#genre#
+❤️體育 Sports,#genre#
 Supersports 1,http://haoyunlai.serv00.net/Smartv-1.php?id=Assp1
 Supersports 1(備用),http://haoyunlai.serv00.net/Smartv-1.php?id=go_assp1
 Supersportq 1(備用2),http://haoyunlai.serv00.net/Smartv-1.php?id=Assp1_mega
@@ -1878,45 +1799,7 @@ Bein 6 Sports,http://haoyunlai.serv00.net/Smartv-1.php?id=bein6_mega
 Bein 7 Sports,http://haoyunlai.serv00.net/Smartv-1.php?id=bein7_mega
 Rugby Pass TV,http://haoyunlai.serv00.net/Smartv-1.php?id=Rugbypasstv
 BolaArena 2,http://haoyunlai.serv00.net/Smartv-1.php?id=Bolaarena2
-印度 Indian,#genre#
-Sun TV HD,http://haoyunlai.serv00.net/Smartv-1.php?id=Suntv
-Star Vijay,http://haoyunlai.serv00.net/Smartv-1.php?id=Starvijay
-Colors Tamil,http://haoyunlai.serv00.net/Smartv-1.php?id=Colorstam_mega
-Sun Music,http://haoyunlai.serv00.net/Smartv-1.php?id=Sunmusic
-Astro Sunlife,http://haoyunlai.serv00.net/Smartv-1.php?id=Sunlife
-Astro Vaanavil,http://haoyunlai.serv00.net/Smartv-1.php?id=Vaanavil
-Zee Tamil,http://haoyunlai.serv00.net/Smartv-1.php?id=Zeetamil
-Zee Business,http://haoyunlai.serv00.net/Smartv-1.php?id=Zeebusiness
-News 18 Tamil,http://haoyunlai.serv00.net/Smartv-1.php?id=news18tamil_raj
-Adithya,http://haoyunlai.serv00.net/Smartv-1.php?id=Adithya
-Makkal TV,http://haoyunlai.serv00.net/Smartv-1.php?id=Makkaltv
-Zee Action,http://haoyunlai.serv00.net/Smartv-1.php?id=Zeeaction
-Astro KTV,http://haoyunlai.serv00.net/Smartv-1.php?id=Astroktv
-Zee TV HD,http://haoyunlai.serv00.net/Smartv-1.php?id=Zeetvhd
-Zee Cinema HD,http://haoyunlai.serv00.net/Smartv-1.php?id=Zeecinemahd
-Color HD,http://haoyunlai.serv00.net/Smartv-1.php?id=Colorhd
-Starplus HD,http://haoyunlai.serv00.net/Smartv-1.php?id=Starplushd
-Picture HD,http://haoyunlai.serv00.net/Smartv-1.php?id=Npicture
-Zee News,http://haoyunlai.serv00.net/Smartv-1.php?id=Zeenews
-Asianet,http://haoyunlai.serv00.net/Smartv-1.php?id=asianet_raj
-Asianet News,http://haoyunlai.serv00.net/Smartv-1.php?id=asianetnews_raj
-Times Now,http://haoyunlai.serv00.net/Smartv-1.php?id=timesnow_mega
-BBC Earth Tamil,http://haoyunlai.serv00.net/Smartv-1.php?id=bbcearthtam_raj
-Discovery World Tamil,http://haoyunlai.serv00.net/Smartv-1.php?id=discoveryworldtam_raj
-History Tamil,http://haoyunlai.serv00.net/Smartv-1.php?id=historytam_raj
-NatGeo Tamil,http://haoyunlai.serv00.net/Smartv-1.php?id=natgeotamil_raj
-Natgeo Wild Tamil,http://haoyunlai.serv00.net/Smartv-1.php?id=natgeowildtamil_raj
-Discovery Kids Tamil,http://haoyunlai.serv00.net/Smartv-1.php?id=discoverykidtamil_raj
-Discovery Tamil,http://haoyunlai.serv00.net/Smartv-1.php?id=discoverytamil_raj
-Sony Yay Tamil,http://haoyunlai.serv00.net/Smartv-1.php?id=sonyyaytam_raj
-Sun TV India,http://haoyunlai.serv00.net/Smartv-1.php?id=suntv_raj
-Starmaa HD,http://haoyunlai.serv00.net/Smartv-1.php?id=starmaa_raj
-Starmaa Movies HD,http://haoyunlai.serv00.net/Smartv-1.php?id=starmaamovies_raj
-Bollyone,http://haoyunlai.serv00.net/Smartv-1.php?id=Bollyone
-Astro Sunmusic,http://haoyunlai.serv00.net/Smartv-1.php?id=Sunmusic
-Sony Pix HD,http://haoyunlai.serv00.net/Smartv-1.php?id=sonypix_mega
-Vijay Super,http://haoyunlai.serv00.net/Smartv-1.php?id=vijaysuper_raj
-電影 Movie,#genre#
+❤️電影 Movie,#genre#
 AXN,http://haoyunlai.serv00.net/Smartv-1.php?id=axn_twn
 Animax,http://haoyunlai.serv00.net/Smartv-1.php?id=Animax
 Astrol Kplus,http://haoyunlai.serv00.net/Smartv-1.php?id=Kplus
@@ -2031,7 +1914,7 @@ Thairath,http://haoyunlai.serv00.net/Smartv-1.php?id=thairath_pat
 Tnn24,http://haoyunlai.serv00.net/Smartv-1.php?id=tnn24_pat
 Workpoint,http://haoyunlai.serv00.net/Smartv-1.php?id=workpoint_pat
 tpbs,http://haoyunlai.serv00.net/Smartv-1.php?id=tpbs_pat
-英國 United Kingdom,#genre#
+❤️英國 United Kingdom,#genre#
 Al-Jazeera,http://haoyunlai.serv00.net/Smartv-1.php?id=aljazeera_twn
 Animal Planet (Eng),http://haoyunlai.serv00.net/Smartv-1.php?id=AnimalPlanet
 Axn HD,http://haoyunlai.serv00.net/Smartv-1.php?id=Axn
@@ -2079,20 +1962,7 @@ Thrill,http://haoyunlai.serv00.net/Smartv-1.php?id=Thrill
 Warner TV,http://haoyunlai.serv00.net/Smartv-1.php?id=WarnerTV
 itv 1,http://haoyunlai.serv00.net/Smartv-1.php?id=itv1_antik
 itv 2,http://haoyunlai.serv00.net/Smartv-1.php?id=itv2_antik
-越南 Vietnam,#genre#
-ANTV,http://haoyunlai.serv00.net/Smartv-1.php?id=viet_antv
-BPTV 2,http://haoyunlai.serv00.net/Smartv-1.php?id=viet_bptv2
-BRT HD,http://haoyunlai.serv00.net/Smartv-1.php?id=viet_brt
-Ca Mau TV,http://haoyunlai.serv00.net/Smartv-1.php?id=viet_camautv
-Danang TV1 HD,http://haoyunlai.serv00.net/Smartv-1.php?id=viet_danangtv1
-Danang TV2 HD,http://haoyunlai.serv00.net/Smartv-1.php?id=viet_danangtv2
-HBTV HD,http://haoyunlai.serv00.net/Smartv-1.php?id=viet_hbtv
-HTV 7,http://haoyunlai.serv00.net/Smartv-1.php?id=viet_htv7
-HTV 9,http://haoyunlai.serv00.net/Smartv-1.php?id=viet_htv9
-PTTH 1,http://haoyunlai.serv00.net/Smartv-1.php?id=viet_ptth1
-VTV 1,http://haoyunlai.serv00.net/Smartv-1.php?id=viet_vtv1
-VTV 7,http://haoyunlai.serv00.net/Smartv-1.php?id=viet_vtv7
-韓國 Korea,#genre#
+❤️韓國 Korea,#genre#
 All the Kpop,http://haoyunlai.serv00.net/Smartv-1.php?id=allthekpop_korea
 Apps TV,http://haoyunlai.serv00.net/Smartv-1.php?id=appongoogle_korea
 Arirang HD,http://haoyunlai.serv00.net/Smartv-1.php?id=arirang_korea
@@ -2127,7 +1997,7 @@ TOKYOMX,http://haoyunlai.serv00.net/Smartv-1.php?id=tokyomx_japan
 テレビ東京 Tokyo TV,http://haoyunlai.serv00.net/Smartv-1.php?id=tokyotv_japan
 
 
-AK47源,#genre#
+❤️AK47源,#genre#
 
 
 
