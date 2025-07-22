@@ -1493,7 +1493,7 @@ Thrill,http://weixin.qq.home.kg/smtv.php?id=Thrill
 Warner TV,http://weixin.qq.home.kg/smtv.php?id=WarnerTV
 itv 1,http://weixin.qq.home.kg/smtv.php?id=itv1_antik
 itv 2,http://weixin.qq.home.kg/smtv.php?id=itv2_antik
-越南 Vietnam,#genre#
+❤️越南 Vietnam,#genre#
 ANTV,http://weixin.qq.home.kg/smtv.php?id=viet_antv
 BPTV 2,http://weixin.qq.home.kg/smtv.php?id=viet_bptv2
 BRT HD,http://weixin.qq.home.kg/smtv.php?id=viet_brt
@@ -1592,7 +1592,7 @@ CN卡通,http://haoyunlai.serv00.net/Smartv-1.php?id=momo1_twn
 龍華洋片,http://haoyunlai.serv00.net/Smartv-1.php?id=lunghuawestern_twn
 龍華經典,http://haoyunlai.serv00.net/Smartv-1.php?id=lunghuajingdian_twn
 龍華電影,http://haoyunlai.serv00.net/Smartv-1.php?id=xingwei_movie
-馬來西亞 Malaysia,#genre#
+❤️馬來西亞 Malaysia,#genre#
 TV1,http://haoyunlai.serv00.net/Smartv-1.php?id=TV1
 TV1(備用),http://haoyunlai.serv00.net/Smartv-1.php?id=TV1_backup
 TV2,http://haoyunlai.serv00.net/Smartv-1.php?id=TV2
@@ -1836,7 +1836,7 @@ tvN Movie,http://haoyunlai.serv00.net/Smartv-1.php?id=Tvnmovie
 美亞電影,http://haoyunlai.serv00.net/Smartv-1.php?id=meiyamovie_twn
 龍華洋片,http://haoyunlai.serv00.net/Smartv-1.php?id=lunghuawestern_twn
 龍祥时代,http://haoyunlai.serv00.net/Smartv-1.php?id=lungxiangtime_twn
-紀錄 Documentary,#genre#
+❤️紀錄 Documentary,#genre#
 AFC 亞洲旅遊台,http://haoyunlai.serv00.net/Smartv-1.php?id=asiatravel_twn
 Animal Planet (Eng),http://haoyunlai.serv00.net/Smartv-1.php?id=AnimalPlanet
 Animal_Planet,http://haoyunlai.serv00.net/Smartv-1.php?id=animalplanet_twn
@@ -1859,7 +1859,7 @@ TLC,http://haoyunlai.serv00.net/Smartv-1.php?id=Tlc
 TLC Asia,http://haoyunlai.serv00.net/Smartv-1.php?id=tlc_twn
 亞洲美食,http://haoyunlai.serv00.net/Smartv-1.php?id=afc_twn
 美食星球,http://haoyunlai.serv00.net/Smartv-1.php?id=foodplanet_twn
-新聞 News,#genre#
+❤️新聞 News,#genre#
 ABC News,http://haoyunlai.serv00.net/Smartv-1.php?id=abcnews_glo
 Al-Jazeera,http://haoyunlai.serv00.net/Smartv-1.php?id=aljazeera_twn
 BBC World News,http://haoyunlai.serv00.net/Smartv-1.php?id=Bbcnews
@@ -1878,7 +1878,7 @@ France 24,http://haoyunlai.serv00.net/Smartv-1.php?id=france24_twn
 NHK World,http://haoyunlai.serv00.net/Smartv-1.php?id=nhkworld_japan
 Skynews,http://haoyunlai.serv00.net/Smartv-1.php?id=skynews_antik
 東森財經新聞,http://haoyunlai.serv00.net/Smartv-1.php?id=ettvcaijing_twn
-兒童 Kids,#genre#
+❤️兒童 Kids,#genre#
 Animax,http://haoyunlai.serv00.net/Smartv-1.php?id=Animax
 Baby TV Eng,http://haoyunlai.serv00.net/Smartv-1.php?id=Babytv
 Baby TV,http://haoyunlai.serv00.net/Smartv-1.php?id=babytv_twn
@@ -1980,7 +1980,7 @@ YTN Korean,http://haoyunlai.serv00.net/Smartv-1.php?id=ytnkorean_korea
 YTN Science,http://haoyunlai.serv00.net/Smartv-1.php?id=ytnscience_korea
 YTN,http://haoyunlai.serv00.net/Smartv-1.php?id=ytn_korea
 Yonhap News,http://haoyunlai.serv00.net/Smartv-1.php?id=yonhapnews_korea
-日本 Japan,#genre#
+❤️日本 Japan,#genre#
 BS-TBS,http://haoyunlai.serv00.net/Smartv-1.php?id=bstbs_japan
 BSジャパン 181,http://haoyunlai.serv00.net/Smartv-1.php?id=bs181_japan
 BSフジ BS Fuji,http://haoyunlai.serv00.net/Smartv-1.php?id=bsfuji_japan
