@@ -1151,6 +1151,8 @@ UK: Sky Sports Main Event,http://vocotv.pro//revol/revol/276918
 UK: : Sky Sports Football,http://vocotv.pro//revol/revol/276924
 UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 
+
+❤️咪咕直播test2,#genre#
 咪咕视频_8M1080_咪视通-1,http://xiaoya.crccxw.top:35455/itv/3000000001000005308.m3u8?cdn=FifastbLive
 咪咕视频_8M1080_咪视通-2,http://xiaoya.crccxw.top:35455/itv/3000000001000005969.m3u8?cdn=FifastbLive
 咪咕视频_8M1080_咪视通-3,http://xiaoya.crccxw.top:35455/itv/3000000001000007218.m3u8?cdn=FifastbLive
