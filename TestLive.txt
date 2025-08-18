@@ -843,7 +843,7 @@ ImpactWrestling,https://d2p372oxiwmcn1.cloudfront.net/hls/1080p/playlist.m3u8
 
 
 💝咪咕备用,#genre#
-咪咕体育46,http://39.135.134.67/000000001000/3000000001000028638/index.m3u8
+咪咕体育46,http://xiaoya.crccxw.top:35455/000000001000/3000000001000028638/index.m3u8
 咪咕体育47,http://39.135.134.67/000000001000/3000000001000008379/index.m3u8
 咪咕体育48,http://39.135.134.67/000000001000/3000000001000008001/index.m3u8
 咪咕体育49,http://39.135.134.67/000000001000/3000000001000031494/index.m3u8
@@ -1048,6 +1048,7 @@ UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 -咪视通-45,http://123.57.251.116:35455/itv/3000000010000031669.m3u8?cdn=FifastbLive
 
 咪咕1,http://xiaoya.crccxw.top:35455/itv/3000000001000005308.m3u8?cdn=FifastbLive
+
 
 
 
