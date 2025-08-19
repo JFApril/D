@@ -765,7 +765,39 @@ RHK 32,http://api.mg.itv888.cn:8080/hls/18c550eab1e/index.m3
 凤凰资讯,http://api.mg.itv888.cn:8080/hls/11ef1dc70d8/index.m3u8
 Viu6,http://api.mg.itv888.cn:8080/hls/0408f039a12/index.m3u8
 
-
+📺douyin港台,#genre#
+FTV综艺,http://push-rtmp-hs-spe-f5.douyincdn.com/live/1234567890-mszyt.flv
+东森LIVE,http://push-rtmp-hs-spe-f5.douyincdn.com/live/1234567890-dsxw.flv
+东森财经新闻,http://push-rtmp-hs-spe-f5.douyincdn.com/live/1234567890-dscjxw.flv
+凤凰中文,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_fhzw.flv
+凤凰中文,http://push-rtmp-hs-spe-f5.douyincdn.com/live/fhwszwt-012346789.flv
+凤凰咨询,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_fhzx.flv
+凤凰咨询,http://push-rtmp-hs-spe-f5.douyincdn.com/live/fhwszxt-012346789.flv
+中天亚洲台,http://push-rtmp-hs-spe-f5.douyincdn.com/live/1234567890-ztyzt.flv
+Now星影,http://push-rtmp-hs-spe-f5.douyincdn.com/live/xiangjiaoge1f3s131fs3f1.flv
+viuTV6,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_viutv6.flv
+中天亚洲,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_ztyz.flv
+重温经典,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_cwjd.flv
+TVBS,http://push-rtmp-hs-spe-f5.douyincdn.com/live/1234567890-tvbs.flv
+TVBS新闻台,http://push-rtmp-hs-spe-f5.douyincdn.com/live/1234567890-tvbsxwt.flv
+V6香港,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_j2.flv
+翡翠台,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_jade.flv
+凤凰香港,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_fhxg.flv
+香港HOY78,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_hoy78.flv
+明珠台,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_mz.flv
+无线新闻,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_wxxw.flv
+八大第一台,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_bddy.flv
+华视新闻资讯,http://push-rtmp-hs-spe-f5.douyincdn.com/live/1234567890-hsxw.flv
+民视,http://push-rtmp-hs-spe-f5.douyincdn.com/live/1234567890-ms.flv
+民视第一台,http://push-rtmp-hs-spe-f5.douyincdn.com/live/1234567890-msdyt.flv
+民视台湾台,http://push-rtmp-hs-spe-f5.douyincdn.com/live/1234567890-mstwt.flv
+民视新闻台,http://push-rtmp-hs-spe-f5.douyincdn.com/live/1234567890-msxwt.flv
+三立综合台,http://push-rtmp-hs-spe-f5.douyincdn.com/live/1234567890-slzh.flv
+中天新闻,http://push-rtmp-hs-spe-f5.douyincdn.com/live/1234567890-ztxwt.flv
+民视,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_ms.flv
+中天新闻,http://push-rtmp-hs-spe-f5.douyincdn.com/live/167ztyz.flv
+中天新闻,http://push-rtmp-hs-spe-f5.douyincdn.com/live/awei_ztxw1.flv
+中天娱乐,http://push-rtmp-hs-spe-f5.douyincdn.com/live/167ztyl.flv
 
 
 
@@ -1048,6 +1080,7 @@ UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 -咪视通-45,http://123.57.251.116:35455/itv/3000000010000031669.m3u8?cdn=FifastbLive
 
 咪咕1,http://xiaoya.crccxw.top:35455/itv/3000000001000005308.m3u8?cdn=FifastbLive
+
 
 
 
