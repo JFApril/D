@@ -954,7 +954,7 @@ CCTV1,http://106.52.196.79:80/TV/mui.php?id=cctv1
 CCTV2,http://106.52.196.79:80/TV/mui.php?id=cctv2
 CCTV3,http://106.52.196.79:80/TV/mui.php?id=cctv3
 CCTV4,http://106.52.196.79:80/TV/mui.php?id=cctv4
-CCTV5,http://106.52.196.79:80/TV/mui.php?id=cctv5
+CCTV5,http://go.bkpcp.top/mg/cctv5
 CCTV5+,http://go.bkpcp.top/mg/cctv5p
 CCTV5+,http://cdn6.bkpcp.top/tl/tuiliu.php?id=cctv5p
 CCTV6,http://106.52.196.79:80/TV/mui.php?id=cctv6
