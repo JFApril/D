@@ -919,62 +919,6 @@ CGTN,https://zby.130519.xyz/PLTV/11/224/3221226016/index.m3u8
 
 
 
-💝咪咕赛事,#genre#
-赛事播01,http://pan.taokee.vip:35455/itv/3000000001000005308.m3u8?cdn=FifastbLive
-赛事播02,http://pan.taokee.vip:35455/itv/3000000001000005969.m3u8?cdn=FifastbLive
-赛事播03,http://pan.taokee.vip:35455/itv/3000000001000007218.m3u8?cdn=FifastbLive
-赛事播04,http://pan.taokee.vip:35455/itv/3000000001000008001.m3u8?cdn=FifastbLive
-赛事播05,http://pan.taokee.vip:35455/itv/3000000001000008176.m3u8?cdn=FifastbLive
-赛事播06,http://pan.taokee.vip:35455/itv/3000000001000008379.m3u8?cdn=FifastbLive
-赛事播07,http://pan.taokee.vip:35455/itv/3000000001000010129.m3u8?cdn=FifastbLive
-赛事播08,http://pan.taokee.vip:35455/itv/3000000001000010948.m3u8?cdn=FifastbLive
-赛事播09,http://pan.taokee.vip:35455/itv/3000000001000026778.m3u8?cdn=FifastbLive
-赛事播10,http://pan.taokee.vip:35455/itv/3000000001000028638.m3u8?cdn=FifastbLive
-赛事播11,http://pan.taokee.vip:35455/itv/3000000001000031494.m3u8?cdn=FifastbLive
-赛事播12,http://pan.taokee.vip:35455/itv/3000000010000000097.m3u8?cdn=FifastbLive
-赛事播13,http://pan.taokee.vip:35455/itv/3000000010000002019.m3u8?cdn=FifastbLive
-赛事播14,http://pan.taokee.vip:35455/itv/3000000010000002032.m3u8?cdn=FifastbLive
-赛事播15,http://pan.taokee.vip:35455/itv/3000000010000002809.m3u8?cdn=FifastbLive
-赛事播16,http://pan.taokee.vip:35455/itv/3000000010000003915.m3u8?cdn=FifastbLive
-赛事播17,http://pan.taokee.vip:35455/itv/3000000010000004193.m3u8?cdn=FifastbLive
-赛事播18,http://pan.taokee.vip:35455/itv/3000000010000004464.m3u8?cdn=FifastbLive
-赛事播19,http://pan.taokee.vip:35455/itv/3000000010000005837.m3u8?cdn=FifastbLive
-赛事播20,http://pan.taokee.vip:35455/itv/3000000010000006077.m3u8?cdn=FifastbLive
-赛事播21,http://pan.taokee.vip:35455/itv/3000000010000006658.m3u8?cdn=FifastbLive
-赛事播22,http://pan.taokee.vip:35455/itv/3000000010000006944.m3u8?cdn=FifastbLive
-赛事播23,http://pan.taokee.vip:35455/itv/3000000010000007692.m3u8?cdn=FifastbLive
-赛事播24,http://pan.taokee.vip:35455/itv/3000000010000009788.m3u8?cdn=FifastbLive
-赛事播25,http://pan.taokee.vip:35455/itv/3000000010000010833.m3u8?cdn=FifastbLive
-赛事播26,http://pan.taokee.vip:35455/itv/3000000010000011112.m3u8?cdn=FifastbLive
-赛事播27,http://pan.taokee.vip:35455/itv/3000000010000011297.m3u8?cdn=FifastbLive
-赛事播28,http://pan.taokee.vip:35455/itv/3000000010000011518.m3u8?cdn=FifastbLive
-赛事播29,http://pan.taokee.vip:35455/itv/3000000010000011763.m3u8?cdn=FifastbLive
-赛事播30,http://pan.taokee.vip:35455/itv/3000000010000011873.m3u8?cdn=FifastbLive
-赛事播31,http://pan.taokee.vip:35455/itv/3000000010000012398.m3u8?cdn=FifastbLive
-赛事播32,http://pan.taokee.vip:35455/itv/3000000010000012450.m3u8?cdn=FifastbLive
-赛事播33,http://pan.taokee.vip:35455/itv/3000000010000012558.m3u8?cdn=FifastbLive
-赛事播34,http://pan.taokee.vip:35455/itv/3000000010000012616.m3u8?cdn=FifastbLive
-赛事播35,http://pan.taokee.vip:35455/itv/3000000010000015470.m3u8?cdn=FifastbLive
-赛事播36,http://pan.taokee.vip:35455/itv/3000000010000015560.m3u8?cdn=FifastbLive
-赛事播37,http://pan.taokee.vip:35455/itv/3000000010000017389.m3u8?cdn=FifastbLive
-赛事播38,http://pan.taokee.vip:35455/itv/3000000010000017678.m3u8?cdn=FifastbLive
-赛事播39,http://pan.taokee.vip:35455/itv/3000000010000017997.m3u8?cdn=FifastbLive
-赛事播40,http://pan.taokee.vip:35455/itv/3000000010000019380.m3u8?cdn=FifastbLive
-赛事播41,http://pan.taokee.vip:35455/itv/3000000010000019839.m3u8?cdn=FifastbLive
-赛事播42,http://pan.taokee.vip:35455/itv/3000000010000020168.m3u8?cdn=FifastbLive
-赛事播43,http://pan.taokee.vip:35455/itv/3000000010000021904.m3u8?cdn=FifastbLive
-赛事播44,http://pan.taokee.vip:35455/itv/3000000010000023434.m3u8?cdn=FifastbLive
-赛事播45,http://pan.taokee.vip:35455/itv/3000000010000024205.m3u8?cdn=FifastbLive
-赛事播46,http://pan.taokee.vip:35455/itv/3000000010000024691.m3u8?cdn=FifastbLive
-赛事播47,http://pan.taokee.vip:35455/itv/3000000010000025380.m3u8?cdn=FifastbLive
-赛事播48,http://pan.taokee.vip:35455/itv/3000000010000025943.m3u8?cdn=FifastbLive
-赛事播49,http://pan.taokee.vip:35455/itv/3000000010000027318.m3u8?cdn=FifastbLive
-赛事播50,http://pan.taokee.vip:35455/itv/3000000010000027638.m3u8?cdn=FifastbLive
-赛事播51,http://pan.taokee.vip:35455/itv/3000000010000027691.m3u8?cdn=FifastbLive
-赛事播52,http://pan.taokee.vip:35455/itv/3000000010000031669.m3u8?cdn=FifastbLive
-赛事播53,http://pan.taokee.vip:35455/itv/3000000010000032106.m3u8?cdn=FifastbLive
-赛事壹4K,http://pan.taokee.vip:35455/itv/3000000010000005180.m3u8?cdn=FifastbLive
-赛事贰4K,http://pan.taokee.vip:35455/itv/3000000010000015686.m3u8?cdn=FifastbLive
 
 
 
@@ -1273,6 +1217,7 @@ Ace
 咪视界27,http://120.197.253.254:1818/rtp/239.21.0.31:3464&HlsProfileId=Ace
 咪视界28,http://120.197.253.254:1818/rtp/239.21.0.32:3468&HlsProfileId=Ace
 咪视界29,http://120.197.253.254:1818/rtp/239.21.0.33:3472&HlsProfileId=Ace
+
 
 
 
