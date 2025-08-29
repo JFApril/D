@@ -1302,7 +1302,7 @@ UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 
 
 🌹咪视界,#genre#
-咪视界1,http://120.198.234.199:8088/000000001001/1.m3u8?cmcc_cid=PLTV/651/224/3221227678&HlsProfileId=Ace
+咪视界1,http://120.197.253.254:1818/000000001001/1.m3u8?cmcc_cid=PLTV/651/224/3221227678&HlsProfileId=Ace
 咪视界2,http://120.198.234.199:8088/000000001001/1.m3u8?cmcc_cid=PLTV/651/224/3221227827&HlsProfileId=Ace
 咪视界3,http://120.198.234.196:8088/000000001001/1.m3u8?cmcc_cid=PLTV/651/224/3221227831&HlsProfileId=Ace
 咪视界4,http://120.198.234.195:8088/000000001001/1.m3u8?cmcc_cid=PLTV/651/224/3221227835&HlsProfileId=Ace
@@ -1416,6 +1416,7 @@ Ace
 咪视界27,http://120.197.253.254:1818/rtp/239.21.0.31:3464&HlsProfileId=Ace
 咪视界28,http://120.197.253.254:1818/rtp/239.21.0.32:3468&HlsProfileId=Ace
 咪视界29,http://120.197.253.254:1818/rtp/239.21.0.33:3472&HlsProfileId=Ace
+
 
 
 
