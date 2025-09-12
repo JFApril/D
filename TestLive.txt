@@ -124,7 +124,7 @@ CHC家庭影院,https://iptv.luas.edu.cn/liverespath/449d51febadb152094085d373b9
 足球频道,http://nmglive.imfc.cn/5n1r1c/182396.m3u8
 
 💝黑龙江移动,#genre#
-CCTV-1 综合,http://ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221226016/index.m3u8
+CCTV-1 综合,http://ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221226016/index.m3u8?IASHttpSessionId=
 CCTV-2 财经,http://ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221225588/index.m3u8
 CCTV-3 综艺,http://ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221226021/index.m3u8
 CCTV-4 中文国际,http://ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221226428/index.m3u8
@@ -554,7 +554,7 @@ CETV1,http://[2409:8087:1a15:10d1::32]/ottrrs.hl.chinamobile.com/PLTV/88888888/2
 CETV2,http://[2409:8087:1a15:10d1::32]/ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221226425/index.m3u8?IASHttpSessionId=
 CETV4,http://[2409:8087:1a15:10d1::32]/ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221225783/index.m3u8?IASHttpSessionId=
 
-北京卫视,http://[2409:8087:1a15:10d1::32]/ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221226450/index.m3u8?IASHttpSessionId=、
+北京卫视,http://[2409:8087:1a15:10d1::32]/ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221226450/index.m3u8?IASHttpSessionId=
 湖南卫视,http://[2409:8087:1a15:10d1::32]/ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221226307/index.m3u8?IASHttpSessionId=
 东方卫视,http://[2409:8087:1a15:10d1::32]/ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221226345/index.m3u8?IASHttpSessionId=
 江苏卫视,http://[2409:8087:1a15:10d1::32]/ottrrs.hl.chinamobile.com/PLTV/88888888/224/3221226310/index.m3u8?IASHttpSessionId=
@@ -1252,7 +1252,7 @@ UK: : Sky Sports Football,http://vocotv.pro//revol/revol/276924
 UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 
 
-❤️咪咕直播test2,#genre#
+❤️咪咕直播,#genre#
 -咪视通-1,http://123.57.251.116:35455/itv/3000000001000005308.m3u8?cdn=FifastbLive
 -咪视通-2,http://123.57.251.116:35455/itv/3000000001000005969.m3u8?cdn=FifastbLive
 -咪视通-3,http://123.57.251.116:35455/itv/3000000001000007218.m3u8?cdn=FifastbLive
@@ -1616,6 +1616,7 @@ CETV2,http://nas.201606.xyz:4022/udp/239.11.0.246:5140
 CETV4,http://nas.201606.xyz:4022/udp/239.11.0.248:5140
 新动漫,http://nas.201606.xyz:4022/rtp/239.10.0.89:5140
 先锋乒羽,http://nas.201606.xyz:4022/rtp/239.10.0.90:5140
+
 
 
 
