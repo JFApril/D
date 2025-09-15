@@ -1331,7 +1331,7 @@ UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 
 咪咕1,http://xiaoya.crccxw.top:35455/itv/3000000001000005308.m3u8?cdn=FifastbLive
 
-🌹咪咕体育,#genre#
+🌹咪咕体育V6,#genre#
 咪咕体育1,https://stream1.freetv.fun/ipv6-mi-gu-ti-yu-1-1.m3u8
 咪咕体育2,https://stream1.freetv.fun/ipv6-mi-gu-ti-yu-2-1.m3u8
 咪咕体育3,https://stream1.freetv.fun/ipv6-mi-gu-ti-yu-3-1.m3u8
