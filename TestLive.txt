@@ -992,6 +992,16 @@ UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 
 
 🌹ddbgh咪咕,#genre#
+
+赛事咪咕播01,https://zby.130519.xyz/PLTV/11/224/3221225636/index.m3u8
+赛事咪咕播02,https://zby.130519.xyz/PLTV/11/224/3221225637/index.m3u8
+赛事咪咕播03,https://zby.130519.xyz/PLTV/11/224/3221225638/index.m3u8
+赛事咪咕播04,https://zby.130519.xyz/PLTV/11/224/3221225639/index.m3u8
+赛事咪咕播05,https://zby.130519.xyz/PLTV/11/224/3221225640/index.m3u8
+赛事咪咕播06,https://zby.130519.xyz/PLTV/11/224/3221225641/index.m3u8
+赛事咪咕播07,https://zby.130519.xyz/PLTV/11/224/3221225643/index.m3u8
+赛事咪咕播08,https://zby.130519.xyz/PLTV/11/224/3221225644/index.m3u8
+赛事咪咕播09,https://zby.130519.xyz/PLTV/11/224/3221225646/index.m3u8
 赛事咪咕播10,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000001000031494&/PLTV/&$8M FHD
 赛事咪咕播11,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000010000000097&/PLTV/&$5M FHD
 赛事咪咕播12,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000010000002019&/PLTV/&$5M FHD
