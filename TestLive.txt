@@ -943,6 +943,39 @@ UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 
 
 🌹咪视界,#genre#
+
+咪视界01,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235557/1.m3u8
+咪视界02,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235558/1.m3u8
+咪视界03,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235559/1.m3u8
+咪视界04,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235560/1.m3u8
+咪视界05,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235561/1.m3u8
+咪视界06,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235562/1.m3u8
+咪视界07,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235563/1.m3u8
+咪视界08,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235564/1.m3u8
+咪视界09,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235565/1.m3u8
+咪视界10,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235566/1.m3u8
+咪视界11,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235567/1.m3u8
+咪视界12,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235568/1.m3u8
+咪视界13,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235569/1.m3u8
+咪视界14,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235570/1.m3u8
+咪视界15,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235571/1.m3u8
+咪视界16,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235572/1.m3u8
+咪视界17,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235573/1.m3u8
+咪视界18,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235574/1.m3u8
+咪视界19,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235575/1.m3u8
+咪视界20,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235577/1.m3u8
+咪视界21,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235578/1.m3u8
+咪视界22,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235580/1.m3u8
+咪视界23,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235581/1.m3u8
+咪视界24,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235582/1.m3u8
+咪视界25,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235584/1.m3u8
+咪视界26,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235585/1.m3u8
+咪视界27,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235586/1.m3u8
+咪视界28,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235587/1.m3u8
+咪视界29,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235588/1.m3u8
+咪视界30,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235589/1.m3u8
+咪视界4K,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235583/1.m3u8
+
 咪视通-1,http://iptv.hn.cn:1258/itv/3000000001000005308.m3u8?cdn=FifastbLive  
 咪视通-2,http://iptv.hn.cn:1258/itv/3000000001000005969.m3u8?cdn=FifastbLive  
 咪视通-3,http://iptv.hn.cn:1258/itv/3000000001000007218.m3u8?cdn=FifastbLive  
@@ -1032,6 +1065,7 @@ UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 赛事咪咕播37,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000020000011522&/PLTV/&$8M FHD
 赛事咪咕播4k,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000010000005180&/PLTV/&$32M UHD
 赛事至臻视界,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000010000015686&/PLTV/&$32M UHD
+
 
 
 
