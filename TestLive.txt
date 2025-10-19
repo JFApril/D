@@ -679,69 +679,6 @@ CGTN,https://zby.130519.xyz/PLTV/11/224/3221226016/index.m3u8
 睛彩广场舞,https://zby.130519.xyz/PLTV/11/224/3221226139/index.m3u8
 
 
-
-
-
-
-🍲咪咕央卫,#genre#
-CCTV1,http://106.52.196.79:80/TV/mui.php?id=cctv1
-CCTV2,http://106.52.196.79:80/TV/mui.php?id=cctv2
-CCTV3,http://106.52.196.79:80/TV/mui.php?id=cctv3
-CCTV4,http://106.52.196.79:80/TV/mui.php?id=cctv4
-CCTV5,http://go.bkpcp.top/mg/cctv5
-CCTV5+,http://go.bkpcp.top/mg/cctv5p
-CCTV5+,http://cdn6.bkpcp.top/tl/tuiliu.php?id=cctv5p
-CCTV6,http://106.52.196.79:80/TV/mui.php?id=cctv6
-CCTV7,http://106.52.196.79:80/TV/mui.php?id=cctv7
-CCTV8,http://106.52.196.79:80/TV/mui.php?id=cctv8
-CCTV9,http://106.52.196.79:80/TV/mui.php?id=cctv9
-CCTV10,http://106.52.196.79:80/TV/mui.php?id=cctv10
-CCTV11,http://106.52.196.79:80/TV/mui.php?id=cctv11
-CCTV12,http://106.52.196.79:80/TV/mui.php?id=cctv12
-CCTV13,http://106.52.196.79:80/TV/mui.php?id=cctv13
-CCTV14,http://106.52.196.79:80/TV/mui.php?id=cctv14
-CCTV15,http://106.52.196.79:80/TV/mui.php?id=cctv15
-CCTV17,http://106.52.196.79:80/TV/mui.php?id=cctv17
-东方卫视,http://106.52.196.79:80/TV/mui.php?id=dfws
-江苏卫视,http://106.52.196.79:80/TV/mui.php?id=jsws
-江西卫视,http://106.52.196.79:80/TV/mui.php?id=jxws
-海南卫视,http://106.52.196.79:80/TV/mui.php?id=hinws
-湖北卫视,http://106.52.196.79:80/TV/mui.php?id=hubws
-陕西卫视,http://106.52.196.79:80/TV/mui.php?id=sxws
-CHC动作电影,http://106.52.196.79:80/TV/mui.php?id=chcdz
-家庭影院,http://106.52.196.79:80/TV/mui.php?id=chcjt
-经典电影,http://106.52.196.79:80/TV/mui.php?id=jdxgdy
-游戏风云,http://106.52.196.79:80/TV/mui.php?id=yxfy
-杭州综合,http://106.52.196.79:80/TV/mui.php?id=hzzh
-杭州明珠,http://106.52.196.79:80/TV/mui.php?id=hzmz
-杭州生活,http://106.52.196.79:80/TV/mui.php?id=hzsh
-杭州影视,http://106.52.196.79:80/TV/mui.php?id=hzys
-杭州少体,http://106.52.196.79:80/TV/mui.php?id=hzse
-之江纪录,http://106.52.196.79:80/TV/mui.php?id=zjjl
-嵊泗综合,http://106.52.196.79:80/TV/mui.php?id=ssxwzh
-山东教育,http://106.52.196.79:80/TV/mui.php?id=sdjy
-cct4欧洲咪咕,http://106.52.196.79:80/TV/mui.php?id=cctv4o
-cct4美洲咪咕,http://106.52.196.79:80/TV/mui.php?id=cctv4m
-CGT西语咪咕,http://106.52.196.79:80/TV/mui.php?id=cgtne
-CGT阿语咪咕,http://106.52.196.79:80/TV/mui.php?id=cgtna
-CGT法语咪咕,http://106.52.196.79:80/TV/mui.php?id=cgtnf
-四海钓鱼咪咕,http://106.52.196.79:80/TV/mui.php?id=shdy
-军事大片咪咕,http://106.52.196.79:80/TV/mui.php?id=jsdp
-热剧联播咪咕,http://106.52.196.79:80/TV/mui.php?id=rjlb
-新片映厅咪咕,http://106.52.196.79:80/TV/mui.php?id=xpfyt
-Y+剧场台咪咕,http://106.52.196.79:80/TV/mui.php?id=yjjc
-熊猫高清咪咕,http://106.52.196.79:80/TV/mui.php?id=xmhd
-熊猫频壹咪咕,http://106.52.196.79:80/TV/mui.php?id=xm1
-熊猫频贰咪咕,http://106.52.196.79:80/TV/mui.php?id=xm2
-熊猫频叁咪咕,http://106.52.196.79:80/TV/mui.php?id=xm3
-熊猫频肆咪咕,http://106.52.196.79:80/TV/mui.php?id=xm4
-熊猫频伍咪咕,http://106.52.196.79:80/TV/mui.php?id=xm5
-熊猫频陆咪咕,http://106.52.196.79:80/TV/mui.php?id=xm6
-熊猫频柒咪咕,http://106.52.196.79:80/TV/mui.php?id=xm7
-熊猫频捌咪咕,http://106.52.196.79:80/TV/mui.php?id=xm8
-熊猫频玖咪咕,http://106.52.196.79:80/TV/mui.php?id=xm9
-熊猫频拾咪咕,http://106.52.196.79:80/TV/mui.php?id=xm10
-
 ❤️咪咕央卫2,#genre#
 CCTV1,http://go.bkpcp.top/mg/cctv1
 CCTV2,http://go.bkpcp.top/mg/cctv2
@@ -850,54 +787,6 @@ UK: : Sky Sports Football,http://vocotv.pro//revol/revol/276924
 UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 
 
-❤️咪咕直播,#genre#
--咪视通-1,http://123.57.251.116:35455/itv/3000000001000005308.m3u8?cdn=FifastbLive
--咪视通-2,http://123.57.251.116:35455/itv/3000000001000005969.m3u8?cdn=FifastbLive
--咪视通-3,http://123.57.251.116:35455/itv/3000000001000007218.m3u8?cdn=FifastbLive
--咪视通-4,http://123.57.251.116:35455/itv/3000000001000008001.m3u8?cdn=FifastbLive
--咪视通-5,http://123.57.251.116:35455/itv/3000000001000008176.m3u8?cdn=FifastbLive
--咪视通-6,http://123.57.251.116:35455/itv/3000000001000008379.m3u8?cdn=FifastbLive
--咪视通-7,http://123.57.251.116:35455/itv/3000000001000010129.m3u8?cdn=FifastbLive
--咪视通-8,http://123.57.251.116:35455/itv/3000000001000010948.m3u8?cdn=FifastbLive
--咪视通-9,http://123.57.251.116:35455/itv/3000000001000028638.m3u8?cdn=FifastbLive
--咪视通-10,http://123.57.251.116:35455/itv/3000000001000031494.m3u8?cdn=FifastbLive
--咪视通-11,http://123.57.251.116:35455/itv/3000000010000005837.m3u8?cdn=FifastbLive
--咪视通-12,http://123.57.251.116:35455/itv/3000000020000011518.m3u8?cdn=FifastbLive
--咪视通-13,http://123.57.251.116:35455/itv/3000000020000011519.m3u8?cdn=FifastbLive
--咪视通-14,http://123.57.251.116:35455/itv/3000000020000011520.m3u8?cdn=FifastbLive
--咪视通-15,http://123.57.251.116:35455/itv/3000000020000011521.m3u8?cdn=FifastbLive
--咪视通-16,http://123.57.251.116:35455/itv/3000000020000011522.m3u8?cdn=FifastbLive
--咪视通-17,http://123.57.251.116:35455/itv/3000000020000011523.m3u8?cdn=FifastbLive
--咪视通-18,http://123.57.251.116:35455/itv/3000000020000011524.m3u8?cdn=FifastbLive
--咪视通-19,http://123.57.251.116:35455/itv/3000000020000011525.m3u8?cdn=FifastbLive
--咪视通-20,http://123.57.251.116:35455/itv/3000000020000011528.m3u8?cdn=FifastbLive
--咪视通-21,http://123.57.251.116:35455/itv/3000000020000011529.m3u8?cdn=FifastbLive
--咪视通-22,http://123.57.251.116:35455/itv/3000000020000011530.m3u8?cdn=FifastbLive
--咪视通-23,http://123.57.251.116:35455/itv/3000000020000011531.m3u8?cdn=FifastbLive
--咪视通-24,http://123.57.251.116:35455/itv/3000000010000000097.m3u8?cdn=FifastbLive
--咪视通-25,http://123.57.251.116:35455/itv/3000000010000002019.m3u8?cdn=FifastbLive
--咪视通-26,http://123.57.251.116:35455/itv/3000000010000002809.m3u8?cdn=FifastbLive
--咪视通-27,http://123.57.251.116:35455/itv/3000000010000003915.m3u8?cdn=FifastbLive
--咪视通-28,http://123.57.251.116:35455/itv/3000000010000004193.m3u8?cdn=FifastbLive
--咪视通-29,http://123.57.251.116:35455/itv/3000000010000006077.m3u8?cdn=FifastbLive
--咪视通-30,http://123.57.251.116:35455/itv/3000000010000006658.m3u8?cdn=FifastbLive
--咪视通-31,http://123.57.251.116:35455/itv/3000000010000009788.m3u8?cdn=FifastbLive
--咪视通-32,http://123.57.251.116:35455/itv/3000000010000010833.m3u8?cdn=FifastbLive
--咪视通-33,http://123.57.251.116:35455/itv/3000000010000011297.m3u8?cdn=FifastbLive
--咪视通-34,http://123.57.251.116:35455/itv/3000000010000011518.m3u8?cdn=FifastbLive
--咪视通-35,http://123.57.251.116:35455/itv/3000000010000012558.m3u8?cdn=FifastbLive
--咪视通-36,http://123.57.251.116:35455/itv/3000000010000012616.m3u8?cdn=FifastbLive
--咪视通-37,http://123.57.251.116:35455/itv/3000000010000015470.m3u8?cdn=FifastbLive
--咪视通-38,http://123.57.251.116:35455/itv/3000000010000015560.m3u8?cdn=FifastbLive
--咪视通-39,http://123.57.251.116:35455/itv/3000000010000017678.m3u8?cdn=FifastbLive
--咪视通-40,http://123.57.251.116:35455/itv/3000000010000019839.m3u8?cdn=FifastbLive
--咪视通-41,http://123.57.251.116:35455/itv/3000000010000021904.m3u8?cdn=FifastbLive
--咪视通-42,http://123.57.251.116:35455/itv/3000000010000023434.m3u8?cdn=FifastbLive
--咪视通-43,http://123.57.251.116:35455/itv/3000000010000025380.m3u8?cdn=FifastbLive
--咪视通-44,http://123.57.251.116:35455/itv/3000000010000027691.m3u8?cdn=FifastbLive
--咪视通-45,http://123.57.251.116:35455/itv/3000000010000031669.m3u8?cdn=FifastbLive
-
-咪咕1,http://xiaoya.crccxw.top:35455/itv/3000000001000005308.m3u8?cdn=FifastbLive
 
 🌹咪咕体育V6,#genre#
 咪咕体育1,https://stream1.freetv.fun/ipv6-mi-gu-ti-yu-1-1.m3u8
@@ -942,85 +831,6 @@ UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 咪咕体育41,https://stream1.freetv.fun/ipv6-mi-gu-ti-yu-41-1.m3u8
 
 
-🌹咪视界,#genre#
-
-咪视界01,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235557/1.m3u8
-咪视界02,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235558/1.m3u8
-咪视界03,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235559/1.m3u8
-咪视界04,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235560/1.m3u8
-咪视界05,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235561/1.m3u8
-咪视界06,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235562/1.m3u8
-咪视界07,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235563/1.m3u8
-咪视界08,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235564/1.m3u8
-咪视界09,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235565/1.m3u8
-咪视界10,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235566/1.m3u8
-咪视界11,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235567/1.m3u8
-咪视界12,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235568/1.m3u8
-咪视界13,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235569/1.m3u8
-咪视界14,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235570/1.m3u8
-咪视界15,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235571/1.m3u8
-咪视界16,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235572/1.m3u8
-咪视界17,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235573/1.m3u8
-咪视界18,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235574/1.m3u8
-咪视界19,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235575/1.m3u8
-咪视界20,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235577/1.m3u8
-咪视界21,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235578/1.m3u8
-咪视界22,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235580/1.m3u8
-咪视界23,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235581/1.m3u8
-咪视界24,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235582/1.m3u8
-咪视界25,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235584/1.m3u8
-咪视界26,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235585/1.m3u8
-咪视界27,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235586/1.m3u8
-咪视界28,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235587/1.m3u8
-咪视界29,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235588/1.m3u8
-咪视界30,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235589/1.m3u8
-咪视界4K,http://hwltc.tv.cdn.zj.chinamobile.com/PLTV/88888888/224/3221235583/1.m3u8
-
-咪视通-1,http://iptv.hn.cn:1258/itv/3000000001000005308.m3u8?cdn=FifastbLive  
-咪视通-2,http://iptv.hn.cn:1258/itv/3000000001000005969.m3u8?cdn=FifastbLive  
-咪视通-3,http://iptv.hn.cn:1258/itv/3000000001000007218.m3u8?cdn=FifastbLive  
-咪视通-4,http://iptv.hn.cn:1258/itv/3000000001000008001.m3u8?cdn=FifastbLive  
-咪视通-5,http://iptv.hn.cn:1258/itv/3000000001000008176.m3u8?cdn=FifastbLive  
-咪视通-6,http://iptv.hn.cn:1258/itv/3000000001000008379.m3u8?cdn=FifastbLive  
-咪视通-7,http://iptv.hn.cn:1258/itv/3000000001000010129.m3u8?cdn=FifastbLive  
-咪视通-8,http://iptv.hn.cn:1258/itv/3000000001000010948.m3u8?cdn=FifastbLive  
-咪视通-9,http://iptv.hn.cn:1258/itv/3000000001000028638.m3u8?cdn=FifastbLive  
-咪视通-10,http://iptv.hn.cn:1258/itv/3000000001000031494.m3u8?cdn=FifastbLive  
-咪视通-11,http://iptv.hn.cn:1258/itv/3000000010000005837.m3u8?cdn=FifastbLive  
-咪视通-12,http://iptv.hn.cn:1258/itv/3000000020000011518.m3u8?cdn=FifastbLive  
-咪视通-13,http://iptv.hn.cn:1258/itv/3000000020000011519.m3u8?cdn=FifastbLive  
-咪视通-14,http://iptv.hn.cn:1258/itv/3000000020000011520.m3u8?cdn=FifastbLive  
-咪视通-15,http://iptv.hn.cn:1258/itv/3000000020000011521.m3u8?cdn=FifastbLive  
-咪视通-16,http://iptv.hn.cn:1258/itv/3000000020000011522.m3u8?cdn=FifastbLive  
-咪视通-17,http://iptv.hn.cn:1258/itv/3000000020000011523.m3u8?cdn=FifastbLive  
-咪视通-18,http://iptv.hn.cn:1258/itv/3000000020000011524.m3u8?cdn=FifastbLive  
-咪视通-19,http://iptv.hn.cn:1258/itv/3000000020000011525.m3u8?cdn=FifastbLive  
-咪视通-20,http://iptv.hn.cn:1258/itv/3000000020000011528.m3u8?cdn=FifastbLive  
-咪视通-21,http://iptv.hn.cn:1258/itv/3000000020000011529.m3u8?cdn=FifastbLive  
-咪视通-22,http://iptv.hn.cn:1258/itv/3000000020000011530.m3u8?cdn=FifastbLive  
-咪视通-23,http://iptv.hn.cn:1258/itv/3000000020000011531.m3u8?cdn=FifastbLive  
-咪视通-24,http://iptv.hn.cn:1258/itv/3000000010000000097.m3u8?cdn=FifastbLive  
-咪视通-25,http://iptv.hn.cn:1258/itv/3000000010000002019.m3u8?cdn=FifastbLive  
-咪视通-26,http://iptv.hn.cn:1258/itv/3000000010000002809.m3u8?cdn=FifastbLive  
-咪视通-27,http://iptv.hn.cn:1258/itv/3000000010000003915.m3u8?cdn=FifastbLive  
-咪视通-28,http://iptv.hn.cn:1258/itv/3000000010000004193.m3u8?cdn=FifastbLive  
-咪视通-29,http://iptv.hn.cn:1258/itv/3000000010000006077.m3u8?cdn=FifastbLive  
-咪视通-30,http://iptv.hn.cn:1258/itv/3000000010000006658.m3u8?cdn=FifastbLive  
-咪视通-31,http://iptv.hn.cn:1258/itv/3000000010000009788.m3u8?cdn=FifastbLive  
-咪视通-32,http://iptv.hn.cn:1258/itv/3000000010000010833.m3u8?cdn=FifastbLive  
-咪视通-33,http://iptv.hn.cn:1258/itv/3000000010000011297.m3u8?cdn=FifastbLive  
-咪视通-34,http://iptv.hn.cn:1258/itv/3000000010000011518.m3u8?cdn=FifastbLive  
-咪视通-35,http://iptv.hn.cn:1258/itv/3000000010000012558.m3u8?cdn=FifastbLive  
-咪视通-36,http://iptv.hn.cn:1258/itv/3000000010000012616.m3u8?cdn=FifastbLive  
-咪视通-37,http://iptv.hn.cn:1258/itv/3000000010000015470.m3u8?cdn=FifastbLive  
-咪视通-38,http://iptv.hn.cn:1258/itv/3000000010000015560.m3u8?cdn=FifastbLive  
-咪视通-39,http://iptv.hn.cn:1258/itv/3000000010000017678.m3u8?cdn=FifastbLive  
-咪视通-40,http://iptv.hn.cn:1258/itv/3000000010000019839.m3u8?cdn=FifastbLive  
-咪视通-41,http://iptv.hn.cn:1258/itv/3000000010000021904.m3u8?cdn=FifastbLive  
-咪视通-42,http://iptv.hn.cn:1258/itv/3000000010000023434.m3u8?cdn=FifastbLive  
-咪视通-43,http://iptv.hn.cn:1258/itv/3000000010000025380.m3u8?cdn=FifastbLive  
-咪视通-44,http://iptv.hn.cn:1258/itv/3000000010000027691.m3u8?cdn=FifastbLive  
-咪视通-45,http://iptv.hn.cn:1258/itv/3000000010000031669.m3u8?cdn=FifastbLive
 
 
 
@@ -1065,6 +875,7 @@ UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 赛事咪咕播37,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000020000011522&/PLTV/&$8M FHD
 赛事咪咕播4k,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000010000005180&/PLTV/&$32M UHD
 赛事至臻视界,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000010000015686&/PLTV/&$32M UHD
+
 
 
 
