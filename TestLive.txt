@@ -875,64 +875,6 @@ UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 赛事咪咕播37,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000020000011522&/PLTV/&$8M FHD
 赛事咪咕播4k,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000010000005180&/PLTV/&$32M UHD
 赛事至臻视界,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000010000015686&/PLTV/&$32M UHD
-💓咪咕直播,#genre#
-咪咕视频_8M1080_咪视通-1,http://jackgao.top:35455/itv/3000000001000005308.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-2,http://jackgao.top:35455/itv/3000000001000005969.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-3,http://jackgao.top:35455/itv/3000000001000007218.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-4,http://jackgao.top:35455/itv/3000000001000008001.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-5,http://jackgao.top:35455/itv/3000000001000008176.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-6,http://jackgao.top:35455/itv/3000000001000008379.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-7,http://jackgao.top:35455/itv/3000000001000010129.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-8,http://jackgao.top:35455/itv/3000000001000010948.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-9,http://jackgao.top:35455/itv/3000000001000028638.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-10,http://jackgao.top:35455/itv/3000000001000031494.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-11,http://jackgao.top:35455/itv/3000000010000005837.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-12,http://jackgao.top:35455/itv/3000000020000011518.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-13,http://jackgao.top:35455/itv/3000000020000011519.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-14,http://jackgao.top:35455/itv/3000000020000011520.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-15,http://jackgao.top:35455/itv/3000000020000011521.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-16,http://jackgao.top:35455/itv/3000000020000011522.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-17,http://jackgao.top:35455/itv/3000000020000011523.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-18,http://jackgao.top:35455/itv/3000000020000011524.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-19,http://jackgao.top:35455/itv/3000000020000011525.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-20,http://jackgao.top:35455/itv/3000000020000011528.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-21,http://jackgao.top:35455/itv/3000000020000011529.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-22,http://jackgao.top:35455/itv/3000000020000011530.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-23,http://jackgao.top:35455/itv/3000000020000011531.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-24,http://jackgao.top:35455/itv/3000000010000000097.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-25,http://jackgao.top:35455/itv/3000000010000002019.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-26,http://jackgao.top:35455/itv/3000000010000002809.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-27,http://jackgao.top:35455/itv/3000000010000003915.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-28,http://jackgao.top:35455/itv/3000000010000004193.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-29,http://jackgao.top:35455/itv/3000000010000006077.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-30,http://jackgao.top:35455/itv/3000000010000006658.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-31,http://jackgao.top:35455/itv/3000000010000009788.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-32,http://jackgao.top:35455/itv/3000000010000010833.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-33,http://jackgao.top:35455/itv/3000000010000011297.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-34,http://jackgao.top:35455/itv/3000000010000011518.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-35,http://jackgao.top:35455/itv/3000000010000012558.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-36,http://jackgao.top:35455/itv/3000000010000012616.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-37,http://jackgao.top:35455/itv/3000000010000015470.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-38,http://jackgao.top:35455/itv/3000000010000015560.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-39,http://jackgao.top:35455/itv/3000000010000017678.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-40,http://jackgao.top:35455/itv/3000000010000019839.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-41,http://jackgao.top:35455/itv/3000000010000021904.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-42,http://jackgao.top:35455/itv/3000000010000023434.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-43,http://jackgao.top:35455/itv/3000000010000025380.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-44,http://jackgao.top:35455/itv/3000000010000027691.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_咪视通-45,http://jackgao.top:35455/itv/3000000010000031669.m3u8?cdn=FifastbLive
-咪咕视频_8M1080_湖南bblive-1,http://jackgao.top:35455/itv/2000000003000000060.m3u8?cdn=hnbblive
-咪咕视频_8M1080_湖南bblive-2,http://jackgao.top:35455/itv/2000000003000000061.m3u8?cdn=hnbblive
-咪咕视频_8M1080_湖南bblive-3,http://jackgao.top:35455/itv/2000000003000000062.m3u8?cdn=hnbblive
-咪咕视频_8M1080_湖南bblive-4,http://jackgao.top:35455/itv/2000000003000000063.m3u8?cdn=hnbblive
-咪咕视频_8M1080_湖南bblive-5,http://jackgao.top:35455/itv/2000000003000000064.m3u8?cdn=hnbblive
-咪咕视频_8M1080_湖南bblive-6,http://jackgao.top:35455/itv/2000000003000000065.m3u8?cdn=hnbblive
-咪咕视频_8M1080_易视腾-1,http://jackgao.top:35455/itv/1000000006000270001.m3u8?cdn=ystenlive
-咪咕视频_8M1080_易视腾-2,http://jackgao.top:35455/itv/1000000006000270002.m3u8?cdn=ystenlive
-咪咕视频_8M1080_易视腾-3,http://jackgao.top:35455/itv/1000000006000270003.m3u8?cdn=ystenlive
-咪咕视频_8M1080_易视腾-4,http://jackgao.top:35455/itv/1000000006000270004.m3u8?cdn=ystenlive
-咪咕视频_8M1080_易视腾-5,http://jackgao.top:35455/itv/1000000006000270005.m3u8?cdn=ystenlive
-
 
 
 
