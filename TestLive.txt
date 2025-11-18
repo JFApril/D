@@ -685,38 +685,6 @@ UK: Sky Sports Premier League,http://vocotv.pro//revol/revol/276906
 
 
 
-
-
-🌹咪视界,#genre#
-睛彩青少,http://iptv.666230.xyz/iptv/bjyd.php/6390
-睛彩青少,http://iptv.666230.xyz/iptv/bjyd.php/7000
-睛彩竞技,http://iptv.666230.xyz/iptv/bjyd.php/6392
-睛彩竞技,http://iptv.666230.xyz/iptv/bjyd.php/6566
-睛彩篮球,http://iptv.666230.xyz/iptv/bjyd.php/6565
-睛彩篮球,http://iptv.666230.xyz/iptv/bjyd.php/6391
-咪世界4K,http://iptv.666230.xyz/iptv/bjyd.php/6399
-至臻视界4K,http://iptv.666230.xyz/iptv/bjyd.php/6400
-咪世界1,http://iptv.666230.xyz/iptv/bjyd.php/6372
-咪世界2,http://iptv.666230.xyz/iptv/bjyd.php/6373
-咪世界3,http://iptv.666230.xyz/iptv/bjyd.php/6374
-咪世界4,http://iptv.666230.xyz/iptv/bjyd.php/6375
-咪世界5,http://iptv.666230.xyz/iptv/bjyd.php/6378
-咪世界6,http://iptv.666230.xyz/iptv/bjyd.php/6379
-咪世界7,http://iptv.666230.xyz/iptv/bjyd.php/6380
-咪世界8,http://iptv.666230.xyz/iptv/bjyd.php/6381
-咪世界9,http://iptv.666230.xyz/iptv/bjyd.php/6382
-咪世界10,http://iptv.666230.xyz/iptv/bjyd.php/6383
-咪世界11,http://iptv.666230.xyz/iptv/bjyd.php/6384
-咪世界12,http://iptv.666230.xyz/iptv/bjyd.php/6387
-咪世界13,http://iptv.666230.xyz/iptv/bjyd.php/6388
-咪世界14,http://iptv.666230.xyz/iptv/bjyd.php/6393
-咪世界15,http://iptv.666230.xyz/iptv/bjyd.php/6394
-咪世界16,http://iptv.666230.xyz/iptv/bjyd.php/6395
-咪世界17,http://iptv.666230.xyz/iptv/bjyd.php/6396
-咪世界18,http://iptv.666230.xyz/iptv/bjyd.php/6397
-咪世界19,http://iptv.666230.xyz/iptv/bjyd.php/6398
-
-
 🌹江苏银河,#genre#
 
 CCTV-1,http://iptv.666230.xyz/iptv/jsyd.php/G_CCTV-1-HD-265-5M
@@ -1006,7 +974,7 @@ CHC动作电影,https://live.chinacert.cftest5.cn/mg/?id=644368714
 赛事咪咕播13,https://zby.130519.xyz/PLTV/11/224/3221225678/index.m3u8 
 赛事咪咕播14,https://zby.130519.xyz/PLTV/11/224/3221225679/index.m3u8 
 赛事咪咕播15,https://zby.130519.xyz/PLTV/11/224/3221225680/index.m3u8
- 赛事咪咕播16,https://zby.130519.xyz/PLTV/11/224/3221225681/index.m3u8 
+赛事咪咕播16,https://zby.130519.xyz/PLTV/11/224/3221225681/index.m3u8 
 赛事咪咕播17,https://zby.130519.xyz/PLTV/11/224/3221225682/index.m3u8 
 赛事咪咕播18,https://zby.130519.xyz/PLTV/11/224/3221225683/index.m3u8 
 赛事咪咕播19,https://zby.130519.xyz/PLTV/11/224/3221225684/index.m3u8 
@@ -1025,7 +993,7 @@ CHC动作电影,https://live.chinacert.cftest5.cn/mg/?id=644368714
 赛事咪咕播32,https://zby.130519.xyz/PLTV/11/224/3221226125/index.m3u8 
 赛事百视通33,https://zby.130519.xyz/PLTV/11/224/3221225663/index.m3u8 
 赛事咪咕播4k,https://zby.130519.xyz/PLTV/11/224/3221226080/index.m3u8 
-赛事咪咕(备用),#genre# 
+🌸赛事咪咕(备用),#genre# 
 赛备咪咕4k播,http://xiaoya.crccxw.top:35455/itv/3000000010000005180.m3u8?cdn=FifastbLive 
 赛事睛彩竞技,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000020000011528&/PLTV/&$8M1FHD 
 赛事睛彩竞技,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000020000011530&/PLTV/&$8M2FHD 
@@ -1075,7 +1043,7 @@ CHC动作电影,https://live.chinacert.cftest5.cn/mg/?id=644368714
 赛事咪咕播37,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000020000011522&/PLTV/&$8M FHD 
 赛事咪咕播4k,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000010000005180&/PLTV/&$32M UHD 
 赛事至臻视界,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000010000015686&/PLTV/&$32M UHD 
-咪咕体育,#genre#
+🌸咪咕体育,#genre#
 赛事咪咕播01,https://zby.130519.xyz/PLTV/11/224/3221225636/index.m3u8
 赛事咪咕播02,https://zby.130519.xyz/PLTV/11/224/3221225637/index.m3u8
 赛事咪咕播03,https://zby.130519.xyz/PLTV/11/224/3221225638/index.m3u8
@@ -1111,7 +1079,7 @@ CHC动作电影,https://live.chinacert.cftest5.cn/mg/?id=644368714
 赛事百视通33,https://zby.130519.xyz/PLTV/11/224/3221225663/index.m3u8
 赛事咪咕播4k,https://zby.130519.xyz/PLTV/11/224/3221226080/index.m3u8
 赛事至臻视界,https://zby.130519.xyz/PLTV/11/224/3221225687/index.m3u8
-咪咕体育(卡顿),#genre#
+🌸咪咕体育(卡顿),#genre#
 赛事睛彩竞技,http://xiaoya.crccxw.top:35455/itv/3000000020000011528.m3u8?cdn=FifastbLive
 赛事睛彩篮球,http://xiaoya.crccxw.top:35455/itv/3000000020000011529.m3u8?cdn=FifastbLive
 赛事睛彩青少,http://xiaoya.crccxw.top:35455/itv/3000000020000011525.m3u8?cdn=FifastbLive
@@ -1224,6 +1192,7 @@ CHC动作电影,https://live.chinacert.cftest5.cn/mg/?id=644368714
 赛事咪咕播37,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000020000011522&/PLTV/&$8M FHD
 赛事咪咕播4k,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000010000005180&/PLTV/&$32M UHD
 赛事至臻视界,http://cdn6.bkpcp.top/itv/yditv.php?Contentid=3000000010000015686&/PLTV/&$32M UHD
+
 
 
 
