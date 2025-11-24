@@ -664,8 +664,20 @@ CHC动作电影,https://live.chinacert.cftest5.cn/mg/?id=644368714
 赛事咪咕播11,https://msj.188766.xyz/play?id=3000000010000000097&token=6d1e06356d1e06356d1e06356d1e0635
 
 
-
-
+🇨🇳港台,#genre#
+港台電視 31,http://222.125.207.8:20000/stream/channelid/1602635863?ticket=636088851803b72399a81e17318efd1d06cc54be&profile=pass
+港台電視 32,http://222.125.207.8:20000/stream/channelid/1554897652?ticket=310f4a81e66c601f05d01490c92de86c8c4071f6&profile=pass
+鳳凰衛視香港台,http://222.125.207.8:20000/stream/channelid/1218293550?ticket=401364957150411c8e763b5548727434439d2cd0&profile=pass
+中天新闻,http://test-al-livepull.migucloud.com/live/hktv-kjfhslkdjngnlkdkgjdlkgjrkltjggrtlmagztxwkks.flv
+tvbs,http://test-al-livepull.migucloud.com/live/hktv-kjfhslkdjngnlkdkgjdlkgjrkltjggrtlmagtvbskks.flv
+TVBS,http://test-al-livepull.migucloud.com/live/hktv-kjfhslkdjngnlkdkgjdlkgjrkltjggrtlmagxytwkks.flv
+TVBPlus,http://vallest.uk/livehttpplay?channel_id=30023
+凤凰中文,http://vallest.uk/livehttpplay?channel_id=30014
+凤凰资讯,http://vallest.uk/livehttpplay?channel_id=30015
+凤凰香港,http://vallest.uk/livehttpplay?channel_id=30016
+凤凰中文,https://mgev.188766.xyz/?migutoken=4819eafe1e2e04ef8bf0fdef6ff14c9f&id=fhzw&pp=1
+凤凰资讯,https://mgev.188766.xyz/?migutoken=4661a46d69e62c4be707d84db6482485&id=fhzx&pp=1
+凤凰香港,https://mgev.188766.xyz/?migutoken=e04a29d4dbd531e8537dfe0f7ed2e299&id=fhhk&pp=1
 
 
 
