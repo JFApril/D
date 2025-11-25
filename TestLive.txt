@@ -642,21 +642,18 @@ CHC动作电影,https://live.chinacert.cftest5.cn/mg/?id=644368714
 
 
 
-🇨🇳港台,#genre#
-港台電視 31,http://222.125.207.8:20000/stream/channelid/1602635863?ticket=636088851803b72399a81e17318efd1d06cc54be&profile=pass
-港台電視 32,http://222.125.207.8:20000/stream/channelid/1554897652?ticket=310f4a81e66c601f05d01490c92de86c8c4071f6&profile=pass
-鳳凰衛視香港台,http://222.125.207.8:20000/stream/channelid/1218293550?ticket=401364957150411c8e763b5548727434439d2cd0&profile=pass
-中天新闻,http://test-al-livepull.migucloud.com/live/hktv-kjfhslkdjngnlkdkgjdlkgjrkltjggrtlmagztxwkks.flv
-tvbs,http://test-al-livepull.migucloud.com/live/hktv-kjfhslkdjngnlkdkgjdlkgjrkltjggrtlmagtvbskks.flv
-TVBS,http://test-al-livepull.migucloud.com/live/hktv-kjfhslkdjngnlkdkgjdlkgjrkltjggrtlmagxytwkks.flv
-TVBPlus,http://vallest.uk/livehttpplay?channel_id=30023
-凤凰中文,http://vallest.uk/livehttpplay?channel_id=30014
-凤凰资讯,http://vallest.uk/livehttpplay?channel_id=30015
-凤凰香港,http://vallest.uk/livehttpplay?channel_id=30016
-凤凰中文,https://mgev.188766.xyz/?migutoken=4819eafe1e2e04ef8bf0fdef6ff14c9f&id=fhzw&pp=1
-凤凰资讯,https://mgev.188766.xyz/?migutoken=4661a46d69e62c4be707d84db6482485&id=fhzx&pp=1
-凤凰香港,https://mgev.188766.xyz/?migutoken=e04a29d4dbd531e8537dfe0f7ed2e299&id=fhhk&pp=1
+🇨🇳上海金山,#genre#
 
+上海教育电视台,http://tencent-live.setv.sh.cn/live/programme_setvweb.m3u8?txSecret=fd19aacaed289e44e3f6d8baa5485a41&txTime=82DF98A7
+点掌财经,http://volcanopull.aniu.tv/live/aniu2/index.m3u8
+金山电视台,http://pili-live-hls.wdit.com.cn/wditlive/8818dfe5f4df45ba9a3f32964d172fb2b6d3.m3u8
+上海新纪实,http://bp-resource-dfl.bestv.cn/155/3/video.m3u8
+爱上海,http://bp-resource-dfl.bestv.cn/148/3/video.m3u8
+第一财经,http://bp-livetytv.bestv.cn/ch/bestvdycj.m3u8
+新闻综合,http://bp-livetytv.bestv.cn/ch/bestvxwzh.m3u8
+五星体育,http://bp-livetytv.bestv.cn/ch/bestvwxty.m3u8
+都市频道,http://bp-livetytv.bestv.cn/ch/bestvdspd.m3u8
+魔都眼,http://bp-livetytv.bestv.cn/ch/bestvshanghaieye.m3u8
 
 
 
