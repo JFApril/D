@@ -232,11 +232,13 @@ CGTN,https://zby.130519.xyz/PLTV/11/224/3221226016/index.m3u8
 金山电视台,http://pili-live-hls.wdit.com.cn/wditlive/8818dfe5f4df45ba9a3f32964d172fb2b6d3.m3u8
 上海新纪实,http://bp-resource-dfl.bestv.cn/155/3/video.m3u8
 爱上海,http://bp-resource-dfl.bestv.cn/148/3/video.m3u8
-第一财经,http://bp-livetytv.bestv.cn/ch/bestvdycj.m3u8
-新闻综合,http://bp-livetytv.bestv.cn/ch/bestvxwzh.m3u8
-五星体育,http://bp-livetytv.bestv.cn/ch/bestvwxty.m3u8
-都市频道,http://bp-livetytv.bestv.cn/ch/bestvdspd.m3u8
-魔都眼,http://bp-livetytv.bestv.cn/ch/bestvshanghaieye.m3u8
+上海新闻综合,https://www.wmviv.com/iptv/bc2t.php?id=shxwzh
+上海第一财经,https://www.wmviv.com/iptv/bc2t.php?id=shdycj
+上海新纪实,https://www.wmviv.com/iptv/bc2t.php?id=shxjs
+上海都市,https://www.wmviv.com/iptv/bc2t.php?id=shds
+哈哈炫动,https://www.wmviv.com/iptv/bc2t.php?id=hhxd
+上海魔都眼,https://www.wmviv.com/iptv/bc2t.php?id=shmdy
+爱上海,https://www.wmviv.com/iptv/bc2t.php?id=ash
 
 🍓咪视界bc,#genre#
 睛彩竞技-夕颜专用, http://yp.qqqtv.top/bc/bc.php?id=%E7%9D%9B%E5%BD%A9%E7%AB%9E%E6%8A%80-%E5%86%B0%E8%8C%B6%E4%B8%93%E7%94%A8&auth=66615415
