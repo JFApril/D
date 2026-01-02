@@ -7,6 +7,7 @@ CCTV-4K 超高清,http://kjsp.aikan.miguvideo.com/PLTV/88888888/224/3221233679/i
 CCTV-4K 超高清,http://[2409:8087:2001:20:2800:0:df6e:eb26]:80/ott.mobaibox.com/PLTV/3/224/3221228472/index.m3u8
 CCTV-5 体育,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001187/index.m3u8
 CCTV-5+ 体育赛事,http://23.237.228.134/live5/CCTV5p.m3u8
+CCTV-5体育赛事,http://ahuidata.myds.me:8188/rtp/225.1.4.75:1104
 CCTV-6 电影,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001188/index.m3u8
 CCTV-7 国防军事,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001236/index.m3u8
 CCTV-7 国防军事,http://39.134.24.166/dbiptv.sn.chinamobile.com/PLTV/88888888/224/3221226192/1.m3u8
