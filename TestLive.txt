@@ -242,20 +242,7 @@ CGTN,https://zby.130519.xyz/PLTV/11/224/3221226016/index.m3u8
 上海魔都眼,https://migu.188766.xyz/?migutoken=f3bd633efde380baa54c0a96c57afa70&id=mdy&type=sz
 上海新纪实,https://migu.188766.xyz/?migutoken=0ca27921cdc632c77a5f62b43f993284&id=jsrw&type=sz
 爱上海,https://migu.188766.xyz/?migutoken=3b924f6815cda22ca9b997b5411faa0d&id=ash&type=sz
-内蒙古新闻综合,http://play1-qk.nmtv.cn/live/1686560423879174.m3u8
-翡翠台4K,https://mgev.188766.xyz/?migutoken=328d231df54d30989bb43acc42d1b75f&id=hk_fct4k&type=dy
-Now新闻,https://mgev.188766.xyz/?migutoken=d491cdf42c6685ba822a9e8dcf848230&id=hk_now&type=dy
-TVB Plus,https://mgev.188766.xyz/?migutoken=c8b048ad60cd0c7d8345a170ae52b7be&id=hk_tvbp&type=dy
-TVB功夫,https://mgev.188766.xyz/?migutoken=39ae59b73c289b9e98ca28e61439e960&id=hk_yzwx&type=dy
-八度空间,https://mgev.188766.xyz/?migutoken=2c2dab09834990bf9986c29822ef5fdd&id=hk_8tv&type=dy
-CHU,https://mgev.188766.xyz/?migutoken=4def6847b9c85c2addca5e9af6437a9c&id=hk_chu&type=dy
-CH5,https://mgev.188766.xyz/?migutoken=6f5c23c710b7e838addb10de714de9f5&id=hk_ch5&type=dy
-CH8,https://mgev.188766.xyz/?migutoken=2d05d7f5159fe9d6fd52cc7159e724b5&id=hk_ch8&type=dy
-澳视澳门,https://mgev.188766.xyz/?migutoken=b2cf68c40a37806536b5584daf742453&id=hk_asam&type=dy
-HOY77,https://mgev.188766.xyz/?migutoken=a5dfe0ceb297db8f7673c91f58298b16&id=hk_hoy&type=dy
-订阅地址的密码不正确_已隐藏,https://188766.xyz/dong
-免费分享_用爱发电_拒绝贩卖_只有TG群,https://188766.xyz/qiu
-12月09日_老封号_体育看咪视界,https://188766.xyz/y
+
 爱上海,https://www.wmviv.com/iptv/bc2t.php?id=ash
 
 🔥咪咕体育v4,#genre#
