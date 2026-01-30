@@ -197,25 +197,13 @@ CGTN,https://zby.130519.xyz/PLTV/11/224/3221226016/index.m3u8
 金山电视台,http://pili-live-hls.wdit.com.cn/wditlive/8818dfe5f4df45ba9a3f32964d172fb2b6d3.m3u8
 上海新纪实,http://bp-resource-dfl.bestv.cn/155/3/video.m3u8
 爱上海,http://bp-resource-dfl.bestv.cn/148/3/video.m3u8
-上海新闻综合,https://www.wmviv.com/iptv/bc2t.php?id=shxwzh
-上海第一财经,https://www.wmviv.com/iptv/bc2t.php?id=shdycj
-上海新纪实,https://www.wmviv.com/iptv/bc2t.php?id=shxjs
-上海都市,https://www.wmviv.com/iptv/bc2t.php?id=shds
-哈哈炫动,https://www.wmviv.com/iptv/bc2t.php?id=hhxd
-上海魔都眼,https://www.wmviv.com/iptv/bc2t.php?id=shmdy
-上海魔都眼,https://migu.188766.xyz/?migutoken=f3bd633efde380baa54c0a96c57afa70&id=mdy&type=sz
-魔都眼,https://d.kstore.dev/k-web/ku9/js/download/4878/webview.js?id=https://live.kankanews.com/huikan?id=11
-上海新纪实,https://migu.188766.xyz/?migutoken=0ca27921cdc632c77a5f62b43f993284&id=jsrw&type=sz
-爱上海,https://migu.188766.xyz/?migutoken=3b924f6815cda22ca9b997b5411faa0d&id=ash&type=sz
-东方卫视, http://8.153.173.168/php/bst-5g.php?id=dfws&token=1Sepm9J7qusfXVtH
-上海新闻综合, http://8.153.173.168/php/bst-5g.php?id=xwzh&token=1Sepm9J7qusfXVtH
-新纪实, http://8.153.173.168/php/bst-5g.php?id=xjs&token=1Sepm9J7qusfXVtH
-魔都眼, http://8.153.173.168/php/bst-5g.php?id=mdy&token=1Sepm9J7qusfXVtH
-乐游, http://8.153.173.168/php/bst-5g.php?id=ly&token=1Sepm9J7qusfXVtH
-第一财经, http://8.153.173.168/php/bst-5g.php?id=dycj&token=1Sepm9J7qusfXVtH
-上海都市, http://8.153.173.168/php/bst-5g.php?id=ds&token=1Sepm9J7qusfXVtH
-五星体育, http://8.153.173.168/php/bst-5g.php?id=wxty&token=1Sepm9J7qusfXVtH
-爱上海,https://www.wmviv.com/iptv/bc2t.php?id=ash
+爱上海149,http://bp-resource-dfl.bestv.cn/149/3/video.m3u8
+爱上海150,http://bp-resource-dfl.bestv.cn/150/3/video.m3u8
+爱上海151,http://bp-resource-dfl.bestv.cn/151/3/video.m3u8
+爱上海152,http://bp-resource-dfl.bestv.cn/152/3/video.m3u8
+爱上海153,http://bp-resource-dfl.bestv.cn/153/3/video.m3u8
+爱上海154,http://bp-resource-dfl.bestv.cn/154/3/video.m3u8
+
 
 🔥咪咕体育v4,#genre#
 咪咕视频1,http://36.155.98.21/gslbserv.itv.cmvideo.cn:80/5000000011000265001/1.m3u8?channel-id=FifastbLive&Contentid=3000000001000005969&livemode=1&stbId=001C366F865C602F58587E8BE8616930&mode=1&$8M FHD
@@ -884,4 +872,5 @@ CETV4,http://101.42.157.180:1234/923287339
 中华特产,http://101.42.157.180:1234/959986618
 环球旅游,http://101.42.157.180:1234/958475356
 茶频道,http://101.42.157.180:1234/961930369
+
 
