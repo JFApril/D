@@ -197,12 +197,9 @@ CGTN,https://zby.130519.xyz/PLTV/11/224/3221226016/index.m3u8
 金山电视台,http://pili-live-hls.wdit.com.cn/wditlive/8818dfe5f4df45ba9a3f32964d172fb2b6d3.m3u8
 上海新纪实,http://bp-resource-dfl.bestv.cn/155/3/video.m3u8
 爱上海,http://bp-resource-dfl.bestv.cn/148/3/video.m3u8
-爱上海149,http://bp-resource-dfl.bestv.cn/149/3/video.m3u8
-爱上海150,http://bp-resource-dfl.bestv.cn/150/3/video.m3u8
-爱上海151,http://bp-resource-dfl.bestv.cn/151/3/video.m3u8
+东方卫视,http://bp-resource-dfl.bestv.cn/151/3/video.m3u8
 爱上海152,http://bp-resource-dfl.bestv.cn/152/3/video.m3u8
-爱上海153,http://bp-resource-dfl.bestv.cn/153/3/video.m3u8
-爱上海154,http://bp-resource-dfl.bestv.cn/154/3/video.m3u8
+看东方,http://bp-resource-dfl.bestv.cn/153/3/video.m3u8
 
 
 🔥咪咕体育v4,#genre#
@@ -872,5 +869,6 @@ CETV4,http://101.42.157.180:1234/923287339
 中华特产,http://101.42.157.180:1234/959986618
 环球旅游,http://101.42.157.180:1234/958475356
 茶频道,http://101.42.157.180:1234/961930369
+
 
 
