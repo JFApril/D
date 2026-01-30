@@ -204,9 +204,17 @@ CGTN,https://zby.130519.xyz/PLTV/11/224/3221226016/index.m3u8
 哈哈炫动,https://www.wmviv.com/iptv/bc2t.php?id=hhxd
 上海魔都眼,https://www.wmviv.com/iptv/bc2t.php?id=shmdy
 上海魔都眼,https://migu.188766.xyz/?migutoken=f3bd633efde380baa54c0a96c57afa70&id=mdy&type=sz
+魔都眼,https://d.kstore.dev/k-web/ku9/js/download/4878/webview.js?id=https://live.kankanews.com/huikan?id=11
 上海新纪实,https://migu.188766.xyz/?migutoken=0ca27921cdc632c77a5f62b43f993284&id=jsrw&type=sz
 爱上海,https://migu.188766.xyz/?migutoken=3b924f6815cda22ca9b997b5411faa0d&id=ash&type=sz
-
+东方卫视, http://8.153.173.168/php/bst-5g.php?id=dfws&token=1Sepm9J7qusfXVtH
+上海新闻综合, http://8.153.173.168/php/bst-5g.php?id=xwzh&token=1Sepm9J7qusfXVtH
+新纪实, http://8.153.173.168/php/bst-5g.php?id=xjs&token=1Sepm9J7qusfXVtH
+魔都眼, http://8.153.173.168/php/bst-5g.php?id=mdy&token=1Sepm9J7qusfXVtH
+乐游, http://8.153.173.168/php/bst-5g.php?id=ly&token=1Sepm9J7qusfXVtH
+第一财经, http://8.153.173.168/php/bst-5g.php?id=dycj&token=1Sepm9J7qusfXVtH
+上海都市, http://8.153.173.168/php/bst-5g.php?id=ds&token=1Sepm9J7qusfXVtH
+五星体育, http://8.153.173.168/php/bst-5g.php?id=wxty&token=1Sepm9J7qusfXVtH
 爱上海,https://www.wmviv.com/iptv/bc2t.php?id=ash
 
 🔥咪咕体育v4,#genre#
@@ -876,3 +884,4 @@ CETV4,http://101.42.157.180:1234/923287339
 中华特产,http://101.42.157.180:1234/959986618
 环球旅游,http://101.42.157.180:1234/958475356
 茶频道,http://101.42.157.180:1234/961930369
+
