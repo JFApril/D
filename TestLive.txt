@@ -201,7 +201,7 @@ CGTN,https://zby.130519.xyz/PLTV/11/224/3221226016/index.m3u8
 爱上海152,http://bp-resource-dfl.bestv.cn/152/3/video.m3u8
 看东方,http://bp-resource-dfl.bestv.cn/153/3/video.m3u8
 魔都眼,http://8.138.7.223/tv/shtv.php?id=mdy
-魔都眼,http://8.138.7.223/tv/shtv.php?id=mdy
+魔都眼,http://utuxx.91kds.cn/live2/shkk.m3u8?id=shmdy&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu%3Ack%3A92%3A92%3Aff&utk=&nwtime=1769856469&ev=20250113&sign=650fd0a6390b3dd68dd78a28fef38622
 
 🔥咪咕体育v4,#genre#
 咪咕视频1,http://36.155.98.21/gslbserv.itv.cmvideo.cn:80/5000000011000265001/1.m3u8?channel-id=FifastbLive&Contentid=3000000001000005969&livemode=1&stbId=001C366F865C602F58587E8BE8616930&mode=1&$8M FHD
