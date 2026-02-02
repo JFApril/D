@@ -587,61 +587,18 @@ CCTV17,http://cdn6.bkpcp.top/tl/tuiliu.php?id=cctv17
 黑龙江卫视,http://cdn6.bkpcp.top/tl/tuiliu.php?id=hljws
 
 🌹港澳极速,#genre#
-无线新闻台,http://74.91.26.218:82/live/inews.m3u8
-TVB Plus,http://74.91.26.218:82/live/j2.m3u8
-美亚电影,http://74.91.26.218:82/live/mydy.m3u8
-中天新闻,http://74.91.26.218:82/live/ztxw.m3u8
-广东体育,http://74.91.26.218:82/live/gdty.m3u8
-翡翠台,http://74.91.26.218:82/live/jade.m3u8
-无线新闻台,http://74.91.26.218:82/live/inews.m3u8
-TVB Plus,http://74.91.26.218:82/live/j2.m3u8
-美亚电影,http://74.91.26.218:82/live/mydy.m3u8
-天映频道,http://74.91.26.218:82/live/typd.m3u8
-天映经典,http://74.91.26.218:82/live/tyjd.m3u8
-NOW星影台,http://74.91.26.218:82/live/nowxy.m3u8
-中天新闻,http://iptvpro.pw:35451//live/加QQ群1078393318领福利/14566541/161.ts
-Z频道,http://74.91.26.218:82/live/twz.m3u8
-CCTV1,http://74.91.26.218:82/live/cctv4.m3u8
-CCTV6,http://74.91.26.218:82/live/zjws.m3u8
-CCTV8,http://74.91.26.218:82/live/bjws.m3u8
-CCTV1,http://74.91.26.218:82/live/dfws.m3u8
-CCTV6,http://74.91.26.218:82/live/cctv6.m3u8
-CCTV8,http://74.91.26.218:82/live/cctv8.m3u8
-广东体育,http://74.91.26.218:82/live/gdty.m3u8
-东森美洲 HD,http://38.64.72.148:80/hls/modn/list/2016/chunklist0.m3u8
-东森美洲 HD,http://38.64.72.148:80/hls/modn/list/2016/chunklist1.m3u8
-东森美洲 HD,http://38.64.72.148:80/hls/modn/list/2016/playlist.m3u8
-东森 AMERICA,http://38.64.72.148:80/hls/modn/list/2015/chunklist0.m3u8
-东森 AMERICA,http://38.64.72.148:80/hls/modn/list/2015/chunklist1.m3u8
-东森 AMERICA,http://38.64.72.148:80/hls/modn/list/2015/playlist.m3u8
-东森超视 34.5,http://38.64.72.148:80/hls/modn/list/2013/chunklist0.m3u8
-东森超视 34.5,http://38.64.72.148:80/hls/modn/list/2013/chunklist1.m3u8
-东森超视 34.5,http://38.64.72.148:80/hls/modn/list/2013/playlist.m3u8
-
-Now Sports 精選,http://hls.168.us.kg/u/630/master.m3u8
-NOW体育1,http://main.light-ott.net:80/play/live.php?mac=00:1A:79:3A:93:FD&stream=382843&extension=ts&play_token=KANAeecxcz
-NOW体育2,http://main.light-ott.net:80/play/live.php?mac=00:1A:79:3A:93:FD&stream=382842&extension=ts&play_token=MCoDoR8s9G
-NOW体育3,http://main.light-ott.net:80/play/live.php?mac=00:1A:79:3A:93:FD&stream=382841&extension=ts&play_token=5uiKCGTNCF
-NOW体育4,http://main.light-ott.net:80/play/live.php?mac=00:1A:79:3A:93:FD&stream=382840&extension=ts&play_token=eoeYdjrkUg
-NOW体育5,http://main.light-ott.net:80/play/live.php?mac=00:1A:79:3A:93:FD&stream=382839&extension=ts&play_token=lu0NOftGgg
-NOW体育6,http://main.light-ott.net:80/play/live.php?mac=00:1A:79:3A:93:FD&stream=382838&extension=ts&play_token=WQ4pi5DTy3
-NOW体育7,http://main.light-ott.net:80/play/live.php?mac=00:1A:79:3A:93:FD&stream=382837&extension=ts&play_token=rRmhe1TsX7
-NOW体育4K1,http://main.light-ott.net:80/play/live.php?mac=00:1A:79:3A:93:FD&stream=382836&extension=ts&play_token=jSAYXQsMoY
-NOW体育,http://main.light-ott.net:80/play/live.php?mac=00:1A:79:3A:93:FD&stream=382834&extension=ts&play_token=JBOlpsgTKU
-NOW英超1台,http://109.61.81.147:1935/cdn7/767/mpegts?token=1d8c18a3d377f5418d2501aa54082b60
-NOW英超1台,http://109.61.81.147:1935/cdn7/767/mpegts?token=1d8c18a3d377f5418d2501aa54082b60
-中视菁采,http://74.91.26.218:82/live/ctvjc.m3u8
-台视,http://74.91.26.218:82/live/ttv.m3u8
-台视新闻,http://74.91.26.218:82/live/ttvnews.m3u8
-台视综合,http://74.91.26.218:82/live/ttvzh.m3u8
-台视财经,http://74.91.26.218:82/live/ttvcj.m3u8
-华视,http://74.91.26.218:82/live/cts.m3u8
-华视新闻资讯,http://74.91.26.218:82/live/ctsnews.m3u8
-华视教育体育文化,http://74.91.26.218:82/live/ctsjy.m3u8
-民视,http://74.91.26.218:82/live/ftv.m3u8
-民视新闻台,http://74.91.26.218:82/live/ftvnews.m3u8
-民视台湾台,http://74.91.26.218:82/live/ftvtw.m3u8
-民视第一台,http://74.91.26.218:82/live/ftvdy.m3u8
+翡翠台,http://php.jdshipin.com:8880/smt.php?id=jade_twn
+华丽翡翠台,http://php.jdshipin.com:8880/smt.php?id=Tvbjade
+TVB星河,http://php.jdshipin.com:8880/smt.php?id=Xinhe
+明珠台,http://php.jdshipin.com:8880/smt.php?id=pearl_twn
+TVB Plus,http://php.jdshipin.com:8880/smt.php?id=j2_twn
+无线新闻,http://php.jdshipin.com:8880/smt.php?id=inews_twn
+凤凰中文,http://j.s.bkpcp.top/js/fhzw
+凤凰资讯,http://j.s.bkpcp.top/js/fhzx
+凤凰香港,http://j.s.bkpcp.top/js/fhxg
+凤凰中文,http://r.jdshipin.com/cCCzW
+凤凰资讯,http://r.jdshipin.com/0Rp07
+凤凰香港,http://r.jdshipin.com/yDoTN
 
 
 💖上海移动内网,#genre#
