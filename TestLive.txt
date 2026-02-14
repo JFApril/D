@@ -811,3 +811,49 @@ CETV4,http://101.200.122.188:1234/923287339
 茶,http://101.200.122.188:1234/961930369
 
 
+💚阿烈港澳,#genre#
+鳳凰中文,http://iptv.4666888.xyz/iptv2A.php?id=27
+TVB翡翠,http://iptv.4666888.xyz/iptv2A.php?id=34
+TVB翡翠(馬來),http://iptv.4666888.xyz/iptv2A.php?id=28
+TVB明珠,http://iptv.4666888.xyz/iptv2A.php?id=29
+TVBJ1,http://iptv.4666888.xyz/iptv2A.php?id=26
+TVB1,http://iptv.4666888.xyz/iptv2A.php?id=25
+千禧经典,http://iptv.4666888.xyz/iptv2A.php?id=22
+HOY77,http://iptv.4666888.xyz/iptv2A.php?id=35
+HOY78,http://iptv.4666888.xyz/iptv2A.php?id=31
+RTHK31,http://iptv.4666888.xyz/iptv2A.php?id=23
+TVB娱乐新闻,http://iptv.4666888.xyz/iptv2A.php?id=36
+MYTV黃金翡翠,http://iptv.4666888.xyz/iptv2A.php?id=32
+TVB翡翠劇集,http://iptv.4666888.xyz/iptv2A.php?id=33
+澳視澳門,http://iptv.4666888.xyz/iptv2A.php?id=41
+
+💙阿烈台湾,#genre#
+TVBS新聞,http://iptv.4666888.xyz/iptv2A.php?id=43
+非凡新闻,http://iptv.4666888.xyz/iptv2A.php?id=44
+民视,http://iptv.4666888.xyz/iptv2A.php?id=55
+華藝中文,http://iptv.4666888.xyz/iptv2A.php?id=37
+爱奇艺,http://iptv.4666888.xyz/iptv2A.php?id=21
+靖洋戏剧,http://iptv.4666888.xyz/iptv2A.php?id=42
+靖天电影,http://iptv.4666888.xyz/iptv2A.php?id=56
+邵氏武侠,http://iptv.4666888.xyz/iptv2A.php?id=40
+東森电影,http://iptv.4666888.xyz/iptv2A.php?id=48
+龍華电影,http://iptv.4666888.xyz/iptv2A.php?id=45
+民視綜藝,http://iptv.4666888.xyz/iptv2A.php?id=46
+TVBS精采,http://iptv.4666888.xyz/iptv2A.php?id=47
+邵氏电影,http://iptv.4666888.xyz/iptv2A.php?id=39
+東森电影,http://iptv.4666888.xyz/iptv2A.php?id=48
+爱尔达综合,http://iptv.4666888.xyz/iptv2A.php?id=49
+ROCK_Action,http://iptv.4666888.xyz/iptv2A.php?id=50
+台视综合,http://iptv.4666888.xyz/iptv2A.php?id=51
+八度空间,http://iptv.4666888.xyz/iptv2A.php?id=52
+民视影剧,http://iptv.4666888.xyz/iptv2A.php?id=53
+中视经典,http://iptv.4666888.xyz/iptv2A.php?id=54
+
+
+🧡阿烈体育,#genre#
+SPOTV,http://iptv.4666888.xyz/iptv2A.php?id=2
+SPOTV2,http://iptv.4666888.xyz/iptv2A.php?id=1
+astroFootball,http://iptv.4666888.xyz/iptv2A.php?id=4
+TntSports1,http://iptv.4666888.xyz/iptv2A.php?id=3
+wwwe,http://iptv.4666888.xyz/iptv2A.php?id=5
+博斯運動1,http://iptv.4666888.xyz/iptv2A.php?id=6
