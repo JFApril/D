@@ -694,7 +694,7 @@ Bestv赛事6,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001154
 家有购物,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001244/index.m3u8
 快乐购,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001368/index.m3u8
 
-💥咪咕央视,#genre#
+💝咪咕央视,#genre#
 CCTV1综合,http://101.200.122.188:1234/608807420
 CCTV2财经,http://101.200.122.188:1234/631780532
 CCTV3综艺,http://101.200.122.188:1234/624878271
@@ -723,7 +723,7 @@ CGTN俄语,http://101.200.122.188:1234/609006446
 发现之旅,http://101.200.122.188:1234/624878970
 中学生,http://101.200.122.188:1234/708869532
 CGTN,http://101.200.122.188:1234/609017205
-🎈咪咕卫视,#genre#
+💖咪咕卫视,#genre#
 东方卫视,http://101.200.122.188:1234/651632648
 江苏卫视,http://101.200.122.188:1234/623899368
 广东卫视,http://101.200.122.188:1234/608831231
@@ -745,7 +745,7 @@ CGTN,http://101.200.122.188:1234/609017205
 宁夏卫视,http://101.200.122.188:1234/738910535
 重庆卫视,http://101.200.122.188:1234/738910914
 三沙卫视,http://101.200.122.188:1234/961023778
-🎈咪咕其他,#genre#
+❤️咪咕其他,#genre#
 赛事最经典,http://101.200.122.188:1234/646596895
 体坛名栏汇,http://101.200.122.188:1234/629943305
 四海钓鱼,http://101.200.122.188:1234/637444975
@@ -857,3 +857,100 @@ astroFootball,http://iptv.4666888.xyz/iptv2A.php?id=4
 TntSports1,http://iptv.4666888.xyz/iptv2A.php?id=3
 wwwe,http://iptv.4666888.xyz/iptv2A.php?id=5
 博斯運動1,http://iptv.4666888.xyz/iptv2A.php?id=6
+💜港澳台,#genre#
+凤凰中文,http://tv.groupshare.com.cn/fhtv?id=cn
+凤凰中文,http://php.jdshipin.com:8880/smt.php?id=phoenixtv_hd
+凤凰资讯,http://tv.groupshare.com.cn/fhtv?id=info
+凤凰资讯,http://php.jdshipin.com:8880/smt.php?id=phoenixinfo_hd
+凤凰香港,http://tv.groupshare.com.cn/fhtv?id=hk
+凤凰香港,http://php.jdshipin.com:8880/smt.php?id=hkphoenix_twn
+TVB翡翠台,http://pull-vivek.speedws.com/live/aaajade.flv
+无线新闻台,http://pull-vivek.speedws.com/live/aaawxxw.flv
+TVB明珠台,http://pull-vivek.speedws.com/live/aaamingzhu.flv
+TVB娱乐新闻,http://pull-vivek.speedws.com/live/aaaylxw.flv
+千禧经典,http://pull-vivek.speedws.com/live/aaamqxjd.flv
+千禧经典,http://pull-vivek.speedws.com/live/aaamqxjd.flv
+PopC电影,http://pull-vivek.speedws.com/live/aaapopc.flv
+美亚电影,http://pull-vivek.speedws.com/live/aaamydy.flv
+AXN,http://pull-vivek.speedws.com/live/aaaAXN.flv
+ROCK综艺娱乐,http://pull-vivek.speedws.com/live/aaarock1.flv
+Animax,http://pull-vivek.speedws.com/live/aaaAnimax.flv
+SUPER FREE,http://pull-vivek.speedws.com/live/aaaSUPERFREE.flv
+SUPER FREE,http://pull-vivek.speedws.com/live/aaaSUPERFREE.flv
+华语剧台,http://pull-vivek.speedws.com/live/aaahyjt.flv
+华语剧台,http://pull-vivek.speedws.com/live/aaahyjt.flv
+亚洲剧台,http://pull-vivek.speedws.com/live/aaayzjt.flv
+亚洲剧台,http://pull-vivek.speedws.com/live/aaayzjt.flv
+黄金华剧台,http://pull-vivek.speedws.com/live/aaahjhj.flv
+黄金华剧台,http://pull-vivek.speedws.com/live/aaahjhj.flv
+黄金翡翠台,http://pull-vivek.speedws.com/live/aaahjfc.flv
+黄金翡翠台,http://pull-vivek.speedws.com/live/aaahjfc.flv
+Mytv戏曲台,http://pull-vivek.speedws.com/live/aaaxqt.flv
+天映频道,http://pull-vivek.speedws.com/live/aaatypd.flv
+天映经典,http://pull-vivek.speedws.com/live/aaatyjd.flv
+Mytv跑马台,http://pull-vivek.speedws.com/live/aaapm18.flv
+HOY 76,http://pull-vivek.speedws.com/live/aaahoy76.flv
+HOY 77,http://pull-vivek.speedws.com/live/aaahoy77.flv
+HOY 78,http://pull-vivek.speedws.com/live/aaahoy78.flv
+戏曲台,http://pull-vivek.speedws.com/live/aaaxqt.flv
+澳门Mac,http://php.jdshipin.com/PLTV/iptv.php?id=as
+澳视澳门,http://php.jdshipin.com/PLTV/iptv.php?id=asam
+澳视卫星,http://php.jdshipin.com/TVOD/iptv.php?id=as
+ViuTV,http://pull-vivek.speedws.com/live/aaaviutv.flv
+ViuTV6,http://pull-vivek.speedws.com/live/aaaviutv6.flv
+TVB星河国语,http://cdn10.163189.xyz/163189/xinghe
+NOW新闻台,https://cdn.163189.xyz/163189/now
+翡翠台4K,https://cdn6.163189.xyz/163189/fct4k
+翡翠台(字幕),https://mytv.cdn.loc.cc/o12.php?id=fct
+明珠台(字幕),https://mytv.cdn.loc.cc/o12.php?id=mzt
+TVB1,https://6.cdn.loc.cc/163189.php?id=tvb1
+翡翠剧集台,https://6.cdn.loc.cc/163189.php?id=tvbd
+八度空间,http://cdn6.163189.xyz/163189/8tv
+八度空间,http://smt.1678520.xyz/smt3.2.3.php?id=TV8
+唐人卫视,https://ntd02.akamaized.net/HD-NY/tracks-v3a1/mono.m3u8
+CH5,http://cdn6.163189.xyz/163189/ch5
+CH8,http://cdn6.163189.xyz/163189/ch8
+CHU,http://cdn6.163189.xyz/163189/chu
+龙华电影,http://cdn8.163189.xyz/163189/lhdy
+龙华经典,http://cdn8.163189.xyz/163189/lhjd
+龙华卡通,http://cdn8.163189.xyz/163189/lhkt
+龙华偶像,http://cdn8.163189.xyz/163189/lhox
+龙华日韩,http://cdn8.163189.xyz/163189/lhrh
+龙华戏剧,http://cdn8.163189.xyz/163189/lhxj
+龙华洋片,http://cdn8.163189.xyz/163189/lhyp
+华丽翡翠,http://o11.163189.xyz/stream/live/hlt/
+华丽翡翠,http://o11.163189.xyz/stream/live/jade/
+AOD,http://o11.163189.xyz/stream/live/aod/
+AEC,http://o11.163189.xyz/stream/live/aec/
+QJ,http://o11.163189.xyz/stream/live/qj/
+欢喜台,http://o11.163189.xyz/stream/live/hxt/
+爱奇艺,http://o11.163189.xyz/stream/live/iqiyi/
+爱奇艺,http://smt.1678520.xyz/smt3.2.3.php?id=Qiyi
+天映频道,http://o11.163189.xyz/stream/live/typd/
+天映频道,http://smt.1678520.xyz/smt3.2.3.php?id=Celestial
+天映经典,http://o11.163189.xyz/stream/live/ccm/
+天映经典,http://smt.1678520.xyz/smt3.2.3.php?id=Celestial2
+TVB星河,http://o11.163189.xyz/stream/live/tvbxh/
+TVB星河,http://smt.1678520.xyz/smt3.2.3.php?id=Xinhe
+TVB星河,https://smt.1678520.xyz/smt3.2.1.php?id=Xinhe
+千禧经典,http://o11.163189.xyz/stream/live/tvbc/
+翡翠台,http://o11.163189.xyz/stream/tvb/fct/
+翡翠台,http://smt.1678520.xyz/smt3.2.3.php?id=jade_twn
+翡翠台,http://smt.1678520.xyz/smt3.2.3.php?id=jade_xue
+tvbp,http://o11.163189.xyz/stream/tvb/tvbp/
+明珠台,http://o11.163189.xyz/stream/tvb/mzt
+明珠台,http://smt.1678520.xyz/smt3.2.3.php?id=pearl_twn
+无线新闻台,http://smt.1678520.xyz/smt3.2.3.php?id=inews_twn
+TVB PLUS,http://smt.1678520.xyz/smt3.2.3.php?id=j2_twn
+ViuTV,http://smt.1678520.xyz/smt3.2.3.php?id=viu1_twn
+ViuTVSix,http://smt.1678520.xyz/smt3.2.3.php?id=viusix_twn
+HOY资讯台,http://smt.1678520.xyz/smt3.2.3.php?id=hoycaijing_twn
+华丽翡翠台,http://smt.1678520.xyz/smt3.2.3.php?id=Tvbjade
+千禧经典台,http://smt.1678520.xyz/smt3.2.3.php?id=Tvbclassic
+TVB娱乐新闻台,http://smt.1678520.xyz/smt3.2.3.php?id=Tvbentertainment
+Astro欢喜台,http://smt.1678520.xyz/smt3.2.3.php?id=Huahee
+Astro AOD,http://smt.1678520.xyz/smt3.2.3.php?id=Aodhd
+Astro AEC,http://smt.1678520.xyz/smt3.2.3.php?id=AEC
+Astro QJ,http://smt.1678520.xyz/smt3.2.3.php?id=Quanjia
+RTHK-31,https://smt.1678520.xyz/smt3.2.1.php?id=rhk31_twn
+RTHK-32,https://smt.1678520.xyz/smt3.2.1.php?id=rhk32_twn
