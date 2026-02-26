@@ -726,6 +726,7 @@ RTHK-32,https://smt.1678520.xyz/smt3.2.1.php?id=rhk32_twn
 晴彩广场舞,http://anfeind1.kmdns.net:19999/migunohosts.php?channel-id=FifastbLive&Contentid=3000000020000011523
 咪咕赛事,http://anfeind1.kmdns.net:19999/migunohosts.php?channel-id=FifastbLive&Contentid=3000000010000002809
 
+
 💖央卫全网,#genre#
 CCTV-1,http://74.91.26.218:82/live/cctv1hd.m3u8
 CCTV-2,http://74.91.26.218:82/live/cctv2hd.m3u8
@@ -777,7 +778,6 @@ CCTV15-音乐,http://74.91.26.218:82/live/cctv15hd.m3u8
 CCTV15-音乐,http://139.227.221.119:9901/tsfile/live/0015_1.m3u8
 CCTV16-奥利匹克,http://74.91.26.218:82/live/cctv16hd.m3u8
 CCTV17-农业农村,http://74.91.26.218:82/live/cctv17hd.m3u8
-卫 视,#genre#
 北京卫视,http://43.156.8.127:5050/ysp?id=2024052703&pid=600002309&q=fhd
 北京卫视,http://139.227.221.119:9901/tsfile/live/0122_1.m3u8
 东方卫视,http://69.30.246.194/live/dfws.m3u8
