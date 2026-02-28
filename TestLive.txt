@@ -833,3 +833,21 @@ CCTV17-农业农村,http://74.91.26.218:82/live/cctv17hd.m3u8
 南方卫视,http://74.91.26.218:82/live/nfws.m3u8
 广东珠江,http://43.156.8.127:5050/ysp?id=2024060703&pid=600002509&q=fhd
 
+
+💝超清频道,#genre#
+浙江卫视4K,https://stream1.freetv.fun/27bde01f6e5506617bec575ba1293bfc0a149bafe1eb681562f3d956baae616a.m3u8
+北京卫视4K,http://106.53.99.30/tv/bj.php?id=bjws4k
+南国都市4K,https://stream1.freetv.fun/4knan-guo-du-shi-1.m3u8
+北京卫视4K,https://shyd.695847.xyz/cms001/ch00000090990000001510/index.m3u8?IAS
+北京卫视4K,https://shyd.695847.xyz/cms001/ch00000090990000001500/index.m3u8?IAS
+湖南卫视4K,https://shyd.695847.xyz/cms001/ch00000090990000001710/index.m3u8?IAS
+东方卫视4K,https://shyd.695847.xyz/cms001/ch00000090990000001641/index.m3u8?IAS
+东方卫视4K,http://106.53.99.30/tv/api.php?id=dfws4k
+四川卫视4K,https://shyd.695847.xyz/cms001/ch00000090990000001690/index.m3u8?IAS
+山东卫视4K,https://shyd.695847.xyz/cms001/ch00000090990000001581/index.m3u8?IAS
+广东卫视4K,https://shyd.695847.xyz/cms001/ch00000090990000001540/index.m3u8?IAS
+广东卫视4K,https://shyd.695847.xyz/cms001/ch00000090990000001550/index.m3u8?IAS
+江苏卫视4K,https://shyd.695847.xyz/cms001/ch00000090990000001700/index.m3u8?IAS
+浙江卫视4K,https://shyd.695847.xyz/cms001/ch00000090990000001720/index.m3u8?IAS
+深圳卫视4K,https://shyd.695847.xyz/cms001/ch00000090990000001560/index.m3u8?HAS
+深圳卫视4K,https://shyd.695847.xyz/cms001/ch00000090990000001521/index.m3u8?IAS
