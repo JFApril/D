@@ -881,7 +881,7 @@ CCTV17-农业农村,http://74.91.26.218:82/live/cctv17hd.m3u8
 咪视通-44,http://anfeind1.kmdns.net:19999/migunohosts.php?channel-id=FifastbLive&Contentid=3000000010000027691
 咪视通-45,http://anfeind1.kmdns.net:19999/migunohosts.php?channel-id=FifastbLive&Contentid=3000000010000031669
 
-❤️经视频道,#genre#
+💚宁波移动,#genre#
 CCTV1,http://223.95.198.3:8000/hls/1/index.m3u8
 CCTV2,http://223.95.198.3:8000/hls/2/index.m3u8
 CCTV3,http://223.95.198.3:8000/hls/3/index.m3u8
@@ -926,5 +926,6 @@ CCTV17,http://223.95.198.3:8000/hls/17/index.m3u8
 云南卫视,http://223.95.198.3:8000/hls/45/index.m3u8
 贵州卫视,http://223.95.198.3:8000/hls/46/index.m3u8
 青海卫视,http://223.95.198.3:8000/hls/47/index.m3u8
+
 
 
