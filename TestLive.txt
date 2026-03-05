@@ -95,6 +95,13 @@ CETV-4,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001348/index
 看东方,http://bp-resource-dfl.bestv.cn/153/3/video.m3u8
 魔都眼,video://https://www.shanghaieye.cn/Live
 魔都眼,video://https://live.kankanews.com/huikan?id=11
+东方卫视,video://https://live.kankanews.com/huikan/
+上海新闻综合,video://https://live.kankanews.com/huikan?id=2
+上海都市,video://https://live.kankanews.com/huikan?id=4
+第一财经,video://https://live.kankanews.com/huikan?id=5
+哈哈炫动,video://https://live.kankanews.com/huikan?id=9
+五星体育,video://https://live.kankanews.com/huikan?id=10
+新纪实,video://https://live.kankanews.com/huikan?id=12
 
 🔥咪咕体育,#genre#
 咪咕视频1,http://36.155.98.21/gslbserv.itv.cmvideo.cn:80/5000000011000265001/1.m3u8?channel-id=FifastbLive&Contentid=3000000001000005969&livemode=1&stbId=001C366F865C602F58587E8BE8616930&mode=1&$8M FHD
@@ -941,5 +948,6 @@ CHC影迷电影,http://47.104.163.156:8123/migu720p.php?id=952383261
 CETV1,http://47.104.163.156:8123/migu720p.php?id=923287154
 CETV2,http://47.104.163.156:8123/migu720p.php?id=923287211
 CETV4,http://47.104.163.156:8123/migu720p.php?id=923287339
+
 
 
