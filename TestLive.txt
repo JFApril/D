@@ -677,11 +677,23 @@ TVB娱乐新闻台,http://smt.1678520.xyz/smt3.2.3.php?id=Tvbentertainment
 Astro欢喜台,http://smt.1678520.xyz/smt3.2.3.php?id=Huahee
 Astro AOD,http://smt.1678520.xyz/smt3.2.3.php?id=Aodhd
 Astro AEC,http://smt.1678520.xyz/smt3.2.3.php?id=AEC
-Astro QJ,http://smt.1678520.xyz/smt3.2.3.php?id=Quanjia
+Astro QJ,http://smt.1678520.xyz/smt3.2.3.php?id=Quanji
 RTHK-31,https://smt.1678520.xyz/smt3.2.1.php?id=rhk31_twn
 RTHK-32,https://smt.1678520.xyz/smt3.2.1.php?id=rhk32_twn
 
-
+八大第一,http://ip1.xiaomidadi.cn:8088/live/6b8CYVkZDFPCSqZI/hls.m3u8
+八大戏剧,http://ip1.xiaomidadi.cn:8088/live/jOj7LMOIfjOCcTBL/hls.m3u8
+八大综合,http://ip1.xiaomidadi.cn:8088/live/mQpfhtEPk6sSnO0S/hls.m3u8
+中视,http://ip1.xiaomidadi.cn:8088/live/7Ik9YzD3kqxocgfU/hls.m3u8
+澳门莲花,http://ip1.xiaomidadi.cn:8088/live/7RCF6kilR4EMfmge/hls.m3u8
+民视台湾,http://ip1.xiaomidadi.cn:8088/live/JLXbovrAXvVvGxtw/hls.m3u8
+民视第一,http://ip1.xiaomidadi.cn:8088/live/vnr8miLNxI7tlvjD/hls.m3u8
+东森综合,http://ip1.xiaomidadi.cn:8088/live/KMn24bon5j3PxYY2/hls.m3u8
+星河,http://ip1.xiaomidadi.cn:8088/live/MITPOmygcya1M6VO/hls.m3u8
+公视,http://ip1.xiaomidadi.cn:8088/live/NiyUTyfIW1axBJp2/hls.m3u8
+中天亚洲,http://ip1.xiaomidadi.cn:8088/live/dhC7oV8LI6lLcZUT/hls.m3u8
+中天综合,http://ip1.xiaomidadi.cn:8088/live/zvYTOOMDQyw276Sd/hls.m3u8
+台视,http://ip1.xiaomidadi.cn:8088/live/dscE7IeEK7vMQFZY/hls.m3u8
 
 
 
