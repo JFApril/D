@@ -696,7 +696,26 @@ RTHK-32,https://smt.1678520.xyz/smt3.2.1.php?id=rhk32_twn
 中天综合,http://ip1.xiaomidadi.cn:8088/live/zvYTOOMDQyw276Sd/hls.m3u8
 台视,http://ip1.xiaomidadi.cn:8088/live/dscE7IeEK7vMQFZY/hls.m3u8
 
-
+翡翠台,http://74.91.26.218:82/live/jade.m3u8
+TVB Plus,http://74.91.26.218:82/live/j2.m3u8
+无线新闻台,http://74.91.26.218:82/live/inews.m3u8
+华视教育体育文化,http://74.91.26.218:82/live/ctsjy.m3u8
+华视新闻资讯,http://74.91.26.218:82/live/ctsnews.m3u8
+民视第一台,http://74.91.26.218:82/live/ftvdy.m3u8
+公视台语台,http://74.91.26.218:82/live/ptsty.m3u8
+民视台湾台,http://74.91.26.218:82/live/ftvtw.m3u8
+民视新闻台,http://74.91.26.218:82/live/ftvnews.m3u8
+台视综合,http://74.91.26.218:82/live/ttvzh.m3u8
+台视新闻,http://74.91.26.218:82/live/ttvnews.m3u8
+中视经典,http://74.91.26.218:82/live/ctvjd.m3u8
+中视菁采,http://74.91.26.218:82/live/ctvjc.m3u8
+中视新闻,http://74.91.26.218:82/live/ctvnews.m3u8
+台视财经,http://74.91.26.218:82/live/ttvcj.m3u8
+小公视,http://74.91.26.218:82/live/ptsse.m3u8
+中视,http://74.91.26.218:82/live/ctv.m3u8
+民视,http://74.91.26.218:82/live/ftv.m3u8
+公视,http://74.91.26.218:82/live/pts.m3u8
+华视,http://74.91.26.218:82/live/cts.m3u8
 
 
 💖央卫全网,#genre#
