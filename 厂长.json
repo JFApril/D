@@ -1,0 +1,45 @@
+{
+    "name": "🎬厂长",
+    "api": "https://czzy.top",
+    "type": 2,
+    "searchable": true,
+    "categories": [
+      { "name": "推荐", "url": "/page/{{page}}" },
+      { "name": "全部", "url": "/movie_bt/page/{{page}}" },
+      { "name": "豆瓣电影Top250", "url": "/dbtop250/page/{{page}}" },
+      { "name": "高分影视", "url": "/gaofenyingshi/page/{{page}}" },
+      { "name": "最新电影", "url": "/zuixindianying/page/{{page}}" },
+      { "name": "电影", "url": "/movie_bt/movie_bt_series/dyy/page/{{page}}" },
+      { "name": "国产剧", "url": "/gcj/page/{{page}}" },
+      { "name": "电视剧", "url": "/dsj/page/{{page}}" },
+      { "name": "番剧", "url": "/fanju/page/{{page}}" },
+      { "name": "剧场版", "url": "/dongmanjuchangban/page/{{page}}" },
+     { "name": "美剧", "url": "/meijutt/page/{{page}}" },
+      { "name": "韩剧", "url": "/hanjutv/page/{{page}}" },
+      { "name": "日剧", "url": "/riju/page/{{page}}" },
+      { "name": "海外剧", "url": "/haiwaijuqita/page/{{page}}" },
+      { "name": "华语电影", "url": "/huayudianying/page/{{page}}" },
+      { "name": "欧美电影", "url": "/oumeidianying/page/{{page}}" },
+      { "name": "韩国电影", "url": "/hanguodianying/page/{{page}}" },
+      { "name": "日本电影", "url": "/ribendianying/page/{{page}}" },
+      { "name": "印度电影", "url": "/yindudianying/page/{{page}}" },
+      { "name": "俄罗斯电影", "url": "/eluosidianying/page/{{page}}" },
+      { "name": "加拿大电影", "url": "/jianadadianying/page/{{page}}" }
+    ],
+    "search": {
+      "url": "/daoyongjiekoshibushiyoubing?q={{key}}",
+      "list": ".bt_img.mi_ne_kd li",
+      "name": "h3.0@text",
+      "tips": ".jidi.0@text",
+      "coverUrl": "img.0@data-original",
+      "detailUrl": "a.0@href"
+    },
+    "detail": {
+      "meta": ".moviedteail_list@html"
+    },
+    "play": {
+      "list": ".paly_list_btn a",
+      "name": "text",
+      "url": "href"
+    }
+  }
