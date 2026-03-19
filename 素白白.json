@@ -1,0 +1,34 @@
+{
+    "name": "🎬素白白",
+    "api": "https://www.subaibaiys.com",
+    "type": 2,
+    "searchable": true,
+    "categories": [
+      { "name": "电影", "url": "/new-movie/page/{{page}}" },
+      { "name": "电视剧", "url": "/tv-drama/page/{{page}}" },
+      { "name": "热门电影", "url": "/hot-month/page/{{page}}" },
+      { "name": "高分电影", "url": "/high-movie/page/{{page}}" },
+      { "name": "动漫电影", "url": "/cartoon-movie/page/{{page}}" },
+      { "name": "香港经典电影", "url": "/hongkong-movie/page/{{page}}" },
+      { "name": "国产剧", "url": "/domestic-drama/page/{{page}}" },
+      { "name": "欧美剧", "url": "/american-drama/page/{{page}}" },
+      { "name": "韩剧", "url": "/korean-drama/page/{{page}}" },
+      { "name": "动漫剧", "url": "/anime-drama/page/{{page}}" }
+    ],
+    "search": {
+      "url": "/?s={{key}}",
+      "list": ".bt_img.mi_ne_kd li",
+      "name": "h3.0@text",
+      "tips": ".jidi.0@text",
+      "coverUrl": "img.0@data-original",
+      "detailUrl": "a.0@href"
+    },
+    "detail": {
+      "meta": ".moviedteail_list@html"
+    },
+    "play": {
+      "list": ".paly_list_btn a",
+      "name": "text",
+      "url": "href"
+    }
+  }
