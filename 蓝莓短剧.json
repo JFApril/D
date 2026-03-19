@@ -1,0 +1,43 @@
+{
+  "name": "🎬蓝莓短剧",
+  "type": 2,
+  "api": "https://app.whjzjx.cn",
+  "searchable": true,
+  "login":{
+     "url":"https://app.whjzjx.cn/v1/account/login",
+     "method":"POST",
+     "post":"device=20caaae96b3443174bf4ebdbdcc253776",
+     "authorization":"$.data.token"
+  },
+  "header":{
+    "authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzU4MDgxNDAsIlVzZXJJZCI6MTc3Njk4NjcsInJlZ2lzdGVyX3RpbWUiOiIyMDI0LTAxLTEzIDE3OjQyOjE3IiwiaXNfbW9iaWxlX2JpbmQiOmZhbHNlfQ.E4vexOAMRo9_LJMLHpcrZojX2rHcWPJ4fsti18SrS5Y"
+  },
+  "categories": [
+    { "name": "古装", "url": "/v1/theater/home_page?theater_class_id=0&page_num={{page-1}}&page_size=24" },
+    { "name": "穿越", "url": "/v1/theater/home_page?theater_class_id=1&page_num={{page-1}}&page_size=24" },
+    { "name": "逆袭", "url": "/v1/theater/home_page?theater_class_id=2&page_num={{page-1}}&page_size=24" },
+    { "name": "重生", "url": "/v1/theater/home_page?theater_class_id=3&page_num={{page-1}}&page_size=24" }
+  ],
+  "search": {
+    "url": "/v2/search",
+    "method":"POST",
+    "post":"text={{key}}",
+    "list": "$.data.search_data",
+    "name": "$.title",
+    "tips": "{{$.current_num}}/{{$.total}}",
+    "coverUrl": "$.cover_url",
+    "detailUrl": "https://app.whjzjx.cn/v2/theater_parent/detail?theater_parent_id={{$.id}}"
+  },
+  "list":{
+    "list": "$.data.list",
+    "name": "$.theater.title",
+    "tips": "{{$.theater.current_num}}/{{$.theater.total}}",
+    "coverUrl": "$.theater.cover_url",
+    "detailUrl": "https://app.whjzjx.cn/v2/theater_parent/detail?theater_parent_id={{$.theater.id}}"
+  },
+  "play": {
+    "list": "$.data.theaters",
+    "name": "$.num",
+    "url": "$.son_video_url"
+  }
+}
