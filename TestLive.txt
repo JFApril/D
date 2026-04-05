@@ -104,6 +104,16 @@ CETV-4,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001348/index
 新纪实,video://https://live.kankanews.com/huikan?id=12
 新视觉HD,http://120.76.248.139/live/bfgd/4200000249.m3u8
 
+五星体育,video://https://live.kankanews.com/huikan?id=10
+魔都眼,video://https://live.kankanews.com/huikan?id=11
+东方卫视,video://https://live.kankanews.com/huikan?id=1
+上海新闻综合,video://https://live.kankanews.com/huikan?id=2
+上海都市,video://https://live.kankanews.com/huikan?id=4
+第一财经,video://https://live.kankanews.com/huikan?id=5
+哈哈炫动,video://https://live.kankanews.com/huikan?id=9
+人文纪实,video://https://live.kankanews.com/huikan?id=12
+
+
 🔥咪咕体育,#genre#
 咪咕视频1,http://36.155.98.21/gslbserv.itv.cmvideo.cn:80/5000000011000265001/1.m3u8?channel-id=FifastbLive&Contentid=3000000001000005969&livemode=1&stbId=001C366F865C602F58587E8BE8616930&mode=1&$8M FHD
 咪咕视频2,http://36.155.98.21/gslbserv.itv.cmvideo.cn:80/5000000011000265001/1.m3u8?channel-id=FifastbLive&Contentid=3000000001000007218&livemode=1&stbId=001C366F865C602F58587E8BE8616930&mode=1&$8M FHD
