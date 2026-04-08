@@ -104,6 +104,17 @@ CETV-4,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001348/index
 新纪实,video://https://live.kankanews.com/huikan?id=12
 新视觉HD,http://120.76.248.139/live/bfgd/4200000249.m3u8
 
+
+五星体育,http://raytitor.cn:8888/udp/233.18.204.58:5140
+五星体育,http://wsc2007123.myds.me:30100/udp/233.18.204.58:5140
+五星体育,http://home.wscxy.fun:30100/udp/233.18.204.58:5140
+五星体育,http://58.37.29.210:9001/udp/233.18.204.58:5140
+五星体育,http://woshiysy1.synology.me:4999/udp/233.18.204.58:5140
+五星体育,http://116.233.89.61:62888/udp/233.18.204.58:5140
+五星体育,http://woshiysy2.synology.me:4999/udp/233.18.204.58:5140
+五星体育,http://116.237.61.115:4022/udp/233.18.204.58:5140
+五星体育,http://yyf1991.top:9999/udp/233.18.204.58:5140
+
 五星体育,video://https://live.kankanews.com/huikan?id=10
 魔都眼,video://https://live.kankanews.com/huikan?id=11
 东方卫视,video://https://live.kankanews.com/huikan?id=1
