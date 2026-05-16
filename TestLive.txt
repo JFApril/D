@@ -84,7 +84,7 @@ CETV-4,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001348/index
 纪实人文,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001019/index.m3u8
 
 
-🇨🇳上海金山,#genre#
+🇨🇳上海特色,#genre#
 上海教育电视台,http://tencent-live.setv.sh.cn/live/programme_setvweb.m3u8?txSecret=fd19aacaed289e44e3f6d8baa5485a41&txTime=82DF98A7
 点掌财经,http://volcanopull.aniu.tv/live/aniu2/index.m3u8
 金山电视台,http://pili-live-hls.wdit.com.cn/wditlive/8818dfe5f4df45ba9a3f32964d172fb2b6d3.m3u8
@@ -114,7 +114,7 @@ CETV-4,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001348/index
 五星体育,http://woshiysy2.synology.me:4999/udp/233.18.204.58:5140
 五星体育,http://116.237.61.115:4022/udp/233.18.204.58:5140
 五星体育,http://yyf1991.top:9999/udp/233.18.204.58:5140
-
+五星体育HD,http://223.167.5.205:4022/rtp/233.18.204.58:5140
 五星体育,video://https://live.kankanews.com/huikan?id=10
 魔都眼,video://https://live.kankanews.com/huikan?id=11
 东方卫视,video://https://live.kankanews.com/huikan?id=1
