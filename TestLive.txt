@@ -1052,3 +1052,18 @@ viutv6,http://120.234.44.98:18180/TV00000000000000000084@HHZT
 凤凰中文台,http://120.234.44.98:18180/TV00000000000000000008@HHZT
 凤凰资讯台,http://120.234.44.98:18180/TV00000000000000000009@HHZT
 凤凰香港台,http://120.234.44.98:18180/TV00000000000000000024@HHZT
+
+❤️世界杯1,#genre#
+咪咕非移动网络需要映射host
+Host=cache.ott.fifalive.itv.cmvideo.cn=base-v4v6-cm-miguvideo.e.cdn.chinamobile.com
+至臻视界,http://221.181.100.64/gslbserv.itv.cmvideo.cn/3000000010000015686/index.m3u8?channel-id=FifastbLive&Contentid=3000000010000015686&livemode=1&stbId=m
+咪视界4K,http://221.181.100.64/gslbserv.itv.cmvideo.cn/3000000010000015686/index.m3u8?channel-id=FifastbLive&Contentid=3000000010000005180&livemode=1&stbId=m
+616,http://77.90.60.172:55555/6
+617,http://77.90.60.172:55555/8
+618,http://77.90.60.172:55555/3
+619,http://77.90.60.172:55555/4
+TSN 4K,http://77.90.60.172:55555/1
+广东体育,http://77.90.60.172:55555/2
+福克斯4K,http://77.90.60.172:55555/5
+福克斯体育1,http://77.90.60.172:55555/7
+德语ORF 1,http://77.90.60.172:55555/9
