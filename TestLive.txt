@@ -951,6 +951,15 @@ TSN 4K,http://77.90.60.172:55555/1
 福克斯体育1,http://77.90.60.172:55555/7
 德语ORF 1,http://77.90.60.172:55555/9
 
+
+世界杯3,https://1nyaler.streamhostingcdn.top/stream/32/index.m3u8
+世界杯4,https://1nyaler.streamhostingcdn.top/stream/23/index.m3u8
+世界杯5,https://1nyaler.streamhostingcdn.top/stream/94/index.m3u8
+世界杯6,https://1nyaler.streamhostingcdn.top/stream/89/index.m3u8
+世界杯7,https://1nyaler.streamhostingcdn.top/stream/106/index.m3u8
+世界杯8,https://dfr80qz435crc.cloudfront.net/MNOP/Amagi/Caze/Caze_TV_BR/1080p-vtt/index.m3u8
+世界杯9,https://1nyaler.streamhostingcdn.top/stream/52/index.m3u8
+
 💚咪咕飞龙,#genre#
 赛事睛彩竞技,http://feilong123.vip/409990236/iptv/gdy.php?id=18
 赛事睛彩竞技,http://feilong123.vip/409990236/iptv/gdy.php?id=24
