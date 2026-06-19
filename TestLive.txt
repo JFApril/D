@@ -104,6 +104,7 @@ CETV-4,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001348/index
 新纪实,video://https://live.kankanews.com/huikan?id=12
 新视觉HD,http://120.76.248.139/live/bfgd/4200000249.m3u8
 
+五星体育,https://cdn15.163189.xyz/163189/wxty
 五星体育,http://58.37.164.52:4000/rtp/233.18.204.6:5140
 五星体育,http://58.37.164.52:4000/rtp/233.18.204.58:5140
 五星体育,http://180.173.123.18:8888/rtp/233.18.204.6:5140
