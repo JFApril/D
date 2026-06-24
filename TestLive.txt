@@ -1037,25 +1037,6 @@ BesTV4K电影,http://www.rogerxlj.top:9998/rtp/233.18.204.169:5140
 BesTV4K记录,http://www.rogerxlj.top:9998/rtp/233.18.204.170:5140
 BesTV4K动画,http://www.rogerxlj.top:9998/rtp/233.18.204.171:5140
 
-💛央视频道,#genre#
-综合,http://115.56.90.71:843/live02.hrtn.net/live/cctv1hd_3000.m3u8
-财经,http://115.56.90.71:843/live02.hrtn.net/live/cctv2hd_3000.m3u8
-综艺http://115.56.90.71:843/live02.hrtn.net/live/cctv3hd_3000.m3u8
-国际,http://115.56.90.71:843/live02.hrtn.net/live/cctv4hd_3000.m3u8
-体育,http://115.56.90.71:843/live02.hrtn.net/live/cctv5hd_3000.m3u8
-赛事,http://115.56.90.71:843/live02.hrtn.net/live/cctv5phd_3000.m3u8
-电影,http://115.56.90.71:843/live02.hrtn.net/live/cctv6hd_3000.m3u8
-军事,http://115.56.90.71:843/live02.hrtn.net/live/cctv7hd_3000.m3u8
-影视,http://115.56.90.71:843/live02.hrtn.net/live/cctv8hd_3000.m3u8
-纪录,http://115.56.90.71:843/live02.hrtn.net/live/cctv9hd_3000.m3u8
-科教,http://115.56.90.71:843/live02.hrtn.net/live/cctv10hd_3000.m3u8
-戏曲,http://115.56.90.71:843/live02.hrtn.net/live/cctv11hd_3000.m3u8
-社会,http://115.56.90.71:843/live02.hrtn.net/live/cctv12hd_3000.m3u8
-新闻,http://115.56.90.71:843/live02.hrtn.net/live/cctv13hd_3000.m3u8
-少儿,http://115.56.90.71:843/live02.hrtn.net/live/cctv17hd_3000.m3u8
-音乐,http://115.56.90.71:843/live02.hrtn.net/live/cctv15hd_3000.m3u8
-奥林,http://115.56.90.71:843/live02.hrtn.net/live/cctv16hd_3000.m3u8
-农业,http://115.56.90.71:843/live02.hrtn.net/live/cctv14hd_3000.m3u8
 
 💜咪咕央卫,#genre#
 CCTV1综合,http://101.34.236.223:1112/608807420
