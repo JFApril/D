@@ -1,0 +1,20 @@
+{
+    "sites": [
+        {
+            "key": "damizhibo",
+            "name": "大米直播🏟[体]",
+            "type": 3,
+            "api": "./test.js",
+            "searchable": 0,
+            "quickSearch": 0,
+            "filterable": 0,
+            "playerType": 2,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        }
+
+
+    ]
+}
