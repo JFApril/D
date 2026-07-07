@@ -4,7 +4,7 @@
             "key": "damizhibo",
             "name": "大米直播🏟[体]",
             "type": 3,
-            "api": "https://gh-proxy.com/raw.githubusercontent.com/JFApril/D/main/file/test.js",
+            "api": "./test.js",
             "searchable": 0,
             "quickSearch": 0,
             "filterable": 0,
