@@ -13,6 +13,20 @@
                 "type": "list",
                 "ratio": 1
             }
+        },
+        {
+            "key": "doubaozhibo",
+            "name": "豆包直播🏟[体]",
+            "type": 3,
+            "api": "./doubao.js",
+            "searchable": 0,
+            "quickSearch": 0,
+            "filterable": 0,
+            "playerType": 2,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
         }
 
 
