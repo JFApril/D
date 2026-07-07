@@ -1,2 +1,416 @@
 //toastlog("damizhibo")
-const HOST='\x68\x74\x74\x70\x73\x3a\x2f\x2f\x77\x77\x77\x2e\x64\x61\x6d\x69\x7a\x68\x69\x62\x6f\x2e\x63\x6f\x6d';const LIST_URL='\x68\x74\x74\x70\x73\x3a\x2f\x2f\x77\x77\x77\x2e\x64\x61\x6d\x69\x7a\x68\x69\x62\x6f\x2e\x63\x6f\x6d\x2f\x6c\x69\x73\x74\x2e\x6a\x73\x6f\x6e';const LOGO='\x68\x74\x74\x70\x73\x3a\x2f\x2f\x77\x77\x77\x2e\x64\x61\x6d\x69\x7a\x68\x69\x62\x6f\x2e\x63\x6f\x6d\x2f\x66\x61\x76\x69\x63\x6f\x6e\x2e\x69\x63\x6f';const UA='\x4d\x6f\x7a\x69\x6c\x6c\x61\x2f\x35\x2e\x30 \x28\x57\x69\x6e\x64\x6f\x77\x73 \x4e\x54 \x31\x30\x2e\x30\x3b \x57\x69\x6e\x36\x34\x3b \x78\x36\x34\x29 \x41\x70\x70\x6c\x65\x57\x65\x62\x4b\x69\x74\x2f\x35\x33\x37\x2e\x33\x36 \x28\x4b\x48\x54\x4d\x4c\x2c \x6c\x69\x6b\x65 \x47\x65\x63\x6b\x6f\x29 \x43\x68\x72\x6f\x6d\x65\x2f\x31\x34\x30\x2e\x30\x2e\x30\x2e\x30 \x53\x61\x66\x61\x72\x69\x2f\x35\x33\x37\x2e\x33\x36';function clean(ruO$VZ1){return window["\x53\x74\x72\x69\x6e\x67"](ruO$VZ1||'')['\x72\x65\x70\x6c\x61\x63\x65'](/<script[\s\S]*?<\/script>/gi,'')['\x72\x65\x70\x6c\x61\x63\x65'](/<style[\s\S]*?<\/style>/gi,'')['\x72\x65\x70\x6c\x61\x63\x65'](/<[^>]+>/g,'')['\x72\x65\x70\x6c\x61\x63\x65'](/&nbsp;/g,' ')['\x72\x65\x70\x6c\x61\x63\x65'](/&amp;/g,'\x26')['\x72\x65\x70\x6c\x61\x63\x65'](/&quot;/g,'\x22')['\x72\x65\x70\x6c\x61\x63\x65'](/&#39;/g,"\x27")['\x72\x65\x70\x6c\x61\x63\x65'](/\s+/g,' ')['\x74\x72\x69\x6d']()}function absUrl(Uch2){if(!Uch2)return LOGO;Uch2=window["\x53\x74\x72\x69\x6e\x67"](Uch2)['\x74\x72\x69\x6d']();if(/^https?:\/\//i['\x74\x65\x73\x74'](Uch2))return Uch2;if(Uch2['\x69\x6e\x64\x65\x78\x4f\x66']('\x2f\x2f')===0)return'\x68\x74\x74\x70\x73\x3a'+Uch2;if(Uch2[0]==='\x2f')return HOST['\x72\x65\x70\x6c\x61\x63\x65'](/\/$/,'')+Uch2;return HOST['\x72\x65\x70\x6c\x61\x63\x65'](/\/$/,'')+'\x2f'+Uch2}function safeJson(ZhyZDUO3,Zs4){try{return JSON['\x70\x61\x72\x73\x65'](ZhyZDUO3||'\x7b\x7d')}catch(e){return Zs4||{}}}function getHeaders(){return{'\x55\x73\x65\x72\x2d\x41\x67\x65\x6e\x74':UA,'\x52\x65\x66\x65\x72\x65\x72':HOST+'\x2f','\x41\x63\x63\x65\x70\x74':'\x2a\x2f\x2a','\x41\x63\x63\x65\x70\x74\x2d\x4c\x61\x6e\x67\x75\x61\x67\x65':'\x7a\x68\x2d\x43\x4e\x2c\x7a\x68\x3b\x71\x3d\x30\x2e\x39'}}async function fetchText(K5,golLH6){const hd=getHeaders();const to=golLH6||8000;try{if(typeof Java!=='\x75\x6e\x64\x65\x66\x69\x6e\x65\x64'&&Java&&Java['\x72\x65\x71']){const r=await Java['\x72\x65\x71'](K5,{headers:hd,golLH6:to});if(typeof r==='\x73\x74\x72\x69\x6e\x67')return r;return window["\x53\x74\x72\x69\x6e\x67"]((r&&(r['\x62\x6f\x64\x79']||r['\x63\x6f\x6e\x74\x65\x6e\x74']||r['\x64\x61\x74\x61']))||'')}const r2=await req(K5,{headers:hd,golLH6:to});if(typeof r2==='\x73\x74\x72\x69\x6e\x67')return r2;return window["\x53\x74\x72\x69\x6e\x67"]((r2&&(r2['\x63\x6f\x6e\x74\x65\x6e\x74']||r2['\x62\x6f\x64\x79']||r2['\x64\x61\x74\x61']))||'')}catch(e){return''}}async function fetchJson(RXImVsz7){try{return JSON['\x70\x61\x72\x73\x65'](await fetchText(RXImVsz7)||'\x7b\x7d')}catch(e){return{}}}let _teamLogos={};let _logoLoaded=false;async function loadTeamLogos(){if(_logoLoaded)return;try{const html=await fetchText(HOST+'\x2f\x3f\x5f\x74\x3d'+window["\x44\x61\x74\x65"]['\x6e\x6f\x77']());if(!html)return;const imgRegex=/<img[^>]*src="\x28\x5b\x5e"]*)"\x5b\x5e\x3e\x5d\x2a\x61\x6c\x74\x3d"([^"\x5d\x2a\x29"[^>]*>/g;let m;while((m=imgRegex['\x65\x78\x65\x63'](html))!==null){const alt=m[2]['\x74\x72\x69\x6d']();if(alt&&alt['\x6c\x65\x6e\x67\x74\x68']>1&&!alt['\x69\x6e\x63\x6c\x75\x64\x65\x73']('\x6c\x6f\x67\x6f')&&!alt['\x69\x6e\x63\x6c\x75\x64\x65\x73']('\x4c\x6f\x67\x6f')){_teamLogos[alt]=m[1]}}_logoLoaded=true}catch(e){}}function getTeamLogo(teamName){return _teamLogos[teamName]||''}async function fetchAllMatches(){try{const text=await fetchText(LIST_URL);if(!text)return[];const data=JSON['\x70\x61\x72\x73\x65'](text);if(window["\x41\x72\x72\x61\x79"]['\x69\x73\x41\x72\x72\x61\x79'](data))return data;if(data['\x64\x61\x74\x61']&&window["\x41\x72\x72\x61\x79"]['\x69\x73\x41\x72\x72\x61\x79'](data['\x64\x61\x74\x61']))return data['\x64\x61\x74\x61'];if(data['\x6c\x69\x73\x74']&&window["\x41\x72\x72\x61\x79"]['\x69\x73\x41\x72\x72\x61\x79'](data['\x6c\x69\x73\x74']))return data['\x6c\x69\x73\x74'];if(data['\x72\x65\x73\x75\x6c\x74']&&window["\x41\x72\x72\x61\x79"]['\x69\x73\x41\x72\x72\x61\x79'](data['\x72\x65\x73\x75\x6c\x74']))return data['\x72\x65\x73\x75\x6c\x74'];return[]}catch(e){return[]}}function isFootball(mnnVfHsQX8,v9){if(v9==='\x66\x6f\x6f\x74\x62\x61\x6c\x6c')return true;const name=(mnnVfHsQX8||'')['\x74\x6f\x4c\x6f\x77\x65\x72\x43\x61\x73\x65']();const kw=['\u8db3\u7403','\x66\x6f\x6f\x74\x62\x61\x6c\x6c','\x73\x6f\x63\x63\x65\x72','\u4e16\u754c\u676f','\x77\x6f\x72\x6c\x64 \x63\x75\x70','\u4e2d\u8d85','\x63\x68\x69\x6e\x65\x73\x65 \x73\x75\x70\x65\x72','\x63\x73\x6c','\u82f1\u8d85','\x70\x72\x65\x6d\x69\x65\x72','\x75\x65\x66\x61','\u6b27\u51a0','\u6b27\u8054','\x65\x75\x72\x6f\x70\x61','\u897f\u7532','\x6c\x61\x6c\x69\x67\x61','\u5fb7\u7532','\x62\x75\x6e\x64\x65\x73\x6c\x69\x67\x61','\u610f\u7532','\x73\x65\x72\x69\x65 \x61','\u6cd5\u7532','\x6c\x69\x67\x75\x65 \x31','\u4e2d\u7532','\u4e2d\u4e59','\u8db3\u534f\u676f','\u4e9a\u51a0','\x61\x66\x63','\u4e16\u9884\u8d5b','\u6b27\u56fd\u8054','\x6e\x61\x74\x69\x6f\x6e\x73 \x6c\x65\x61\x67\x75\x65','\u65e5\u804c','\x6a \x6c\x65\x61\x67\x75\x65','\u97e9\x6b','\x6b \x6c\x65\x61\x67\x75\x65','\u6fb3\u8d85','\x61 \x6c\x65\x61\x67\x75\x65','\u8377\u7532','\x65\x72\x65\x64\x69\x76\x69\x73\x69\x65','\u8461\u8d85','\x70\x72\x69\x6d\x65\x69\x72\x61 \x6c\x69\x67\x61','\u4fc4\u8d85','\u51b0\u5c9b\u8d85','\x69\x63\x65\x6c\x61\x6e\x64\x69\x63','\u7231\u8d85','\u7f57\u7532','\u6377\u7532','\x63\x7a\x65\x63\x68','\u5308\u7532','\x68\x75\x6e\x67\x61\x72\x69\x61\x6e','\u4e2d\u51a0','\u6751\u8d85','\u54c8\u8428\u7532','\u62c9\u8131\u8d85','\u6469\u6d1b\u8d85','\u57c3\u585e\u8d85','\u767d\u4fc4\u8d85','\u8499\u53e4\u8d85','\u8d8a\u5973\u8054','\u97e9\u5973\u8054','\u7403\u4f1a\u53cb\u8c0a','\u6fb3\u5a01\u8d85','\u6fb3\u7ef4\u8d85','\u6fb3\u8fbe\u8d85','\u5df4\u897f\u4e59','\u571f\u8d85','\u6bd4\u7532','\u4e39\u8d85','\u632a\u8d85','\u745e\u5178\u8d85','\u5965\u8d85','\u745e\u58eb\u8d85'];for(const k of kw){if(name['\x69\x6e\x63\x6c\x75\x64\x65\x73'](k))return true}return false}function isBasketball(DKl_10,NuNzBTrdi11){if(NuNzBTrdi11==='\x62\x61\x73\x6b\x65\x74\x62\x61\x6c\x6c')return true;const name=(DKl_10||'')['\x74\x6f\x4c\x6f\x77\x65\x72\x43\x61\x73\x65']();const kw=['\u7bee\u7403','\x62\x61\x73\x6b\x65\x74\x62\x61\x6c\x6c','\x6e\x62\x61','\x77\x6e\x62\x61','\x63\x62\x61','\x6e\x62\x6c','\u6b27\u51a0\u7bee','\x65\x75\x72\x6f\x6c\x65\x61\x67\x75\x65','\u6b27\u7bee','\u53d1\u5c55\u8054\u76df','\x67 \x6c\x65\x61\x67\x75\x65','\x6e\x63\x61\x61','\u65b0\u897f\u5170\u8054','\x6e\x7a\x6e\x62\x6c','\u6fb3\u6d32\u7bee','\x6e\x62\x6c \x61\x75\x73\x74\x72\x61\x6c\x69\x61','\u5370\u5c3c\u8054','\x69\x62\x6c','\u65e5\u672c\u7bee','\x62 \x6c\x65\x61\x67\x75\x65','\u97e9\u56fd\u7bee','\x6b\x62\x6c','\u83f2\u5f8b\u5bbe\u7bee','\x70\x62\x61','\u56fd\u9645\u8d5b\u5973','\x77\x6f\x6d\x65\x6e \x69\x6e\x74\x65\x72\x6e\x61\x74\x69\x6f\x6e\x61\x6c','\u571f\u7bee\u8d85','\x62\x73\x6c','\u897f\u7bee\u7532','\u5fb7\u7bee\u7532','\u6cd5\u7bee\u7532','\u610f\u7bee\u7532','\u7acb\u9676\u5b9b\u8054','\x6c\x6b\x6c','\x76\x62\x6c','\u8d8a\u5357\u8054','\u6cf0\u56fd\u8054','\u9a6c\u6765\u897f\u4e9a\u8054'];for(const k of kw){if(name['\x69\x6e\x63\x6c\x75\x64\x65\x73'](k))return true}return false}function isHot(OnGsDsUsr12){const name=(OnGsDsUsr12||'')['\x74\x6f\x4c\x6f\x77\x65\x72\x43\x61\x73\x65']();const kw=['\u4e16\u754c\u676f','\x77\x6f\x72\x6c\x64 \x63\x75\x70','\u4e2d\u8d85','\x63\x73\x6c','\x77\x6e\x62\x61','\x6e\x62\x61','\x63\x62\x61','\u4e2d\u51a0','\u51b0\u5c9b\u8d85','\x69\x63\x65\x6c\x61\x6e\x64\x69\x63','\u5df4\u897f\u4e59','\u56fd\u9645\u8d5b'];for(const k of kw){if(name['\x69\x6e\x63\x6c\x75\x64\x65\x73'](k))return true}return false}function buildVod(MCmsmlv13){if(!MCmsmlv13)return null;const namiId=window["\x53\x74\x72\x69\x6e\x67"](MCmsmlv13['\x6e\x61\x6d\x69\x5f\x69\x64']||MCmsmlv13['\x69\x64']||MCmsmlv13['\x6d\x61\x74\x63\x68\x5f\x69\x64']||'');const homeTeam=MCmsmlv13['\x68\x6f\x6d\x65\x5f\x74\x65\x61\x6d']||MCmsmlv13['\x68\x6f\x6d\x65']||MCmsmlv13['\x74\x65\x61\x6d\x31']||MCmsmlv13['\x74\x65\x61\x6d\x5f\x61']||'';const awayTeam=MCmsmlv13['\x61\x77\x61\x79\x5f\x74\x65\x61\x6d']||MCmsmlv13['\x61\x77\x61\x79']||MCmsmlv13['\x74\x65\x61\x6d\x32']||MCmsmlv13['\x74\x65\x61\x6d\x5f\x62']||'';const leagueName=MCmsmlv13['\x6c\x65\x61\x67\x75\x65\x5f\x6e\x61\x6d\x65']||MCmsmlv13['\x6c\x65\x61\x67\x75\x65']||MCmsmlv13['\x74\x6f\x75\x72\x6e\x61\x6d\x65\x6e\x74']||MCmsmlv13['\x73\x65\x72\x69\x65\x73']||'';const timeStr=MCmsmlv13['\x6d\x61\x74\x63\x68\x5f\x74\x69\x6d\x65']||MCmsmlv13['\x74\x69\x6d\x65']||MCmsmlv13['\x73\x74\x61\x72\x74\x5f\x74\x69\x6d\x65']||MCmsmlv13['\x64\x61\x74\x65']||'';let remark=leagueName;if(timeStr){const t=timeStr['\x72\x65\x70\x6c\x61\x63\x65'](/T/,' ')['\x73\x75\x62\x73\x74\x72\x69\x6e\x67'](0,16);if(t['\x6c\x65\x6e\x67\x74\x68']>=10)remark=leagueName+' '+t}if(timeStr){const cleanTime=timeStr['\x72\x65\x70\x6c\x61\x63\x65'](/T/,' ')['\x73\x75\x62\x73\x74\x72\x69\x6e\x67'](0,19);const matchTime=new window["\x44\x61\x74\x65"](cleanTime);const now=new window["\x44\x61\x74\x65"]();if(!isNaN(matchTime['\x67\x65\x74\x54\x69\x6d\x65']())&&matchTime<=now){remark='\ud83d\udfe2 '+remark}}const logo=getTeamLogo(homeTeam);return{vod_id:'\x64\x6d\x7a\x7c'+namiId,vod_name:homeTeam+' \x76\x73 '+awayTeam,vod_pic:logo||LOGO,vod_remarks:remark,vod_content:(leagueName||'\u4f53\u80b2\u76f4\u64ad')+'\n'+homeTeam+' \x76\x73 '+awayTeam,type_name:leagueName||'\u5168\u90e8'}}function getClasses(){return[{type_id:'\x61\x6c\x6c',type_name:'\u5168\u90e8'},{type_id:'\x68\x6f\x74',type_name:'\ud83d\udd25 \u70ed\u95e8'},{type_id:'\x66\x6f\x6f\x74\x62\x61\x6c\x6c',type_name:'\u26bd \u8db3\u7403'},{type_id:'\x62\x61\x73\x6b\x65\x74\x62\x61\x6c\x6c',type_name:'\ud83c\udfc0 \u7bee\u7403'}]}async function init(W14){}async function home(qhjgXvKt15){return JSON['\x73\x74\x72\x69\x6e\x67\x69\x66\x79']({class:getClasses(),filters:{}})}async function homeVod(){return await category('\x61\x6c\x6c',1,{},{})}async function category(mayqaEmqJ16,LWBjrVTnN17,PnEyfnnFj18,NdXsd$qw19){mayqaEmqJ16=window["\x53\x74\x72\x69\x6e\x67"]((NdXsd$qw19&&NdXsd$qw19['\x63\x61\x74\x65\x49\x64'])||mayqaEmqJ16||'\x61\x6c\x6c');LWBjrVTnN17=window["\x70\x61\x72\x73\x65\x49\x6e\x74"](LWBjrVTnN17)||1;let list=[];try{await loadTeamLogos();const matches=await fetchAllMatches();for(let i=0;i<matches['\x6c\x65\x6e\x67\x74\x68'];i++){const m=matches[i];if(!m)continue;const league=m['\x6c\x65\x61\x67\x75\x65\x5f\x6e\x61\x6d\x65']||m['\x6c\x65\x61\x67\x75\x65']||m['\x74\x6f\x75\x72\x6e\x61\x6d\x65\x6e\x74']||m['\x73\x65\x72\x69\x65\x73']||'';if(mayqaEmqJ16==='\x68\x6f\x74'&&!isHot(league))continue;if(mayqaEmqJ16==='\x66\x6f\x6f\x74\x62\x61\x6c\x6c'&&!isFootball(league))continue;if(mayqaEmqJ16==='\x62\x61\x73\x6b\x65\x74\x62\x61\x6c\x6c'&&!isBasketball(league))continue;const vod=buildVod(m);if(vod)list['\x70\x75\x73\x68'](vod)}}catch(e){}return JSON['\x73\x74\x72\x69\x6e\x67\x69\x66\x79']({code:1,msg:'\u8d5b\u7a0b\u5217\u8868',page:LWBjrVTnN17,pagecount:1,limit:200,total:list['\x6c\x65\x6e\x67\x74\x68'],list})}async function detail(cGlPMf_G20){const id=window["\x53\x74\x72\x69\x6e\x67"](window["\x41\x72\x72\x61\x79"]['\x69\x73\x41\x72\x72\x61\x79'](cGlPMf_G20)?cGlPMf_G20[0]:cGlPMf_G20||'');const parts=id['\x73\x70\x6c\x69\x74']('\x7c');const namiId=parts['\x6c\x65\x6e\x67\x74\x68']>1?parts[1]:id;try{await loadTeamLogos();const matches=await fetchAllMatches();let target=null;for(let i=0;i<matches['\x6c\x65\x6e\x67\x74\x68'];i++){const m=matches[i];if(!m)continue;if(window["\x53\x74\x72\x69\x6e\x67"](m['\x6e\x61\x6d\x69\x5f\x69\x64']||m['\x69\x64']||m['\x6d\x61\x74\x63\x68\x5f\x69\x64']||'')===namiId){target=m;break}}if(!target){return JSON['\x73\x74\x72\x69\x6e\x67\x69\x66\x79']({code:1,msg:'\x6f\x6b',page:1,pagecount:1,limit:1,total:0,list:[]})}const homeTeam=target['\x68\x6f\x6d\x65\x5f\x74\x65\x61\x6d']||target['\x68\x6f\x6d\x65']||target['\x74\x65\x61\x6d\x31']||target['\x74\x65\x61\x6d\x5f\x61']||'';const awayTeam=target['\x61\x77\x61\x79\x5f\x74\x65\x61\x6d']||target['\x61\x77\x61\x79']||target['\x74\x65\x61\x6d\x32']||target['\x74\x65\x61\x6d\x5f\x62']||'';const leagueName=target['\x6c\x65\x61\x67\x75\x65\x5f\x6e\x61\x6d\x65']||target['\x6c\x65\x61\x67\x75\x65']||target['\x74\x6f\x75\x72\x6e\x61\x6d\x65\x6e\x74']||target['\x73\x65\x72\x69\x65\x73']||'';const signals=target['\x73\x69\x67\x6e\x61\x6c\x73']||target['\x6c\x69\x76\x65\x5f\x73\x69\x67\x6e\x61\x6c\x73']||[];let playUrls=[];if(signals['\x6c\x65\x6e\x67\x74\x68']>0){for(let si=0;si<signals['\x6c\x65\x6e\x67\x74\x68'];si++){const sig=signals[si];const name=sig['\x6c\x61\x62\x65\x6c']||sig['\x6e\x61\x6d\x65']||sig['\x74\x69\x74\x6c\x65']||'\u7ebf\u8def'+(si+1);const url=sig['\x75\x72\x6c']||sig['\x6c\x69\x6e\x6b']||sig['\x73\x72\x63']||'';if(url){playUrls['\x70\x75\x73\x68'](name+'\x24'+url)}}}if(playUrls['\x6c\x65\x6e\x67\x74\x68']===0){playUrls['\x70\x75\x73\x68']('\u6682\u65e0\u4fe1\u53f7\x24'+HOST)}const vod={vod_id:id,vod_name:homeTeam+' \x76\x73 '+awayTeam,vod_pic:getTeamLogo(homeTeam)||LOGO,vod_remarks:leagueName,vod_content:(leagueName||'\u4f53\u80b2\u76f4\u64ad')+'\n'+homeTeam+' \x76\x73 '+awayTeam,vod_play_from:'\u5927\u7c73\u76f4\u64ad',vod_play_url:playUrls['\x6a\x6f\x69\x6e']('\x23')};return JSON['\x73\x74\x72\x69\x6e\x67\x69\x66\x79']({code:1,msg:'\u76f4\u64ad\u8be6\u60c5',page:1,pagecount:1,limit:1,total:1,list:[vod]})}catch(e){return JSON['\x73\x74\x72\x69\x6e\x67\x69\x66\x79']({code:1,msg:'\x6f\x6b',page:1,pagecount:1,limit:1,total:0,list:[]})}}async function search(czOuRlz21,UuRsPeHpE22,CiDC23){const keyword=(czOuRlz21||'')['\x74\x72\x69\x6d']()['\x74\x6f\x4c\x6f\x77\x65\x72\x43\x61\x73\x65']();if(!keyword){return JSON['\x73\x74\x72\x69\x6e\x67\x69\x66\x79']({code:1,msg:'\u641c\u7d22',page:1,pagecount:1,limit:20,total:0,list:[]})}try{await loadTeamLogos();const matches=await fetchAllMatches();const list=[];for(let i=0;i<matches['\x6c\x65\x6e\x67\x74\x68'];i++){const m=matches[i];if(!m)continue;const homeTeam=m['\x68\x6f\x6d\x65\x5f\x74\x65\x61\x6d']||m['\x68\x6f\x6d\x65']||m['\x74\x65\x61\x6d\x31']||m['\x74\x65\x61\x6d\x5f\x61']||'';const awayTeam=m['\x61\x77\x61\x79\x5f\x74\x65\x61\x6d']||m['\x61\x77\x61\x79']||m['\x74\x65\x61\x6d\x32']||m['\x74\x65\x61\x6d\x5f\x62']||'';const league=m['\x6c\x65\x61\x67\x75\x65\x5f\x6e\x61\x6d\x65']||m['\x6c\x65\x61\x67\x75\x65']||m['\x74\x6f\x75\x72\x6e\x61\x6d\x65\x6e\x74']||m['\x73\x65\x72\x69\x65\x73']||'';const searchText=(homeTeam+' '+awayTeam+' '+league)['\x74\x6f\x4c\x6f\x77\x65\x72\x43\x61\x73\x65']();if(searchText['\x69\x6e\x64\x65\x78\x4f\x66'](keyword)===-1)continue;const vod=buildVod(m);if(vod)list['\x70\x75\x73\x68'](vod)}return JSON['\x73\x74\x72\x69\x6e\x67\x69\x66\x79']({code:1,msg:'\u641c\u7d22\u7ed3\u679c',page:CiDC23||1,pagecount:1,limit:50,total:list['\x6c\x65\x6e\x67\x74\x68'],list})}catch(e){return JSON['\x73\x74\x72\x69\x6e\x67\x69\x66\x79']({code:1,msg:'\u641c\u7d22',page:1,pagecount:1,limit:20,total:0,list:[]})}}async function play(bwV$24,nfOrUVqRL25,$V_K26){const url=window["\x53\x74\x72\x69\x6e\x67"](nfOrUVqRL25||'');if(/\.(m3u8|flv|mp4)(\?|$)/i['\x74\x65\x73\x74'](url)){return JSON['\x73\x74\x72\x69\x6e\x67\x69\x66\x79']({parse:0,url:url,header:{'\x55\x73\x65\x72\x2d\x41\x67\x65\x6e\x74':UA,'\x52\x65\x66\x65\x72\x65\x72':HOST+'\x2f','\x4f\x72\x69\x67\x69\x6e':HOST}})}return JSON['\x73\x74\x72\x69\x6e\x67\x69\x66\x79']({parse:1,url:url,header:{'\x55\x73\x65\x72\x2d\x41\x67\x65\x6e\x74':UA,'\x52\x65\x66\x65\x72\x65\x72':HOST+'\x2f','\x4f\x72\x69\x67\x69\x6e':HOST}})}async function homeContent(pgJ27){return safeJson(await home(pgJ27),{class:[],filters:{}})}async function homeVideoContent(){return safeJson(await homeVod(),{list:[]})}async function categoryContent(kIjWOhrF28,jew29,Zblld30,hpVg_nok31){return safeJson(await category(kIjWOhrF28,jew29,Zblld30,hpVg_nok31||{}),{list:[]})}async function detailContent(mY_OjE32){return safeJson(await detail(mY_OjE32),{list:[]})}async function searchContent(Vls33,RHNfmRW34,dss35){return safeJson(await search(Vls33,RHNfmRW34,dss35||1),{list:[]})}async function playerContent(hK36,mrW37,LXN38){return safeJson(await play(hK36,mrW37,LXN38),{parse:1,url:mrW37})}export function __jsEvalReturn(){return{init:init,home:home,homeVod:homeVod,category:category,search:search,detail:detail,play:play,homeContent:homeContent,homeVideoContent:homeVideoContent,categoryContent:categoryContent,detailContent:detailContent,searchContent:searchContent,playerContent:playerContent}}
+const HOST = 'https://www.damizhibo.com';
+const LIST_URL = 'https://www.damizhibo.com/list.json';
+const LOGO = 'https://www.damizhibo.com/favicon.ico';
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+
+/* ============================================================================
+ *   工具函数
+ * ============================================================================ */
+function clean(s) {
+  return String(s || '').replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ').trim();
+}
+
+function absUrl(url) {
+  if (!url) return LOGO;
+  url = String(url).trim();
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.indexOf('//') === 0) return 'https:' + url;
+  if (url[0] === '/') return HOST.replace(/\/$/, '') + url;
+  return HOST.replace(/\/$/, '') + '/' + url;
+}
+
+function safeJson(t, d) {
+  try { return JSON.parse(t || '{}'); } catch(e) { return d || {}; }
+}
+
+function getHeaders() {
+  return {
+    'User-Agent': UA,
+    'Referer': HOST + '/',
+    'Accept': '*/*',
+    'Accept-Language': 'zh-CN,zh;q=0.9'
+  };
+}
+
+/* ── 网络请求 ── */
+async function fetchText(url, timeout) {
+  const hd = getHeaders();
+  const to = timeout || 8000;
+  try {
+    if (typeof Java !== 'undefined' && Java && Java.req) {
+      const r = await Java.req(url, { headers: hd, timeout: to });
+      if (typeof r === 'string') return r;
+      return String((r && (r.body || r.content || r.data)) || '');
+    }
+    const r2 = await req(url, { headers: hd, timeout: to });
+    if (typeof r2 === 'string') return r2;
+    return String((r2 && (r2.content || r2.body || r2.data)) || '');
+  } catch(e) {
+    return '';
+  }
+}
+
+async function fetchJson(url) {
+  try { return JSON.parse(await fetchText(url) || '{}'); } catch(e) { return {}; }
+}
+
+/* ── 球队Logo缓存 ── */
+let _teamLogos = {};
+let _logoLoaded = false;
+
+/**
+ * 从首页HTML解析球队Logo
+ */
+async function loadTeamLogos() {
+  if (_logoLoaded) return;
+  try {
+    const html = await fetchText(HOST + '/?_t=' + Date.now());
+    if (!html) return;
+
+    // 解析 img 标签：div.team-logo.img-logo > img[src][alt]
+    const imgRegex = /<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*>/g;
+    let m;
+    while ((m = imgRegex.exec(html)) !== null) {
+      const alt = m[2].trim();
+      if (alt && alt.length > 1 && !alt.includes('logo') && !alt.includes('Logo')) {
+        _teamLogos[alt] = m[1];
+      }
+    }
+
+    _logoLoaded = true;
+  } catch(e) {
+    // 静默
+  }
+}
+
+function getTeamLogo(teamName) {
+  return _teamLogos[teamName] || '';
+}
+
+/* ── 比赛数据 ── */
+async function fetchAllMatches() {
+  try {
+    const text = await fetchText(LIST_URL);
+    if (!text) return [];
+    const data = JSON.parse(text);
+    if (Array.isArray(data)) return data;
+    if (data.data && Array.isArray(data.data)) return data.data;
+    if (data.list && Array.isArray(data.list)) return data.list;
+    if (data.result && Array.isArray(data.result)) return data.result;
+    return [];
+  } catch(e) {
+    return [];
+  }
+}
+
+/* ── 分类判断 ── */
+function isFootball(league, sportType) {
+  if (sportType === 'football') return true;
+  const name = (league || '').toLowerCase();
+  const kw = [
+    '足球','football','soccer',
+    '世界杯','world cup','中超','chinese super','csl',
+    '英超','premier','uefa','欧冠','欧联','europa',
+    '西甲','laliga','德甲','bundesliga','意甲','serie a',
+    '法甲','ligue 1','中甲','中乙','足协杯',
+    '亚冠','afc','世预赛','欧国联','nations league',
+    '日职','j league','韩k','k league','澳超','a league',
+    '荷甲','eredivisie','葡超','primeira liga',
+    '俄超','冰岛超','icelandic','爱超',
+    '罗甲','捷甲','czech','匈甲','hungarian',
+    '中冠','村超','哈萨甲','拉脱超','摩洛超',
+    '埃塞超','白俄超','蒙古超','越女联','韩女联',
+    '球会友谊','澳威超','澳维超','澳达超','巴西乙',
+    '土超','比甲','丹超','挪超','瑞典超','奥超','瑞士超'
+  ];
+  for (const k of kw) { if (name.includes(k)) return true; }
+  return false;
+}
+
+function isBasketball(league, sportType) {
+  if (sportType === 'basketball') return true;
+  const name = (league || '').toLowerCase();
+  const kw = [
+    '篮球','basketball',
+    'nba','wnba','cba','nbl',
+    '欧冠篮','euroleague','欧篮',
+    '发展联盟','g league','ncaa',
+    '新西兰联','nznbl','澳洲篮','nbl australia',
+    '印尼联','ibl','日本篮','b league',
+    '韩国篮','kbl','菲律宾篮','pba',
+    '国际赛女','women international',
+    '土篮超','bsl','西篮甲','德篮甲',
+    '法篮甲','意篮甲','立陶宛联','lkl',
+    'vbl','越南联','泰国联','马来西亚联'
+  ];
+  for (const k of kw) { if (name.includes(k)) return true; }
+  return false;
+}
+
+function isHot(league) {
+  const name = (league || '').toLowerCase();
+  const kw = ['世界杯','world cup','中超','csl','wnba','nba','cba',
+    '中冠','冰岛超','icelandic','巴西乙','国际赛'];
+  for (const k of kw) { if (name.includes(k)) return true; }
+  return false;
+}
+
+/* ── 构建VOD ── */
+function buildVod(match) {
+  if (!match) return null;
+  const namiId = String(match.nami_id || match.id || match.match_id || '');
+  const homeTeam = match.home_team || match.home || match.team1 || match.team_a || '';
+  const awayTeam = match.away_team || match.away || match.team2 || match.team_b || '';
+  const leagueName = match.league_name || match.league || match.tournament || match.series || '';
+  const timeStr = match.match_time || match.time || match.start_time || match.date || '';
+
+  // 格式化时间
+  let remark = leagueName;
+  if (timeStr) {
+    const t = timeStr.replace(/T/, ' ').substring(0, 16);
+    if (t.length >= 10) remark = leagueName + ' ' + t;
+  }
+
+  // 🟢 判断是否已开赛（比赛时间 ≤ 当前时间）
+  if (timeStr) {
+    const cleanTime = timeStr.replace(/T/, ' ').substring(0, 19);
+    const matchTime = new Date(cleanTime);
+    const now = new Date();
+    if (!isNaN(matchTime.getTime()) && matchTime <= now) {
+      remark = '🟢 ' + remark;
+    }
+  }
+
+  // 主队Logo
+  const logo = getTeamLogo(homeTeam);
+
+  return {
+    vod_id: 'dmz|' + namiId,
+    vod_name: homeTeam + ' vs ' + awayTeam,
+    vod_pic: logo || LOGO,
+    vod_remarks: remark,
+    vod_content: (leagueName || '体育直播') + '\n' + homeTeam + ' vs ' + awayTeam,
+    type_name: leagueName || '全部'
+  };
+}
+
+/* ── 分类定义 ── */
+function getClasses() {
+  return [
+    { type_id: 'all', type_name: '全部' },
+    { type_id: 'hot', type_name: '🔥 热门' },
+    { type_id: 'football', type_name: '⚽ 足球' },
+    { type_id: 'basketball', type_name: '🏀 篮球' }
+  ];
+}
+
+/* ============================================================================
+ *   爬虫接口
+ * ============================================================================ */
+async function init(cfg) { }
+
+async function home(filter) {
+  return JSON.stringify({ class: getClasses(), filters: {} });
+}
+
+async function homeVod() {
+  return await category('all', 1, {}, {});
+}
+
+async function category(tid, pg, filter, extend) {
+  tid = String((extend && extend.cateId) || tid || 'all');
+  pg = parseInt(pg) || 1;
+  let list = [];
+
+  try {
+    await loadTeamLogos();
+    const matches = await fetchAllMatches();
+
+    for (let i = 0; i < matches.length; i++) {
+      const m = matches[i];
+      if (!m) continue;
+      const league = m.league_name || m.league || m.tournament || m.series || '';
+
+      // 分类过滤
+      if (tid === 'hot' && !isHot(league)) continue;
+      if (tid === 'football' && !isFootball(league)) continue;
+      if (tid === 'basketball' && !isBasketball(league)) continue;
+
+      const vod = buildVod(m);
+      if (vod) list.push(vod);
+    }
+  } catch(e) {}
+
+  return JSON.stringify({
+    code: 1, msg: '赛程列表', page: pg, pagecount: 1,
+    limit: 200, total: list.length, list
+  });
+}
+
+async function detail(ids) {
+  const id = String(Array.isArray(ids) ? ids[0] : ids || '');
+  const parts = id.split('|');
+  const namiId = parts.length > 1 ? parts[1] : id;
+
+  try {
+    await loadTeamLogos();
+    const matches = await fetchAllMatches();
+    let target = null;
+
+    for (let i = 0; i < matches.length; i++) {
+      const m = matches[i];
+      if (!m) continue;
+      if (String(m.nami_id || m.id || m.match_id || '') === namiId) {
+        target = m;
+        break;
+      }
+    }
+
+    if (!target) {
+      return JSON.stringify({ code: 1, msg: 'ok', page: 1, pagecount: 1, limit: 1, total: 0, list: [] });
+    }
+
+    const homeTeam = target.home_team || target.home || target.team1 || target.team_a || '';
+    const awayTeam = target.away_team || target.away || target.team2 || target.team_b || '';
+    const leagueName = target.league_name || target.league || target.tournament || target.series || '';
+    const signals = target.signals || target.live_signals || [];
+
+    // 构建播放列表
+    let playUrls = [];
+    if (signals.length > 0) {
+      for (let si = 0; si < signals.length; si++) {
+        const sig = signals[si];
+        const name = sig.label || sig.name || sig.title || '线路' + (si + 1);
+        const url = sig.url || sig.link || sig.src || '';
+        if (url) {
+          playUrls.push(name + '$' + url);
+        }
+      }
+    }
+
+    if (playUrls.length === 0) {
+      playUrls.push('暂无信号$' + HOST);
+    }
+
+    const vod = {
+      vod_id: id,
+      vod_name: homeTeam + ' vs ' + awayTeam,
+      vod_pic: getTeamLogo(homeTeam) || LOGO,
+      vod_remarks: leagueName,
+      vod_content: (leagueName || '体育直播') + '\n' + homeTeam + ' vs ' + awayTeam,
+      vod_play_from: '大米直播',
+      vod_play_url: playUrls.join('#')
+    };
+
+    return JSON.stringify({ code: 1, msg: '直播详情', page: 1, pagecount: 1, limit: 1, total: 1, list: [vod] });
+  } catch(e) {
+    return JSON.stringify({ code: 1, msg: 'ok', page: 1, pagecount: 1, limit: 1, total: 0, list: [] });
+  }
+}
+
+async function search(wd, quick, pg) {
+  const keyword = (wd || '').trim().toLowerCase();
+  if (!keyword) {
+    return JSON.stringify({ code: 1, msg: '搜索', page: 1, pagecount: 1, limit: 20, total: 0, list: [] });
+  }
+
+  try {
+    await loadTeamLogos();
+    const matches = await fetchAllMatches();
+    const list = [];
+
+    for (let i = 0; i < matches.length; i++) {
+      const m = matches[i];
+      if (!m) continue;
+      const homeTeam = m.home_team || m.home || m.team1 || m.team_a || '';
+      const awayTeam = m.away_team || m.away || m.team2 || m.team_b || '';
+      const league = m.league_name || m.league || m.tournament || m.series || '';
+      const searchText = (homeTeam + ' ' + awayTeam + ' ' + league).toLowerCase();
+
+      if (searchText.indexOf(keyword) === -1) continue;
+
+      const vod = buildVod(m);
+      if (vod) list.push(vod);
+    }
+
+    return JSON.stringify({ code: 1, msg: '搜索结果', page: pg || 1, pagecount: 1, limit: 50, total: list.length, list });
+  } catch(e) {
+    return JSON.stringify({ code: 1, msg: '搜索', page: 1, pagecount: 1, limit: 20, total: 0, list: [] });
+  }
+}
+
+async function play(flag, id, flags) {
+  const url = String(id || '');
+  if (/\.(m3u8|flv|mp4)(\?|$)/i.test(url)) {
+    return JSON.stringify({
+      parse: 0, url: url,
+      header: {
+        'User-Agent': UA,
+        'Referer': HOST + '/',
+        'Origin': HOST
+      }
+    });
+  }
+  return JSON.stringify({
+    parse: 1, url: url,
+    header: {
+      'User-Agent': UA,
+      'Referer': HOST + '/',
+      'Origin': HOST
+    }
+  });
+}
+
+/* ============================================================================
+ *   包装函数（统一响应格式）
+ * ============================================================================ */
+async function homeContent(f) {
+  return safeJson(await home(f), { class: [], filters: {} });
+}
+
+async function homeVideoContent() {
+  return safeJson(await homeVod(), { list: [] });
+}
+
+async function categoryContent(tid, pg, f, ext) {
+  return safeJson(await category(tid, pg, f, ext || {}), { list: [] });
+}
+
+async function detailContent(ids) {
+  return safeJson(await detail(ids), { list: [] });
+}
+
+async function searchContent(wd, q, pg) {
+  return safeJson(await search(wd, q, pg || 1), { list: [] });
+}
+
+async function playerContent(flag, id, flags) {
+  return safeJson(await play(flag, id, flags), { parse: 1, url: id });
+}
+
+/* ============================================================================
+ *   引擎导出 — 全局函数模式
+ * ============================================================================ */
+export function __jsEvalReturn() {
+  return {
+    init: init,
+    home: home,
+    homeVod: homeVod,
+    category: category,
+    search: search,
+    detail: detail,
+    play: play,
+    homeContent: homeContent,
+    homeVideoContent: homeVideoContent,
+    categoryContent: categoryContent,
+    detailContent: detailContent,
+    searchContent: searchContent,
+    playerContent: playerContent
+  };
+}
