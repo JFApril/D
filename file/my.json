@@ -18,7 +18,7 @@
             "key": "zhibomi",
             "name": "直播迷🏟[体]",
             "type": 3,
-            "api": "./zhibomi2.js",
+            "api": "./zhibomi.js",
             "searchable": 0,
             "quickSearch": 0,
             "filterable": 0,
