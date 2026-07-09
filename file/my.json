@@ -28,7 +28,7 @@
                 "ratio": 1
             }
         },
-                {
+        {
             "key": "doubaozhibo",
             "name": "豆包直播🏟[体]",
             "type": 3,
@@ -37,6 +37,19 @@
             "quickSearch": 0,
             "filterable": 0,
             "playerType": 2,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
+            "key": "feili",
+            "name": "菲利体育🏟[体]",
+            "type": 3,
+            "api": "./feili.js",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
             "style": {
                 "type": "list",
                 "ratio": 1
