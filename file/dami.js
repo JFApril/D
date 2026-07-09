@@ -183,7 +183,7 @@ function buildVod(match) {
     const matchTime = new Date(cleanTime);
     const now = new Date();
     if (!isNaN(matchTime.getTime()) && matchTime <= now) {
-      remark = '🟢' + remark;
+      remark = '●' + remark;
     }
   }
 
