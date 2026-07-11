@@ -55,11 +55,24 @@
                 "ratio": 1
             }
         },
-                {
+        {
             "key": "74001",
             "name": "74直播🏟[体]",
             "type": 3,
             "api": "./74001.js",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
+            "key": "jjrrss",
+            "name": "JRS直播🏟[体]",
+            "type": 3,
+            "api": "./jjrrss.js",
             "searchable": 1,
             "quickSearch": 1,
             "filterable": 1,
