@@ -85,7 +85,7 @@
             "key": "zq200.py",
             "name": "ZQ直播🏟[体]",
             "type": 3,
-            "api": "./zq200.py",
+            "api": "./zq200.js",
             "searchable": 1,
             "quickSearch": 1,
             "filterable": 1,
