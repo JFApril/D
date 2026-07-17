@@ -82,6 +82,19 @@
             }
         },
         {
+            "key": "88.js",
+            "name": "88看球🏟[体]",
+            "type": 3,
+            "api": "./88.js",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
             "key": "zq200.py",
             "name": "ZQ直播🏟[体]",
             "type": 3,
