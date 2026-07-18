@@ -6,7 +6,7 @@ CCTV-4 中文国际,http://iptvrr.sh.chinamobile.com:6060/cms001/ch0000009099000
 CCTV-5 体育,http://iptvrr.sh.chinamobile.com:6060/cms001/ch00000090990000001187/index.m3u8
 CCTV-5 体育,http://183.17.238.95:4022/rtp/239.77.0.170:5146
 
-CCTV-5+ 体育赛事,http://183.17.238.95:4022/rtp/239.77.0.87:5146
+CCTV-5+ 体育赛事,http://wfenf.x3322.net:7788/641886773
 CCTV-5+ 体育赛事,http://183.17.238.95:4022/rtp/239.77.1.31:5146
 CCTV-5+ 体育赛事,http://101.34.236.223:1112/641886773
 CCTV-5+ 体育赛事,http://74.91.26.218:82/live/cctv5p.m3u8
