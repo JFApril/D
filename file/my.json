@@ -108,6 +108,19 @@
             }
         },
         {
+            "key": "qiuba_V6.js",
+            "name": "球吧体育🏟[体]",
+            "type": 3,
+            "api": "./qiuba_V6.js",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
             "key": "310zhibo",
             "name": "310直播🏟[体]",
             "type": 3,
