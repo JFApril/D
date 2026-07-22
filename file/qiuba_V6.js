@@ -1,4 +1,4 @@
-// 球吧体育 V6.0 - peek不行，ys，ysc可以
+// qiuba V6.6
 const HOST = 'https://www.qiuba001.vip';
 const API = HOST + '/api';
 const UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
@@ -40,6 +40,10 @@ async function fetchJson(url, method, body) {
                 const code = Number((r.statusCode || r.status || r.code) || 0);
                 const body = String((r.body || r.content || r.data) || '');
                 if (code >= 200 && code < 300 && body) return JSON.parse(body);
+                // 兼容201等非标准状态码
+                if (code === 201 && body) {
+                    try { return JSON.parse(body); } catch (e) {}
+                }
                 if (body) return JSON.parse(body);
             }
         } catch (e) {}
@@ -56,6 +60,10 @@ async function fetchJson(url, method, body) {
                 const code = Number((r.statusCode || r.status || r.code) || 0);
                 const body = String((r.content || r.body || r.data) || '');
                 if (code >= 200 && code < 300 && body) return JSON.parse(body);
+                // 兼容201等非标准状态码
+                if (code === 201 && body) {
+                    try { return JSON.parse(body); } catch (e) {}
+                }
                 if (body) return JSON.parse(body);
             }
         } catch (e) {}
@@ -219,7 +227,7 @@ async function detail(ids) {
         if (signalData && signalData.signals) signals = signalData.signals;
         else if (Array.isArray(signalData)) signals = signalData;
         
-        // 构建播放列表
+        // 构建播放列表 - 保持V6.0格式
         const playLines = [];
         if (signals.length > 0) {
             for (let i = 0; i < signals.length; i++) {
@@ -285,7 +293,7 @@ async function search(wd, quick, pg) {
 async function play(flag, id, flags) {
     const url = String(id || '');
     
-    // 处理 qiuba|matchId|sourceId 格式
+    // 处理 qiuba|matchId|sourceId 格式 - 保持V6.0逻辑
     if (url.indexOf('qiuba|') === 0) {
         const parts = url.split('|');
         if (parts.length >= 3) {
@@ -320,38 +328,146 @@ async function play(flag, id, flags) {
                         const b64 = encrypted.split(':', 2)[1];
                         if (b64) {
                             try {
-                                // 尝试多种解码方式
+                                // 调试日志：输出原始Base64字符串
+                                console.log('=== Base64解码调试 ===');
+                                console.log('原始加密字符串:', encrypted);
+                                console.log('提取的Base64:', b64);
+                                console.log('Base64长度:', b64.length);
+                                console.log('Base64模4余数:', b64.length % 4);
+                                
                                 let m3u8 = '';
-                                if (typeof atob === 'function') {
-                                    m3u8 = atob(b64);
-                                } else if (typeof Buffer === 'function') {
-                                    m3u8 = Buffer.from(b64, 'base64').toString('utf-8');
-                                } else {
-                                    // 手动解码
+                                // 预处理Base64：确保长度能被4整除
+                                let fixedB64 = b64;
+                                const padCount = fixedB64.length % 4;
+                                if (padCount === 2) fixedB64 += '==';
+                                else if (padCount === 3) fixedB64 += '=';
+                                console.log('填充后Base64:', fixedB64);
+                                
+                                // 手动解码函数 - 最可靠的方式
+                                function manualBase64Decode(str) {
                                     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
                                     const lookup = {};
                                     for (let i = 0; i < 64; i++) lookup[chars[i]] = i;
                                     
-                                    let result = '';
-                                    const padded = b64.replace(/-/g, '+').replace(/_/g, '/');
-                                    const pad = padded.length % 4;
-                                    const str = pad ? padded + '='.repeat(4 - pad) : padded;
+                                    // 处理URL安全Base64
+                                    let padded = str.replace(/-/g, '+').replace(/_/g, '/');
                                     
-                                    for (let i = 0; i < str.length; i += 4) {
-                                        const a = lookup[str.charAt(i)] || 0;
-                                        const b = lookup[str.charAt(i + 1)] || 0;
-                                        const c = str.charAt(i + 2) === '=' ? 0 : (lookup[str.charAt(i + 2)] || 0);
-                                        const d = str.charAt(i + 3) === '=' ? 0 : (lookup[str.charAt(i + 3)] || 0);
+                                    // 方法1：使用Uint8Array和TextDecoder（更可靠）
+                                    try {
+                                        const bytes = new Uint8Array(Math.floor(padded.length / 4) * 3);
+                                        let byteIndex = 0;
                                         
-                                        const triplet = (a << 18) + (b << 12) + (c << 6) + d;
-                                        result += String.fromCharCode((triplet >> 16) & 0xFF);
-                                        if (str.charAt(i + 2) !== '=') result += String.fromCharCode((triplet >> 8) & 0xFF);
-                                        if (str.charAt(i + 3) !== '=') result += String.fromCharCode(triplet & 0xFF);
+                                        for (let i = 0; i < padded.length; i += 4) {
+                                            const a = lookup[padded.charAt(i)] || 0;
+                                            const b = lookup[padded.charAt(i + 1)] || 0;
+                                            const c = padded.charAt(i + 2) === '=' ? 0 : (lookup[padded.charAt(i + 2)] || 0);
+                                            const d = padded.charAt(i + 3) === '=' ? 0 : (lookup[padded.charAt(i + 3)] || 0);
+                                            
+                                            const triplet = (a << 18) + (b << 12) + (c << 6) + d;
+                                            bytes[byteIndex++] = (triplet >> 16) & 0xFF;
+                                            if (padded.charAt(i + 2) !== '=') bytes[byteIndex++] = (triplet >> 8) & 0xFF;
+                                            if (padded.charAt(i + 3) !== '=') bytes[byteIndex++] = triplet & 0xFF;
+                                        }
+                                        
+                                        // 截取实际长度
+                                        const actualBytes = bytes.slice(0, byteIndex);
+                                        
+                                        // 尝试TextDecoder
+                                        if (typeof TextDecoder !== 'undefined') {
+                                            const decoder = new TextDecoder('utf-8', { fatal: false });
+                                            const result = decoder.decode(actualBytes);
+                                            if (result && result.indexOf('http') === 0) {
+                                                return result;
+                                            }
+                                        }
+                                        
+                                        // 回退到String.fromCharCode
+                                        let result = '';
+                                        for (let i = 0; i < actualBytes.length; i++) {
+                                            result += String.fromCharCode(actualBytes[i]);
+                                        }
+                                        return result.replace(/\0/g, '');
+                                    } catch (e) {
+                                        // 方法2：直接使用String.fromCharCode
+                                        let result = '';
+                                        for (let i = 0; i < padded.length; i += 4) {
+                                            const a = lookup[padded.charAt(i)] || 0;
+                                            const b = lookup[padded.charAt(i + 1)] || 0;
+                                            const c = padded.charAt(i + 2) === '=' ? 0 : (lookup[padded.charAt(i + 2)] || 0);
+                                            const d = padded.charAt(i + 3) === '=' ? 0 : (lookup[padded.charAt(i + 3)] || 0);
+                                            
+                                            const triplet = (a << 18) + (b << 12) + (c << 6) + d;
+                                            result += String.fromCharCode((triplet >> 16) & 0xFF);
+                                            if (padded.charAt(i + 2) !== '=') result += String.fromCharCode((triplet >> 8) & 0xFF);
+                                            if (padded.charAt(i + 3) !== '=') result += String.fromCharCode(triplet & 0xFF);
+                                        }
+                                        return result.replace(/\0/g, '');
                                     }
-                                    m3u8 = result;
                                 }
                                 
-                                if (m3u8 && (m3u8.indexOf('.m3u8') !== -1 || m3u8.indexOf('.mp4') !== -1 || m3u8.indexOf('.flv') !== -1)) {
+                                // 解码策略：直接使用填充后的Base64
+                                console.log('使用手动解码策略');
+                                m3u8 = manualBase64Decode(fixedB64);
+                                console.log('解码结果:', m3u8);
+                                
+                                // 如果解码结果不是有效URL，尝试其他方式
+                                if (!m3u8 || m3u8.indexOf('http') !== 0) {
+                                    console.log('解码结果无效，尝试其他方式');
+                                    
+                                    // 尝试1：使用原始Base64手动解码
+                                    const originalResult = manualBase64Decode(b64);
+                                    console.log('原始Base64解码结果:', originalResult);
+                                    if (originalResult && originalResult.indexOf('http') === 0) {
+                                        m3u8 = originalResult;
+                                        console.log('使用原始Base64解码成功');
+                                    }
+                                    // 尝试2：使用base64Decode函数
+                                    else if (typeof base64Decode === 'function') {
+                                        try {
+                                            const decoded = base64Decode(fixedB64);
+                                            console.log('base64Decode(fixedB64):', decoded);
+                                            if (decoded && decoded.indexOf('http') === 0) {
+                                                m3u8 = decoded;
+                                                console.log('使用base64Decode成功');
+                                            }
+                                        } catch (e) {
+                                            console.log('base64Decode异常:', e.message);
+                                        }
+                                    }
+                                    // 尝试3：使用atob函数
+                                    else if (typeof atob === 'function') {
+                                        try {
+                                            const decoded = atob(fixedB64);
+                                            console.log('atob(fixedB64):', decoded);
+                                            if (decoded && decoded.indexOf('http') === 0) {
+                                                m3u8 = decoded;
+                                                console.log('使用atob成功');
+                                            }
+                                        } catch (e) {
+                                            console.log('atob异常:', e.message);
+                                        }
+                                    }
+                                }
+                                
+                                // 最终清理
+                                m3u8 = m3u8.replace(/\0/g, '');
+                                console.log('最终解码结果:', m3u8);
+                                
+                                // 增强直链判断：检查标准后缀或域名特征
+                                const isDirectUrl = m3u8 && (
+                                    m3u8.indexOf('.m3u8') !== -1 || 
+                                    m3u8.indexOf('.mp4') !== -1 || 
+                                    m3u8.indexOf('.flv') !== -1 ||
+                                    m3u8.indexOf('stream.sports3.win') !== -1 ||
+                                    m3u8.indexOf('hls.live123.fans') !== -1 ||
+                                    m3u8.indexOf('/live/') !== -1 ||
+                                    m3u8.indexOf('signal-') !== -1 ||
+                                    m3u8.indexOf('iptv') !== -1 ||
+                                    m3u8.indexOf('live/') !== -1 ||
+                                    (m3u8.indexOf('http') === 0 && m3u8.length > 20)
+                                );
+                                
+                                if (isDirectUrl) {
                                     return JSON.stringify({
                                         parse: 0,
                                         url: m3u8,
@@ -364,16 +480,23 @@ async function play(flag, id, flags) {
                 }
             }
             
-            // 降级到播放页面
+            // 降级到播放页面 - 增强羊壳兼容性
+            // 对于羊壳，尝试添加更多兼容性处理
             return JSON.stringify({
                 parse: 1,
                 url: HOST + '/live/' + matchId,
-                header: getVideoHeaders()
+                header: {
+                    ...getVideoHeaders(),
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1'
+                }
             });
         }
     }
     
-    // 直链处理
+    // 直链处理 - 保持V6.0逻辑
     if (url.indexOf('.m3u8') !== -1 || url.indexOf('.mp4') !== -1 || url.indexOf('.flv') !== -1) {
         return JSON.stringify({
             parse: 0,
@@ -417,8 +540,17 @@ async function searchContent(wd, quick, pg) {
 }
 
 async function playerContent(flag, id, flags) {
-    try { return JSON.parse(await play(flag, id, flags)); }
-    catch (e) { return { parse: 0, url: id || '', header: '' }; }
+    try { 
+        const result = await play(flag, id, flags);
+        return JSON.parse(result); 
+    }
+    catch (e) { 
+        return { 
+            parse: 0, 
+            url: id || '', 
+            header: getVideoHeaders()
+        }; 
+    }
 }
 
 export function __jsEvalReturn() {
