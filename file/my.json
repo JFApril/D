@@ -109,9 +109,35 @@
         },
         {
             "key": "qiuba_V6.js",
-            "name": "球吧体育🏟[体]",
+            "name": "球吧🏟[体]",
             "type": 3,
             "api": "./qiuba_V6.js",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
+            "key": "zhizhu.js",
+            "name": "蜘蛛🏟[体]",
+            "type": 3,
+            "api": "./zhizhu.js",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
+            "key": "919.js",
+            "name": "919直播🏟[体]",
+            "type": 3,
+            "api": "./919.js",
             "searchable": 1,
             "quickSearch": 1,
             "filterable": 1,
