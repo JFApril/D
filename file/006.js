@@ -1,4 +1,4 @@
-// 006直播 V1.2 - 修复比分显示：清除内嵌HTML标签后正确提取数字
+// 006直播 V1.3 - 修复足球频道提取：支持/live-1/和/live-2/两种路径
 const HOST = 'https://hot.006shipin.com';
 const UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
 
@@ -230,7 +230,7 @@ async function detail(ids) {
                 const blockRegex = new RegExp('id="t_' + matchId + '"([\\s\\S]*?)(?=id="t_|$)');
                 const blockM = html.match(blockRegex);
                 if (blockM) {
-                    const chRegex = /<a[^>]*href="(\/live-2\/\d+\?_tv=\d+)"[^>]*title="([^"]+)"/g;
+                    const chRegex = /<a[^>]*href="(\/live-[12]\/\d+\?_tv=\d+)"[^>]*title="([^"]+)"/g;
                     let chMatch;
                     while ((chMatch = chRegex.exec(blockM[1])) !== null) {
                         channelLinks.push({ name: chMatch[2], url: HOST + chMatch[1] });
