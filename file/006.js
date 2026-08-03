@@ -1,4 +1,4 @@
-// 006直播 V1.1 - 修复正则贪婪匹配导致分类列表为空
+// 006直播 V1.2 - 修复比分显示：清除内嵌HTML标签后正确提取数字
 const HOST = 'https://hot.006shipin.com';
 const UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
 
@@ -91,7 +91,7 @@ function parseMatches(html) {
         const matchTime = timeM ? timeM[1] : '';
 
         // 状态 - 通过CSS class判断直播中
-        const statusM = block.match(/<div class="text-12 relative text-nowrap[^"]*">(.*?)<\/div>/s);
+        const statusM = block.match(/<div class="text-12 relative text-nowrap[^"]*">([\s\S]*?)<\/div>/);
         let status = '';
         let isLive = false;
         if (statusM) {
@@ -109,10 +109,11 @@ function parseMatches(html) {
         const awayTeam = awayM ? awayM[1].replace(/<[^>]+>/g, '').trim() : '';
 
         // 比分
-        const scoreM = block.match(/<div class="text-15 text-default">(.*?)<\/div>/s);
+        const scoreM = block.match(/<div class="text-15 text-default">([\s\S]*?)<\/div>/);
         let score = 'VS';
         if (scoreM) {
-            const scoreText = scoreM[1].replace(/<[^>]+>/g, '').trim();
+            let scoreText = scoreM[1].replace(/<[^>]+>/g, '').trim();
+            scoreText = scoreText.replace(/\s+/g, ' ').trim();
             if (/\d+\s*-\s*\d+/.test(scoreText)) {
                 score = scoreText.replace(/\s+/g, '');
             }
