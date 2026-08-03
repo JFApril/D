@@ -146,6 +146,17 @@
                 "ratio": 1
             }
         },
+       {
+            "key": "006js",
+            "name": "006js🏟[体]",
+            "type": 3,
+            "api": "./006.js",
+            "style": {
+                "type": "list",
+                "ratio": 0.75
+            },
+            "changeable": 0
+        },
         {
             "key": "310zhibo",
             "name": "310直播🏟[体]",
