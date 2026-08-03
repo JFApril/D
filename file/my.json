@@ -2,7 +2,7 @@
     "sites": [
         {
             "key": "damizhibo",
-            "name": "大米直播🏟[体]",
+            "name": "大米直播[体]",
             "type": 3,
             "api": "./dami.js",
             "searchable": 0,
@@ -30,7 +30,7 @@
         },
         {
             "key": "doubaozhibo",
-            "name": "豆包直播🏟[体]",
+            "name": "豆包直播[体]",
             "type": 3,
             "api": "./doubao.js",
             "searchable": 0,
@@ -44,7 +44,7 @@
         },
         {
             "key": "feili",
-            "name": "菲利体育🏟[体]",
+            "name": "菲利体育[体]",
             "type": 3,
             "api": "./feili.js",
             "searchable": 1,
@@ -57,7 +57,7 @@
         },
         {
             "key": "74001",
-            "name": "74直播🏟[体]",
+            "name": "74直播[体]",
             "type": 3,
             "api": "./74001.js",
             "searchable": 1,
@@ -96,7 +96,7 @@
         },
         {
             "key": "zq200.py",
-            "name": "ZQ直播🏟[体]",
+            "name": "ZQ直播[体]",
             "type": 3,
             "api": "./zq200.js",
             "searchable": 1,
@@ -109,7 +109,7 @@
         },
         {
             "key": "qiuba_V6.js",
-            "name": "球吧🏟[体]",
+            "name": "球吧[体]",
             "type": 3,
             "api": "./qiuba_V6.js",
             "searchable": 1,
@@ -148,7 +148,7 @@
         },
        {
             "key": "006js",
-            "name": "006js🏟[体]",
+            "name": "006js[体]",
             "type": 3,
             "api": "./006.js",
             "style": {
@@ -159,9 +159,23 @@
         },
         {
             "key": "310zhibo",
-            "name": "310直播🏟[体]",
+            "name": "310直播[体]",
             "type": 3,
             "api": "./310.js",
+            "searchable": 0,
+            "quickSearch": 0,
+            "filterable": 0,
+            "playerType": 2,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+       {
+            "key": "kafeizhibo",
+            "name": "咖啡直播🏟[体]",
+            "type": 3,
+            "api": "./kafei.js",
             "searchable": 0,
             "quickSearch": 0,
             "filterable": 0,
