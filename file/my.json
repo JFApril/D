@@ -95,8 +95,8 @@
             }
         },
         {
-            "key": "zq200.py",
-            "name": "ZQ直播[体]",
+            "key": "zq200.js",
+            "name": "ZQ-js[体]",
             "type": 3,
             "api": "./zq200.js",
             "searchable": 1,
@@ -104,6 +104,19 @@
             "filterable": 1,
             "style": {
                 "type": "list",
+                "ratio": 1
+            }
+        },
+       {
+            "key": "zq200.py",
+            "name": "ZQ-py[体]",
+            "type": 3,
+            "api": "./zq200.py",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "rect",
                 "ratio": 1
             }
         },
