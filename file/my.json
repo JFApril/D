@@ -117,7 +117,7 @@
             "filterable": 1,
             "style": {
                 "type": "rect",
-                "ratio": 1
+                "ratio": 0.75
             }
         },
         {
