@@ -11,12 +11,12 @@
 */
 
 
-const API_BASE = 'https://919q02.9adk7m.com/api/web/live_lists';
+const API_BASE = 'https://919q02.9adn8v.com/api/web/live_lists';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const headers = {
   'User-Agent': UA,
   'Accept': 'application/json, text/plain, */*',
-  'Referer': 'https://919q02.9adk7m.com/'
+  'Referer': 'https://919q02.9adn8v.com/'
 };
 const PAGE_SIZE = 20;
 
