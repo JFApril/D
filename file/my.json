@@ -107,7 +107,7 @@
                 "ratio": 1
             }
         },
-       {
+        {
             "key": "zq200.py",
             "name": "ZQ-py[体]",
             "type": 3,
@@ -116,11 +116,11 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "rect",
+                "type": "list",
                 "ratio": 0.75
             }
         },
-       {
+        {
             "key": "qiuba.py",
             "name": "球吧py[体]",
             "type": 3,
@@ -129,7 +129,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "rect",
+                "type": "list",
                 "ratio": 0.75
             }
         },
@@ -172,13 +172,13 @@
                 "ratio": 1
             }
         },
-       {
+        {
             "key": "006py",
             "name": "006py[体]",
             "type": 3,
             "api": "./006.py",
             "style": {
-                "type": "rect",
+                "type": "list",
                 "ratio": 1
             },
             "changeable": 0
@@ -197,7 +197,7 @@
                 "ratio": 1
             }
         },
-       {
+        {
             "key": "kafeizhibo",
             "name": "咖啡直播🏟[体]",
             "type": 3,
