@@ -212,10 +212,24 @@
             "changeable": 0
         },
         {
-            "key": "310zhibo",
-            "name": "310直播[体]",
+            "key": "310zhibojs",
+            "name": "310js[体]",
             "type": 3,
             "api": "./310.js",
+            "searchable": 0,
+            "quickSearch": 0,
+            "filterable": 0,
+            "playerType": 2,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
+            "key": "310zhibopy",
+            "name": "310py[体]",
+            "type": 3,
+            "api": "./310.py",
             "searchable": 0,
             "quickSearch": 0,
             "filterable": 0,
