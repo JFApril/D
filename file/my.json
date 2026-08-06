@@ -1,10 +1,24 @@
 {
     "sites": [
         {
-            "key": "damizhibo",
-            "name": "大米直播[体]",
+            "key": "damizhibojs",
+            "name": "大米js[体]",
             "type": 3,
             "api": "./dami.js",
+            "searchable": 0,
+            "quickSearch": 0,
+            "filterable": 0,
+            "playerType": 2,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
+            "key": "damizhibopy",
+            "name": "大米py[体]",
+            "type": 3,
+            "api": "./dami.py",
             "searchable": 0,
             "quickSearch": 0,
             "filterable": 0,
