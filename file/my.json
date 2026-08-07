@@ -111,45 +111,6 @@
             }
         },
         {
-            "key": "74001",
-            "name": "74直播[体]",
-            "type": 3,
-            "api": "./74001.js",
-            "searchable": 1,
-            "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "list",
-                "ratio": 1
-            }
-        },
-        {
-            "key": "jjrrss",
-            "name": "JRS直播🏟[体]",
-            "type": 3,
-            "api": "./jjrrss.js",
-            "searchable": 1,
-            "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "list",
-                "ratio": 1
-            }
-        },
-        {
-            "key": "88.js",
-            "name": "88看球🏟[体]",
-            "type": 3,
-            "api": "./88.js",
-            "searchable": 1,
-            "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "list",
-                "ratio": 1
-            }
-        },
-        {
             "key": "zq200.js",
             "name": "ZQ-js[体]",
             "type": 3,
@@ -176,19 +137,6 @@
             }
         },
         {
-            "key": "qiuba.py",
-            "name": "球吧py[体]",
-            "type": 3,
-            "api": "./qiuba.py",
-            "searchable": 1,
-            "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "list",
-                "ratio": 0.75
-            }
-        },
-        {
             "key": "qiuba_V6.js",
             "name": "球吧js[体]",
             "type": 3,
@@ -202,45 +150,21 @@
             }
         },
         {
-            "key": "zhizhu.js",
-            "name": "蜘蛛🏟[体]",
+            "key": "qiuba.py",
+            "name": "球吧py[体]",
             "type": 3,
-            "api": "./zhizhu.js",
+            "api": "./qiuba.py",
             "searchable": 1,
             "quickSearch": 1,
             "filterable": 1,
             "style": {
                 "type": "list",
-                "ratio": 1
+                "ratio": 0.75
             }
-        },
-        {
-            "key": "919.js",
-            "name": "919直播🏟[体]",
-            "type": 3,
-            "api": "./919.js",
-            "searchable": 1,
-            "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "list",
-                "ratio": 1
-            }
-        },
-        {
-            "key": "006py",
-            "name": "006py[体]",
-            "type": 3,
-            "api": "./006.py",
-            "style": {
-                "type": "list",
-                "ratio": 1
-            },
-            "changeable": 0
         },
         {
             "key": "310zhibojs",
-            "name": "310js[体]",
+            "name": "310-js[体]",
             "type": 3,
             "api": "./310.js",
             "searchable": 0,
@@ -254,7 +178,7 @@
         },
         {
             "key": "310zhibopy",
-            "name": "310py[体]",
+            "name": "310-py[体]",
             "type": 3,
             "api": "./310.py",
             "searchable": 0,
@@ -267,8 +191,84 @@
             }
         },
         {
+            "key": "zhizhu.js",
+            "name": "蜘蛛js🏟[体]",
+            "type": 3,
+            "api": "./zhizhu.js",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
+            "key": "919.js",
+            "name": "919-js🏟[体]",
+            "type": 3,
+            "api": "./919.js",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
+            "key": "006py",
+            "name": "006-py[体]",
+            "type": 3,
+            "api": "./006.py",
+            "style": {
+                "type": "list",
+                "ratio": 1
+            },
+            "changeable": 0
+        },
+        {
+            "key": "74001",
+            "name": "74-js[体]",
+            "type": 3,
+            "api": "./74001.js",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
+            "key": "jjrrss",
+            "name": "JRS-js🏟[体]",
+            "type": 3,
+            "api": "./jjrrss.js",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
+            "key": "88.js",
+            "name": "88-js🏟[体]",
+            "type": 3,
+            "api": "./88.js",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
             "key": "kafeizhibo",
-            "name": "咖啡直播🏟[体]",
+            "name": "咖啡js🏟[体]",
             "type": 3,
             "api": "./kafei.js",
             "searchable": 0,
