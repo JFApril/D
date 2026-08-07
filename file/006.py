@@ -63,7 +63,7 @@ class Spider(BaseSpider):
             else:
                 display_score = score.replace('-', ':') if score != "VS" else "0:0"
             vod_name = f"{home_team} {display_score} {away_team}"
-            status_icon = "🟢" if is_live else ""
+            status_icon = "🔴" if is_live else ""
             if match_time:
                 remarks = f"{status_icon}{today} {match_time} {league}"
             else:
