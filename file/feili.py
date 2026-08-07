@@ -167,7 +167,7 @@ class Spider(BaseSpider):
             parts=match_time.split(" ")
             if len(parts)>=2: dp,tp=parts[0][5:],parts[1][:5]
             elif parts: tp=parts[0][:5]
-        prefix="\U0001f7e2 " if status==0 and has_live else ("\u2705 " if status==2 else "\U0001f4c5 ")
+        prefix="\U0001f534 " if status==0 and has_live else ("\u2705 " if status==2 else "\U0001f4c5 ")
         td=f"{dp} {tp}".strip() if dp and tp else (tp if tp else "")
         remarks=prefix+(f"{td} {league}".strip() if td and league else (league or td or "\u4f53\u80b2\u76f4\u64ad"))
         return {"vod_id":f"fl|{ct}|{ci}|{mid}","vod_name":f"{home} vs {away}","vod_pic":pic,"vod_remarks":remarks}
@@ -178,7 +178,7 @@ class Spider(BaseSpider):
 
     def homeContent(self, f):
         matches=self._fetch_matches(); live=[self._parse_match(m) for m in matches if m.get("status")==0]
-        return {"class":[{"type_id":"all","type_name":"\u5168\u90e8"},{"type_id":"live","type_name":"\U0001f7e2 \u76f4\u64ad\u4e2d"},{"type_id":"hot","type_name":"\U0001f525 \u70ed\u95e8"},{"type_id":"football","type_name":"\u26bd \u8db3\u7403"},{"type_id":"basketball","type_name":"\U0001f3c0 \u7bee\u7403"}],"list":live if live else [self._parse_match(m) for m in matches[:20]],"filters":{}}
+        return {"class":[{"type_id":"all","type_name":"\u5168\u90e8"},{"type_id":"live","type_name":"\U0001f534 \u76f4\u64ad\u4e2d"},{"type_id":"hot","type_name":"\U0001f525 \u70ed\u95e8"},{"type_id":"football","type_name":"\u26bd \u8db3\u7403"},{"type_id":"basketball","type_name":"\U0001f3c0 \u7bee\u7403"}],"list":live if live else [self._parse_match(m) for m in matches[:20]],"filters":{}}
 
     def _filter_matches(self, matches, tid):
         r=[]
