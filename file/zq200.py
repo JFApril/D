@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 # Version: V12 - 无外部依赖版本，使用urllib替代requests
-# 适用于  等平台，无需pip安装任何依赖,过滤主播
+# 适用于TVBox/T4/海阔等平台，无需pip安装任何依赖,过滤主播
 import json, time, re
 from urllib.request import urlopen, Request
 
@@ -140,7 +140,7 @@ class Spider(Spider):
             is_live = effective_video_url and status_id in (2, 4)
             is_upcoming = not effective_video_url and status_id in (1, 2, 3)
             if is_live:
-                prefix = "🟢 "
+                prefix = "🔴 "
             elif is_upcoming:
                 prefix = "⏳ "
             else:
@@ -196,11 +196,11 @@ class Spider(Spider):
                 mt = house_time_map.get(house_id, (0, 0))
                 time_str = fmt_time(mt[0])
                 if time_str and league:
-                    remarks = f"🟢 {time_str} {league}"
+                    remarks = f"🔴 {time_str} {league}"
                 elif time_str:
-                    remarks = f"🟢 {time_str}"
+                    remarks = f"🔴 {time_str}"
                 else:
-                    remarks = f"🟢 {league}" if league else "🟢 直播中"
+                    remarks = f"🔴 {league}" if league else "🔴 直播中"
                 key = f"{match_name}_{league}"
                 if key in seen: continue
                 seen.add(key)
