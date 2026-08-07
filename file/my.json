@@ -29,10 +29,24 @@
             }
         },
         {
-            "key": "zhibomi",
-            "name": "直播迷🏟[体]",
+            "key": "zhibomijs",
+            "name": "直播迷js🏟[体]",
             "type": 3,
             "api": "./zhibomi.js",
+            "searchable": 0,
+            "quickSearch": 0,
+            "filterable": 0,
+            "playerType": 2,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
+            "key": "zhibomipy",
+            "name": "直播迷py🏟[体]",
+            "type": 3,
+            "api": "./zhibomi.py",
             "searchable": 0,
             "quickSearch": 0,
             "filterable": 0,
