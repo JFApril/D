@@ -46,7 +46,7 @@ function formatTimestamp(timestamp) {
 }
 
 function getStatusIcon(state) {
-  const map = { 1: '🟢', 2: '⚪', 3: '⚫' };
+  const map = { 1: '🔴', 2: '⚪', 3: '⚫' };
   return map[state] || '⚪';
 }
 
