@@ -30,7 +30,7 @@
         },
         {
             "key": "zhibomijs",
-            "name": "直播迷js🏟[体]",
+            "name": "直播迷js[体]",
             "type": 3,
             "api": "./zhibomi.js",
             "searchable": 0,
@@ -44,7 +44,7 @@
         },
         {
             "key": "zhibomipy",
-            "name": "直播迷py🏟[体]",
+            "name": "直播迷py[体]",
             "type": 3,
             "api": "./zhibomi.py",
             "searchable": 0,
@@ -192,7 +192,7 @@
         },
         {
             "key": "zhizhu.js",
-            "name": "蜘蛛js🏟[体]",
+            "name": "蜘蛛js[体]",
             "type": 3,
             "api": "./zhizhu.js",
             "searchable": 1,
@@ -205,7 +205,7 @@
         },
         {
             "key": "919.js",
-            "name": "919-js🏟[体]",
+            "name": "919-js[体]",
             "type": 3,
             "api": "./919.js",
             "searchable": 1,
@@ -242,7 +242,7 @@
         },
         {
             "key": "jjrrss",
-            "name": "JRS-js🏟[体]",
+            "name": "JRS-js[体]",
             "type": 3,
             "api": "./jjrrss.js",
             "searchable": 1,
@@ -255,7 +255,7 @@
         },
         {
             "key": "88.js",
-            "name": "88-js🏟[体]",
+            "name": "88-js[体]",
             "type": 3,
             "api": "./88.js",
             "searchable": 1,
@@ -268,7 +268,7 @@
         },
         {
             "key": "kafeizhibo",
-            "name": "咖啡js🏟[体]",
+            "name": "咖啡js[体]",
             "type": 3,
             "api": "./kafei.js",
             "searchable": 0,
