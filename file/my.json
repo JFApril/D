@@ -228,10 +228,23 @@
             "changeable": 0
         },
         {
-            "key": "74001",
-            "name": "74-js[体]",
+            "key": "7zbpy",
+            "name": "7zb-py[体]",
             "type": 3,
-            "api": "./74001.js",
+            "api": "./7zb.py",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
+            "key": "qbspy",
+            "name": "球布斯py[体]",
+            "type": 3,
+            "api": "./qbs.py",
             "searchable": 1,
             "quickSearch": 1,
             "filterable": 1,
