@@ -8,7 +8,7 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
-@version V38.2
+@version V39
 */
 
 let host = 'https://m.jrskk.com';
@@ -218,7 +218,7 @@ async function resolvePao(paoUrl, referer) {
         var paoHtml = await fetchText(paoUrl, referer || host + '/');
         if (!paoHtml || paoHtml.length <= 5) return null;
         var encMatch = paoHtml.match(/encodedStr\s*=\s*["']([^"']+)/i);
-        if (!encMatch) { console.log('[V38] no encodedStr'); return null; }
+        if (!encMatch) { return null; }
         var encodedStr = encMatch[1];
         var encBinary = '';
         if (typeof Buffer !== 'undefined') {
@@ -243,12 +243,10 @@ async function resolvePao(paoUrl, referer) {
         }
         if (m3u8 && m3u8.indexOf('.m3u8') !== -1) {
             m3u8 = m3u8.replace(/\\\//g, '/');
-            console.log('[V38] pao m3u8: ' + m3u8);
             return fixM3u8Domain(m3u8);
         }
         return null;
     } catch (e) {
-        console.log('[V38] pao err: ' + e);
         return null;
     }
 }
@@ -401,7 +399,6 @@ function parseSignals(html, playPageUrl) {
         var dp = firstMatch(tag, /data-play=["']([^"']+)["']/i);
         var href = firstMatch(tag, /href=["']([^"']+)["']/i);
         var target = dp || href;
-        console.log('[V33 parseSignals] tag=' + tag.slice(0, 100) + ', dp=' + dp + ', href=' + href);
         if (!target || target === 'javascript:void(0)' || target.indexOf('void') !== -1) continue;
         target = target.replace(/&amp;/g, '&');
         if (target.indexOf('=&') === 0 || target.length < 5) continue;
@@ -532,7 +529,6 @@ async function detail(id) {
         var fPath = fallback.replace(/^https?:\/\/[^/]+/i, '');
         if (fPath !== '/.html' && fPath.length >= 3 && !/pao/i.test(fallback)) playPageUrls.push(fallback);
     }
-    console.log('[V35] ppUrls=' + playPageUrls.length);
     var allPlayLines = [];
     var lineNames = ['直播线路1', '直播线路2', '直播线路3'];
     var li = 0;
@@ -541,19 +537,15 @@ async function detail(id) {
         var signals = [];
         try {
             var ph = await fetchText(playPageUrl, host + '/');
-            console.log('[V35] L' + (li + 1) + ' len=' + (ph ? ph.length : 0));
             if (ph) signals = parseSignals(ph, playPageUrl);
         } catch (e) {}
-        console.log('[V35] L' + (li + 1) + ' sigs=' + signals.length);
         var parts = [];
         for (var si = 0; si < signals.length; si++) {
             var sig = signals[si];
             var resolved = await resolveSignal(sig.url, playPageUrl);
             if (!resolved) {
-                console.log('[V35] drop no-resolve: ' + sig.name);
                 continue;
             }
-            console.log('[V35] L' + (li + 1) + ' ' + sig.name + ' -> ' + resolved.slice(0, 80));
             parts.push(sig.name + '$' + resolved);
         }
         if (parts.length) {
@@ -575,8 +567,6 @@ async function detail(id) {
     }
     var playFrom = allPlayLines.map(function(l) { return l.name; }).join('$$$');
     var playUrl = allPlayLines.map(function(l) { return l.playUrl; }).join('$$$');
-    console.log('[V35] from=' + playFrom);
-    console.log('[V35] url=' + playUrl);
     if (!playUrl) return JSON.stringify({ code: 1, list: [], page: 1, pagecount: 1, total: 0 });
     return JSON.stringify({ code: 1, msg: '数据列表', page: 1, pagecount: 1, limit: 1, total: 1, list: [{ vod_id: id, vod_name: payload.name || '赛事直播', vod_pic: payload.pic || defaultPic, vod_remarks: '直播ing', vod_content: 'JRKAN 体育赛事直播。', vod_play_from: playFrom, vod_play_url: playUrl }] });
 }
@@ -591,7 +581,6 @@ async function resolveSignal(sigUrl, referer) {
     }
     if (/\.(m3u8|mp4|flv)(\?|$)/i.test(sigUrl)) {
         var fixed = fixM3u8Domain(sigUrl);
-        console.log('[V34] m3u8 direct: ' + fixed);
         return fixed;
     }
     if (/sm\.html/i.test(sigUrl)) {
@@ -601,15 +590,14 @@ async function resolveSignal(sigUrl, referer) {
                 var iUrl = absUrl('/play/' + smId + '.html', sigUrl);
                 var iHtml = await fetchText(iUrl, sigUrl);
                 if (iHtml) {
-                    console.log('[V34] sm inner len=' + iHtml.length);
                     var mm = iHtml.match(/src=["']([^"']*\/msss\.html\?id=([^"']+))["']/i);
-                    if (mm) { var st = mm[2]; if (st.indexOf('//') === 0) st = 'https:' + st; st = fixM3u8Domain(st); console.log('[V34] msss match=' + st); return st; }
+                    if (mm) { var st = mm[2]; if (st.indexOf('//') === 0) st = 'https:' + st; st = fixM3u8Domain(st); return st; }
                     var du = extractM3u8FromPage(iHtml, iUrl);
-                    if (du && looksLikePlayable(du)) { du = fixM3u8Domain(du); console.log('[V34] extract match=' + du); return du; }
+                    if (du && looksLikePlayable(du)) { du = fixM3u8Domain(du); return du; }
                 }
-            } catch (e) { console.log('[V34] sm err: ' + e); }
+            } catch (e) {}
         }
-        try { var sr = await resolveSmM3u8(sigUrl); if (sr) { sr = fixM3u8Domain(sr); console.log('[V34] resolveSm match=' + sr); return sr; } } catch (e) {}
+        try { var sr = await resolveSmM3u8(sigUrl); if (sr) { sr = fixM3u8Domain(sr); return sr; } } catch (e) {}
         return '';
     }
     try {
