@@ -8,7 +8,7 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
-@version V39
+@version V40
 */
 
 let host = 'https://m.jrskk.com';
@@ -630,10 +630,9 @@ async function search(wd, quick, pg) {
         list: []
     });
 }
-
 async function play(flag, id, flags) {
     if (/\.(m3u8|mp4|flv)(\?|$)/i.test(String(id || ''))) {
-        return JSON.stringify({ parse: 0, url: id, header: { 'User-Agent': UA, 'Referer': host + '/' } });
+        return JSON.stringify({ parse: 0, url: id });
     }
     return JSON.stringify({ parse: 1, url: id, header: { 'User-Agent': UA, 'Referer': host + '/' } });
 }
