@@ -3,12 +3,12 @@
   searchable: 0,
   filterable: 0,
   quickSearch: 0,
-  title: 'J。R。S[体]',
+  title: 'JRS直播[体]',
   author: 'OpenClaw',
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
-@version V38
+@version V38.2
 */
 
 let host = 'https://m.jrskk.com';
@@ -585,7 +585,7 @@ function fixM3u8Domain(url) {
 }
 
 async function resolveSignal(sigUrl, referer) {
-    if (/pao\/\?/i.test(sigUrl)) {
+    if (/\/play\/(?:pao|kbs)\/\?/i.test(sigUrl)) {
         var paoResult = await resolvePao(sigUrl, referer);
         return paoResult || '';
     }
