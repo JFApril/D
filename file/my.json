@@ -257,7 +257,7 @@
             "key": "jjrrss",
             "name": "JRS-js[体]",
             "type": 3,
-            "api": "./jjrrsso.js",
+            "api": "./jjrrss.js",
             "searchable": 1,
             "quickSearch": 1,
             "filterable": 1,
