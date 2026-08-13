@@ -279,6 +279,19 @@
                 "ratio": 1
             }
         },
+       {
+            "key": "jylive.js",
+            "name": "鲸鱼js[体]",
+            "type": 3,
+            "api": "./jylive.js",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
         {
             "key": "kafeizhibo",
             "name": "咖啡js[体]",
