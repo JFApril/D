@@ -1,4 +1,4 @@
-# @version V3.3
+# @version V4.4
 import re, base64, time, json, requests
 from base.spider import Spider as BaseSpider
 
@@ -38,8 +38,9 @@ def fmt_time(ts):
     except:
         return ''
 
-CIRCLE_RED = '\U0001f534'
-CIRCLE_DARK = '\u25cb'
+CIRCLE_RED = '\U0001f534'  # 🔴
+CIRCLE_DARK = '\u25cb'  # ○
+NO_SIGNAL = '\u6682\u65f6\u6ca1\u4fe1\u53f7'  # 暂时没信号
 
 class Spider(BaseSpider):
     def getName(self): return '\u7403\u76f4\u64ad'
@@ -82,15 +83,27 @@ class Spider(BaseSpider):
         return {'list': [], 'page': 1}
 
     def playerContent(self, flag, id, vipFlags):
-        mid = id.split('_')[-1]
-        live_url = self._get_live_url(mid)
-        if live_url:
-            return {'parse': 0, 'url': live_url, 'header': {'User-Agent': UA}}
-        return {'parse': 0, 'url': f'https://m.jqpyn.com/#/player/{mid}', 'header': {'User-Agent': UA}}
+        parts = id.split('_')
+        if len(parts) >= 3 and parts[-1].isdigit():
+            match_id = parts[-2]
+            url_idx = int(parts[-1])
+        else:
+            match_id = parts[-1]
+            url_idx = 0
+        live_urls = self._get_live_urls(match_id)
+        if live_urls and url_idx < len(live_urls):
+            return {'parse': 0, 'url': live_urls[url_idx], 'header': {'User-Agent': UA}}
+        if live_urls:
+            return {'parse': 0, 'url': live_urls[0], 'header': {'User-Agent': UA}}
+        return {'parse': 0, 'url': f'https://m.jqpyn.com/#/player/{match_id}', 'header': {'User-Agent': UA}}
+
+    def _get_live_urls(self, mid):
+        live_map = self._get_live_map()
+        return live_map.get(int(mid), {}).get('urls', [])
 
     def _get_live_url(self, mid):
-        live_map = self._get_live_map()
-        return live_map.get(int(mid), {}).get('url')
+        urls = self._get_live_urls(mid)
+        return urls[0] if urls else None
 
     def _get_live_map(self):
         now = time.time()
@@ -104,17 +117,20 @@ class Spider(BaseSpider):
                     mid = item.get('match_id')
                     url = item.get('live_url')
                     nick = item.get('nickName', '')
-                    if not mid or not url:
+                    if not mid:
                         continue
-                    if url.startswith('https:///'):
-                        continue
-                    is_preferred = url.startswith('https://live2.hylivedo.com/')
-                    is_valid = is_preferred or url.startswith('https://bf.njscwh.com/')
+                    is_preferred = url and url.startswith('https://live2.hylivedo.com/')
+                    is_valid = is_preferred or (url and url.startswith('https://bf.njscwh.com/'))
                     if not is_valid:
                         continue
-                    if mid in mapping and mapping[mid].get('url', '').startswith('https://live2.hylivedo.com/'):
-                        continue
-                    mapping[mid] = {'url': url, 'nick': nick}
+                    if mid not in mapping:
+                        mapping[mid] = {'urls': [], 'nicks': [], 'room_title': item.get('room_title', ''), 'short_name': item.get('short_name_zh', '')}
+                    existing_urls = mapping[mid]['urls']
+                    if url not in existing_urls:
+                        existing_urls.append(url)
+                        mapping[mid]['nicks'].append(nick)
+                    if nick and len(mapping[mid]['nicks']) < len(mapping[mid]['urls']):
+                        mapping[mid]['nicks'].append(nick)
         self._live_cache = mapping
         self._live_cache_ts = now
         return mapping
@@ -128,6 +144,33 @@ class Spider(BaseSpider):
             time.sleep(0.2)
             data = self._fetch('encryptionRecommMatch')
         if data:
+            live_map = self._get_live_map()
+            match_ids = set(m.get('id') for m in data)
+            for mid, info in live_map.items():
+                if mid not in match_ids:
+                    room_title = info.get('room_title', '')
+                    if ' VS ' in room_title:
+                        parts = room_title.split(' VS ')
+                        home_name = parts[0]
+                        away_name = parts[1] if len(parts) > 1 else ''
+                    else:
+                        home_name = room_title
+                        away_name = ''
+                    short_name = info.get('short_name', '')
+                    type_id = '2' if any(x in short_name for x in ['篮', 'NBA', 'CBA', '女子篮', '男子篮']) else '1'
+                    data.append({
+                        'id': mid,
+                        'type_id': type_id,
+                        'home_name': home_name,
+                        'away_name': away_name,
+                        'home_scores': [0],
+                        'away_scores': [0],
+                        'status_id': 2,
+                        'match_time': int(time.time()),
+                        'competition_name': short_name or '',
+                        'home_log': 'https://m.jqpyn.com/favicon.ico',
+                        'away_log': 'https://m.jqpyn.com/favicon.ico',
+                    })
             self._match_cache = data
             self._match_cache_ts = now
         return self._match_cache or []
@@ -166,8 +209,11 @@ class Spider(BaseSpider):
         match_time = m.get('match_time', 0)
 
         live_map = self._get_live_map()
-        nick = live_map.get(int(mid), {}).get('nick', '') if live_map else ''
-        has_url = int(mid) in live_map and live_map.get(int(mid), {}).get('url') is not None
+        info = live_map.get(int(mid), {})
+        urls = info.get('urls', [])
+        nicks = info.get('nicks', [])
+        has_url = len(urls) > 0
+        nick = nicks[0] if nicks else info.get('nick', '')
 
         score_str = f'{h_score}:{a_score}'
         if nick:
@@ -181,7 +227,18 @@ class Spider(BaseSpider):
         else:
             remarks = f'{CIRCLE_DARK} {time_str} {league}'
 
-        logo = m.get('home_log') or m.get('away_log') or ''
+        logo = m.get('home_log') or m.get('away_log') or 'https://m.jqpyn.com/favicon.ico'
+
+        if has_url:
+            play_parts = []
+            for i, url in enumerate(urls):
+                domain = 'live2' if 'live2.hylivedo.com' in url else 'bf'
+                nick_i = nicks[i] if i < len(nicks) else (nick if i == 0 else '')
+                label = f'{nick_i}{domain}线路{i+1}' if nick_i else f'{domain}线路{i+1}'
+                play_parts.append(f'{label}$jinqiu_{mid}_{i}')
+            play_url = '#'.join(play_parts)
+        else:
+            play_url = f'{NO_SIGNAL}$jinqiu_{mid}'
 
         vod = {
             'vod_id': f'jinqiu_{mid}',
@@ -189,12 +246,12 @@ class Spider(BaseSpider):
             'vod_pic': logo,
             'vod_remarks': remarks,
             'vod_play_from': '\u7403\u76f4\u64ad',
-            'vod_play_url': f'{name}$jinqiu_{mid}' if has_url else f'\u6682\u65f6\u6ca1\u4fe1\u53f7$jinqiu_{mid}',
+            'vod_play_url': play_url,
         }
         if detail:
             content = f'{league} {score_str} {time_str}'
             if not has_url:
-                content = '\u6682\u65f6\u6ca1\u4fe1\u53f7'
+                content = NO_SIGNAL
             vod['vod_content'] = content
         return vod
 
