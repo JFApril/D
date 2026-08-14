@@ -1,4 +1,4 @@
-# @version V3.2
+# @version V3.3
 import re, base64, time, json, requests
 from base.spider import Spider as BaseSpider
 
@@ -38,7 +38,7 @@ def fmt_time(ts):
     except:
         return ''
 
-CIRCLE_RED = '\u25cf'
+CIRCLE_RED = '\U0001f534'
 CIRCLE_DARK = '\u25cb'
 
 class Spider(BaseSpider):
@@ -176,7 +176,7 @@ class Spider(BaseSpider):
             name = f'{home} {score_str} {away}'
 
         time_str = fmt_time(match_time)
-        if is_live:
+        if is_live and has_url:
             remarks = f'{CIRCLE_RED} {time_str} {league}'
         else:
             remarks = f'{CIRCLE_DARK} {time_str} {league}'
