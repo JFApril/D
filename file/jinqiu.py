@@ -1,4 +1,4 @@
-# @version V3.1
+# @version V3.2
 import re, base64, time, json, requests
 from base.spider import Spider as BaseSpider
 
@@ -189,7 +189,7 @@ class Spider(BaseSpider):
             'vod_pic': logo,
             'vod_remarks': remarks,
             'vod_play_from': '\u7403\u76f4\u64ad',
-            'vod_play_url': f'{name}$jinqiu_{mid}',
+            'vod_play_url': f'{name}$jinqiu_{mid}' if has_url else f'\u6682\u65f6\u6ca1\u4fe1\u53f7$jinqiu_{mid}',
         }
         if detail:
             content = f'{league} {score_str} {time_str}'
