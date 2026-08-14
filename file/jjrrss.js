@@ -8,11 +8,11 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
-@version V40
-*/
+ * @version V43
+ */
 
-let host = 'https://m.jrskk.com';
-const hosts = ['https://m.jrskk.com', 'https://m.jrs21.com', 'https://www.jrs33.com', 'https://3.swjrzx.com'];
+let host = 'https://m.sportsteam53.com';
+const hosts = ['https://m.sportsteam53.com', 'https://m.jrskk.com', 'https://m.jrs21.com', 'https://www.jrs33.com', 'https://3.swjrzx.com', 'https://m.sportsteam356.com'];
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 const defaultPic = 'https://im-imgs-bucket.oss-accelerate.aliyuncs.com/icon-192.png';
 let cacheTime = 0;
@@ -390,22 +390,45 @@ function parseSignals(html, playPageUrl) {
     var chHtml = h;
     var chMatch = h.match(/<div\b[^>]*class=["'][^"']*sub_channel[^"']*["'][^>]*>([\s\S]*?)(?:<\/div>|<!--)/i);
     if (chMatch) chHtml = chMatch[1];
-    var reg = /<a\b[^>]*class=["'][^"']*ok[^"']*me[^"']*["'][^>]*>[\s\S]*?<strong>([^<]*)<\/strong>[\s\S]*?<\/a>/gi;
+    // V41: 去掉强依赖 class="ok me"，捕获所有带 data-play 的信号按钮（主播解说/中文高清/高清直播等）
+    var reg = /<a\b([^>]*data-play=["'][^"']+["'][^>]*)>([\s\S]*?)<\/a>/gi;
     var seenUrls = {};
     var m;
     while ((m = reg.exec(chHtml)) !== null) {
-        var tag = m[0];
-        var name = '' + stripHtml(m[1]);
-        var dp = firstMatch(tag, /data-play=["']([^"']+)["']/i);
-        var href = firstMatch(tag, /href=["']([^"']+)["']/i);
+        var attrs = m[1];
+        var inner = m[2];
+        var dp = firstMatch(attrs, /data-play=["']([^"']+)["']/i);
+        if (!dp) continue;
+        var href = firstMatch(attrs, /href=["']([^"']+)["']/i);
         var target = dp || href;
         if (!target || target === 'javascript:void(0)' || target.indexOf('void') !== -1) continue;
         target = target.replace(/&amp;/g, '&');
         if (target.indexOf('=&') === 0 || target.length < 5) continue;
+        // 信号名优先取 strong 文本，否则取标签内文字
+        var name = stripHtml(firstMatch(inner, /<strong>([^<]*)<\/strong>/i) || inner);
+        if (!name || name.length < 1) name = '信号' + (signals.length + 1);
         var fullUrl = absUrl(target, playPageUrl || host);
-        if (seenUrls[fullUrl]) continue;
-        seenUrls[fullUrl] = true;
+        if (seenUrls[fullUrl + name]) continue;
+        seenUrls[fullUrl + name] = true;
         signals.push({ name: name, url: fullUrl });
+    }
+    // 兜底：若仍无 data-play 信号，尝试通用按钮
+    if (!signals.length) {
+        var reg2 = /<a\b([^>]*class=["'][^"']*me[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi;
+        var m2;
+        while ((m2 = reg2.exec(chHtml)) !== null) {
+            var a = m2[1];
+            var dp2 = firstMatch(a, /data-play=["']([^"']+)["']/i);
+            var href2 = firstMatch(a, /href=["']([^"']+)["']/i);
+            var t2 = dp2 || href2;
+            if (!t2 || t2 === 'javascript:void(0)') continue;
+            t2 = t2.replace(/&amp;/g, '&');
+            var nm2 = stripHtml(firstMatch(m2[2], /<strong>([^<]*)<\/strong>/i) || m2[2]) || ('信号' + (signals.length + 1));
+            var fu2 = absUrl(t2, playPageUrl || host);
+            if (seenUrls[fu2 + nm2]) continue;
+            seenUrls[fu2 + nm2] = true;
+            signals.push({ name: nm2, url: fu2 });
+        }
     }
     if (!signals.length && playPageUrl) {
         signals.push({ name: '直播', url: playPageUrl });
@@ -529,55 +552,69 @@ async function detail(id) {
         var fPath = fallback.replace(/^https?:\/\/[^/]+/i, '');
         if (fPath !== '/.html' && fPath.length >= 3 && !/pao/i.test(fallback)) playPageUrls.push(fallback);
     }
-    var allPlayLines = [];
-    var lineNames = ['直播线路1', '直播线路2', '直播线路3'];
-    var li = 0;
-    for (var pi = 0; pi < Math.min(playPageUrls.length, 3); pi++) {
+    // V41: 合并所有线路页的信号为单场一行（最多取前6个线路页，每个页内全部信号），去掉硬限3路
+    var allParts = [];
+    var maxPages = Math.min(playPageUrls.length, 6);
+    for (var pi = 0; pi < maxPages; pi++) {
         var playPageUrl = playPageUrls[pi];
         var signals = [];
         try {
             var ph = await fetchText(playPageUrl, host + '/');
             if (ph) signals = parseSignals(ph, playPageUrl);
         } catch (e) {}
-        var parts = [];
         for (var si = 0; si < signals.length; si++) {
             var sig = signals[si];
             var resolved = await resolveSignal(sig.url, playPageUrl);
-            if (!resolved) {
-                continue;
-            }
-            parts.push(sig.name + '$' + resolved);
-        }
-        if (parts.length) {
-            allPlayLines.push({ name: lineNames[li], playUrl: parts.join('#') });
-            li++;
+            // V41: 解析失败时仍保留按钮名+原始链接，不再直接跳过，保证8路全显示
+            var finalUrl = resolved || sig.url;
+            allParts.push(sig.name + '$' + finalUrl);
         }
     }
-    if (!allPlayLines.length) {
+    // 若整场无信号页，回退到原始 url 解析
+    if (!allParts.length) {
         for (var i = 0; i < urls.length; i++) {
             var u = urls[i];
             if (u && u.indexOf('http') === 0 && !/pao/i.test(u)) {
                 var r = await resolveSignal(u, host + '/');
                 if (r) {
-                    allPlayLines.push({ name: '直播', playUrl: '直播$' + r });
+                    allParts.push('直播$' + r);
                     break;
                 }
             }
         }
     }
-    var playFrom = allPlayLines.map(function(l) { return l.name; }).join('$$$');
-    var playUrl = allPlayLines.map(function(l) { return l.playUrl; }).join('$$$');
+    var playFrom = 'JRKAN直播';
+    var playUrl = allParts.join('#');
     if (!playUrl) return JSON.stringify({ code: 1, list: [], page: 1, pagecount: 1, total: 0 });
     return JSON.stringify({ code: 1, msg: '数据列表', page: 1, pagecount: 1, limit: 1, total: 1, list: [{ vod_id: id, vod_name: payload.name || '赛事直播', vod_pic: payload.pic || defaultPic, vod_remarks: '直播ing', vod_content: 'JRKAN 体育赛事直播。', vod_play_from: playFrom, vod_play_url: playUrl }] });
 }
 function fixM3u8Domain(url) {
-    return String(url || '').replace(/hdl\d+\.remmuszs\.cn/g, function(m) { return m.replace('remmuszs.cn', 'szsummer.cn'); });
+    var s = String(url || '').replace(/hdl\d+\.remmuszs\.cn/g, function(m) { return m.replace('remmuszs.cn', 'szsummer.cn'); });
+    // V43: 主播解说真实可播域名为 hanxi1688.com，站点编码异常导致解出 8861ixnah.com，强制纠偏
+    s = s.replace(/hdl\d+\.8861ixnah\.com/g, function(m) { return m.replace('8861ixnah.com', 'hanxi1688.com'); });
+    return s;
 }
 
 async function resolveSignal(sigUrl, referer) {
     if (/\/play\/(?:pao|kbs)\/\?/i.test(sigUrl)) {
         var paoResult = await resolvePao(sigUrl, referer);
-        return paoResult || '';
+        if (paoResult) return paoResult;
+        // V41: pao 页未命中 encodedStr 时，直接取页内 m3u8 / iframe 兜底
+        try {
+            var pUrl = sigUrl;
+            var pHtml = await fetchText(pUrl, referer || host + '/');
+            if (pHtml) {
+                var pdu = extractM3u8FromPage(pHtml, pUrl);
+                if (pdu && looksLikePlayable(pdu)) { pdu = fixM3u8Domain(pdu); return pdu; }
+                var pif = firstMatch(pHtml, /<iframe[^>]+src=["']([^"']+)["']/i);
+                if (pif) {
+                    if (pif.indexOf('http') !== 0) pif = absUrl(pif, pUrl);
+                    var pifH = await fetchText(pif, pUrl);
+                    if (pifH) { var pdu2 = extractM3u8FromPage(pifH, pif); if (pdu2 && looksLikePlayable(pdu2)) { pdu2 = fixM3u8Domain(pdu2); return pdu2; } }
+                }
+            }
+        } catch (e) {}
+        return '';
     }
     if (/\.(m3u8|mp4|flv)(\?|$)/i.test(sigUrl)) {
         var fixed = fixM3u8Domain(sigUrl);
@@ -590,6 +627,9 @@ async function resolveSignal(sigUrl, referer) {
                 var iUrl = absUrl('/play/' + smId + '.html', sigUrl);
                 var iHtml = await fetchText(iUrl, sigUrl);
                 if (iHtml) {
+                    // V43: 主播解说真实页用 encodedStr/XXTEA，复用 resolvePao 解码（之前漏调导致解出坏域名8861ixnah）
+                    var paoFromInner = await resolvePao(iUrl, sigUrl);
+                    if (paoFromInner) { paoFromInner = fixM3u8Domain(paoFromInner); return paoFromInner; }
                     var mm = iHtml.match(/src=["']([^"']*\/msss\.html\?id=([^"']+))["']/i);
                     if (mm) { var st = mm[2]; if (st.indexOf('//') === 0) st = 'https:' + st; st = fixM3u8Domain(st); return st; }
                     var du = extractM3u8FromPage(iHtml, iUrl);
@@ -598,6 +638,27 @@ async function resolveSignal(sigUrl, referer) {
             } catch (e) {}
         }
         try { var sr = await resolveSmM3u8(sigUrl); if (sr) { sr = fixM3u8Domain(sr); return sr; } } catch (e) {}
+        return '';
+    }
+    // V41: 新增三种信号格式解析（mgxl / wlive / wen），均复用 pao 的 XXTEA 解码（同 encodedStr 结构）
+    if (/\/play\/(mgxl|wlive|wen)\//i.test(sigUrl)) {
+        var pr = await resolvePao(sigUrl, referer || host + '/');
+        if (pr) return pr;
+        try {
+            var wHtml = await fetchText(sigUrl, referer || host + '/');
+            if (wHtml) {
+                var wmm = wHtml.match(/src=["']([^"']*\/msss\.html\?id=([^"']+))["']/i);
+                if (wmm) { var wst = wmm[2]; if (wst.indexOf('//') === 0) wst = 'https:' + wst; wst = fixM3u8Domain(wst); return wst; }
+                var wdu = extractM3u8FromPage(wHtml, sigUrl);
+                if (wdu && looksLikePlayable(wdu)) { wdu = fixM3u8Domain(wdu); return wdu; }
+                var wif = firstMatch(wHtml, /<iframe[^>]+src=["']([^"']+)["']/i);
+                if (wif) {
+                    if (wif.indexOf('http') !== 0) wif = absUrl(wif, sigUrl);
+                    var wifH = await fetchText(wif, sigUrl);
+                    if (wifH) { var wdu2 = extractM3u8FromPage(wifH, wif); if (wdu2 && looksLikePlayable(wdu2)) { wdu2 = fixM3u8Domain(wdu2); return wdu2; } }
+                }
+            }
+        } catch (e) {}
         return '';
     }
     try {
@@ -630,11 +691,27 @@ async function search(wd, quick, pg) {
         list: []
     });
 }
+// V42: 播放header统一（防盗链CDN必须带Referer/Origin）
+function playHeaders() {
+    return {
+        'User-Agent': UA,
+        'Referer': host + '/',
+        'Origin': host
+    };
+}
+
 async function play(flag, id, flags) {
-    if (/\.(m3u8|mp4|flv)(\?|$)/i.test(String(id || ''))) {
-        return JSON.stringify({ parse: 0, url: id });
+    var raw = String(id || '');
+    if (/\.(m3u8|mp4|flv)(\?|$)/i.test(raw)) {
+        // V42: 直链也带 header，否则 kinxie/8861ixnah 等防盗链CDN会拒流（主播解说类播不出的根因）
+        return JSON.stringify({ parse: 0, url: raw, header: playHeaders() });
     }
-    return JSON.stringify({ parse: 1, url: id, header: { 'User-Agent': UA, 'Referer': host + '/' } });
+    // 相对路径兜底：detail传进来的若是站点相对地址，转绝对
+    if (/^\//.test(raw)) {
+        raw = (host || 'https://m.sportsteam53.com') + raw;
+        return JSON.stringify({ parse: 0, url: raw, header: playHeaders() });
+    }
+    return JSON.stringify({ parse: 1, url: raw, header: playHeaders() });
 }
 
 async function homeContent(filter) {
