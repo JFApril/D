@@ -319,6 +319,19 @@
             }
         },
         {
+            "key": "bszb.py",
+            "name": "比赛直播py[体]",
+            "type": 3,
+            "api": "./bszb.py",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
             "key": "kafeizhibo",
             "name": "咖啡js[体]",
             "type": 3,
