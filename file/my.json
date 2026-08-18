@@ -306,6 +306,19 @@
             }
         },
         {
+            "key": "kanqiu8.py",
+            "name": "看球吧py[体]",
+            "type": 3,
+            "api": "./kanqiu8.py",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
             "key": "kafeizhibo",
             "name": "咖啡js[体]",
             "type": 3,
