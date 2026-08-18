@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-# 看球8直播爬虫 V2.1 - 推荐精选/首页与各分类统一全量加载含比分赛事，支持篮球逐节累加
-import json, re, requests
+# 看球8直播爬虫 V2.2 - 修复预告比赛日期时间缺失，比赛开赛时间（北京时间）与主播开播时间双重兼容
+import json, re, time, requests
+from datetime import datetime, timezone, timedelta
 from urllib.parse import quote
 from base.spider import Spider as BaseSpider
 
 API_HOST = "https://zhiboapi1001.bszb.me"
 WEB_HOST = "https://kanqiu8svip-cctv.123kq.live"
 UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+TZ_BJ = timezone(timedelta(hours=8))
 
 class Spider(BaseSpider):
     def getName(self):
@@ -54,6 +56,25 @@ class Spider(BaseSpider):
                 return int(s)
         return sc
 
+    def _format_match_time(self, item, match_info):
+        m_time = match_info.get("time") or match_info.get("match_time") or item.get("match_time")
+        if m_time and str(m_time).isdigit():
+            ts = int(m_time)
+            if ts > 0:
+                dt = datetime.fromtimestamp(ts, TZ_BJ)
+                return dt.strftime("%H:%M")
+
+        st = item.get("start_time") or match_info.get("start_time") or ""
+        if isinstance(st, str) and len(st) >= 16:
+            return st[11:16]
+
+        st_stamp = item.get("start_stamp") or 0
+        if str(st_stamp).isdigit() and int(st_stamp) > 0:
+            dt = datetime.fromtimestamp(int(st_stamp), TZ_BJ)
+            return dt.strftime("%H:%M")
+
+        return ""
+
     def _parse_live_item(self, item):
         if not isinstance(item, dict):
             return None
@@ -97,8 +118,8 @@ class Spider(BaseSpider):
 
         me_obj = match_info.get("matchevent") if isinstance(match_info.get("matchevent"), dict) else {}
         badge = item.get("badge_text") or me_obj.get("short_name_zh") or me_obj.get("name_zh") or match_info.get("eventname") or ""
-        start_time = item.get("start_time") or match_info.get("start_time") or ""
-        time_str = start_time[11:16] if len(start_time) >= 16 else start_time
+        
+        time_str = self._format_match_time(item, match_info)
         status_txt = "🔴 直播中" if is_live else "📅 预告"
         remarks_parts = [p for p in [status_txt, time_str, badge, anchor_name] if p]
         remarks = " | ".join(remarks_parts) if remarks_parts else "看球8直播"
