@@ -332,6 +332,32 @@
             }
         },
         {
+            "key": "longzhu.py",
+            "name": "龙珠py[体]",
+            "type": 3,
+            "api": "./longzhu.py",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
+            "key": "9939.py",
+            "name": "绿茵py[体]",
+            "type": 3,
+            "api": "./9939.py",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "style": {
+                "type": "list",
+                "ratio": 1
+            }
+        },
+        {
             "key": "kafeizhibo",
             "name": "咖啡js[体]",
             "type": 3,
