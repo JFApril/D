@@ -320,7 +320,7 @@
         },
         {
             "key": "bszb.py",
-            "name": "比赛直播py[体]",
+            "name": "比赛py[体]",
             "type": 3,
             "api": "./bszb.py",
             "searchable": 1,
