@@ -373,9 +373,9 @@
         },
         {
             "key": "Cat_五源合一",
-            "name": "五源合一[影]",
+            "name": "五源合一js[影]",
             "type": 3,
-            "api": "./js/5in1.js",
+            "api": "./5in1.js",
             "searchable": 1,
             "quickSearch": 0,
             "filterable": 1
