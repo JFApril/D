@@ -370,6 +370,29 @@
                 "type": "list",
                 "ratio": 1
             }
+        },
+        {
+            "key": "Cat_五源合一",
+            "name": "五源合一[影]",
+            "type": 3,
+            "api": "./js/5in1.js",
+            "searchable": 1,
+            "quickSearch": 0,
+            "filterable": 1
+        },
+        {
+            "key": "freeOK",
+            "name": "freeOK-py[影]",
+            "type": 3,
+            "api": "./freeOK.py",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "playerType": 2,
+            "style": {
+                "type": "rect",
+                "ratio": 1
+            }
         }
     ]
 }
