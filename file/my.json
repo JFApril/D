@@ -382,7 +382,7 @@
         },
         {
             "key": "VIP2",
-            "name": "VIP兔py[影]",
+            "name": "星空py[影]",
             "type": 3,
             "api": "./VIP2.py",
             "searchable": 1,
