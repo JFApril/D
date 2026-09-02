@@ -372,6 +372,24 @@
             }
         },
         {
+            "key": "redguo",
+            "name": "红果py[短]",
+            "type": 3,
+            "api": "./redguo.py",
+            "searchable": 1,
+            "quickSearch": 0,
+            "filterable": 1
+        },
+        {
+            "key": "baidudj",
+            "name": "百度短py[短]",
+            "type": 3,
+            "api": "./baidudj.js",
+            "searchable": 1,
+            "quickSearch": 0,
+            "filterable": 1
+        },
+        {
             "key": "qingniu",
             "name": "青牛py[影]",
             "type": 3,
