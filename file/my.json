@@ -382,9 +382,9 @@
         },
         {
             "key": "baidudj",
-            "name": "百度短py[短]",
+            "name": "百度js[短]",
             "type": 3,
-            "api": "./baidudj.js",
+            "api": "./baududj.js",
             "searchable": 1,
             "quickSearch": 0,
             "filterable": 1
