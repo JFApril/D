@@ -1,13 +1,18 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# V1.17 球布斯体育直播 - 去重+vivo200代理
+# V1.20 球布斯体育直播 - 列表接口免Token直调(登录限频不再阻塞) 调试日志落盘
+# 变更 V1.20: 实测/v1/live/recommend无需Token, 登录从前置条件降级为可选(401才登录), 解除IP限频阻塞; _log写qbs_debug.log
 import re, json, requests, time  #, os
 from base.spider import Spider as BaseSpider
-# LOG_DIR = "/storage/emulated/0/Download/Operit/cleanOnExit"
-# LOG_FILE = os.path.join(LOG_DIR, "qbs_v1.17.log")
+LOG_FILE = "/sdcard/Download/spider/qbs_debug.log"
 def _log(msg):
-    pass
-    # line = "[QBS V1.17 " + time.strftime("%H:%M:%S") + "] " + msg
+    line = "[QBS " + time.strftime("%H:%M:%S") + "] " + msg
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+    # line = "[QBS V1.18 " + time.strftime("%H:%M:%S") + "] " + msg
     # print(line)
     # try:
     #     os.makedirs(LOG_DIR, exist_ok=True)
@@ -27,7 +32,8 @@ def _fmt_time(ts):
     except Exception:
         return ""
 HOST = "https://www.jsnxka5nln.com"
-API = "https://qiubusi.it"
+API = "https://api.qbs787.com"
+API_ALT = "https://qiubusi.it"
 SITE_CODE = "S0001"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
 PLAY_HEADER = json.dumps({"User-Agent": UA, "Referer": HOST + "/", "Origin": HOST})
@@ -35,6 +41,8 @@ CAT_KW1 = ["足球", "英超", "西甲", "意甲", "德甲", "法甲", "中超",
 CAT_KW2 = ["篮球", "NBA", "nba", "CBA", "cba", "女篮", "男篮", "WNBA"]
 VIVO_HOST = "live.vivo200.com"
 PROXY_PREFIX = "/live-stream-proxy"
+REQ_HEADERS = {"User-Agent": UA, "Accept": "*/*", "Accept-Language": "zh-CN,zh;q=0.9", "Content-Type": "application/json", "Origin": HOST + "/", "Referer": HOST + "/", "Sec-Ch-Ua": "'Chromium';v='140', 'Not_A Brand';v='8'", "Sec-Ch-Ua-Mobile": "?0", "Sec-Ch-Ua-Platform": "'Windows'", "Sec-Fetch-Dest": "empty", "Sec-Fetch-Mode": "cors", "Sec-Fetch-Site": "cross-site"}
+
 class Spider(BaseSpider):
     def getName(self):
         return "球布斯体育"
@@ -45,6 +53,8 @@ class Spider(BaseSpider):
         self._rooms_cache_ts = 0
         self._s2r = {}
         self._r2room = {}
+        self._base = API
+        self._rate_limited = 0
     def _get_rooms(self, force=False):
         now = time.time()
         if not force and self._rooms_cache and (now - self._rooms_cache_ts < 60):
@@ -79,42 +89,66 @@ class Spider(BaseSpider):
         now = time.time()
         if self._guest_token and now < self._guest_expires:
             return self._guest_token
+        if now - self._rate_limited < 30:
+            return None
+        h = dict(REQ_HEADERS)
+        h["Site-Code"] = SITE_CODE
+        h["Sport-Data"] = "1"
+        h["OperationID"] = str(int(now * 1000))
         try:
-            h = {"Content-Type": "application/json", "Site-Code": SITE_CODE, "Sport-Data": "1", "OperationID": str(int(now * 1000))}
-            r = requests.post(API + "/v1/guest/login", json={"platform": 5}, headers=h, timeout=10)
+            r = requests.post(self._base + "/v1/guest/login", json={"platform": 5}, headers=h, timeout=4)
             d = r.json()
             if d.get("code") == 0 and d.get("data"):
                 self._guest_token = d["data"]["req_token"]
                 self._guest_expires = now + 3500
-                _log("token ok")
+                _log("token ok base=" + self._base)
                 return self._guest_token
-            _log("login " + str(d.get("code")) + " " + str(d.get("message", ""))[:30])
+            code = d.get("code")
+            _log("login " + str(code) + " " + str(d.get("message", ""))[:30] + " base=" + self._base)
+            if code in (99, 401) or (self._base == API and code not in (0,)):
+                self._rate_limited = now
+                if self._base == API:
+                    self._base = API_ALT
+                    _log("switch base -> " + self._base)
         except Exception as e:
-            _log("login err:" + str(e)[:40])
+            _log("login err:" + str(e)[:40] + " base=" + self._base)
+            if self._base == API:
+                self._base = API_ALT
+                self._rate_limited = now
+                _log("switch base -> " + self._base)
         return None
     def _api(self, path, body=None):
-        token = self._ensure_guest()
-        if not token:
-            return None
-        h = {"Content-Type": "application/json", "Site-Code": SITE_CODE, "Sport-Data": "1", "OperationID": str(int(time.time() * 1000)), "Token": token}
+        d = self._do_post(path, body, self._guest_token)
+        if d and d.get("code") == 401:
+            self._guest_token = None
+            t2 = self._ensure_guest()
+            if t2:
+                d = self._do_post(path, body, t2)
+        return d
+    def _do_post(self, path, body, token):
+        h = dict(REQ_HEADERS)
+        h["Site-Code"] = SITE_CODE
+        h["Sport-Data"] = "1"
+        h["OperationID"] = str(int(time.time() * 1000))
+        if token:
+            h["Token"] = token
         try:
-            r = requests.post(API + path, json=body or {}, headers=h, timeout=10)
+            r = requests.post(self._base + path, json=body or {}, headers=h, timeout=6)
             d = r.json()
-            if d.get("code") == 401:
-                self._guest_token = None
-                t2 = self._ensure_guest()
-                if t2:
-                    h["Token"] = t2
-                    return requests.post(API + path, json=body or {}, headers=h, timeout=10).json()
+            _log(path + " code=" + str(d.get("code")))
             return d
         except Exception as e:
-            _log("api err:" + str(e)[:40])
+            _log("api err:" + str(e)[:40] + " base=" + self._base)
+            if self._base == API:
+                self._base = API_ALT
+                self._rate_limited = time.time()
+                _log("switch base -> " + self._base)
             return None
     def _proxy_url(self, url):
         if VIVO_HOST in url:
             from urllib.parse import urlparse
             p = urlparse(url)
-            new = API + PROXY_PREFIX + p.path + "?" + p.query
+            new = self._base + PROXY_PREFIX + p.path + "?" + p.query
             _log("proxy: " + new[:80])
             return new
         return url
@@ -140,7 +174,7 @@ class Spider(BaseSpider):
         pic = _safe_pic(home_logo) or _safe_pic(away_logo) or _safe_pic(r.get("cover", ""))
         if name and aname:
             name += " [" + aname + "]"
-        parts = ["🔴"]
+        parts = ["🔴直播中"]
         if ts: parts.append(ts)
         if league: parts.append(league)
         return {"vod_id": rid, "vod_name": name, "vod_pic": pic, "vod_remarks": " ".join(parts),
