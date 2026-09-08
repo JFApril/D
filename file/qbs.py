@@ -1,6 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# V1.20 球布斯体育直播 - 列表接口免Token直调(登录限频不再阻塞) 调试日志落盘
+# V1.24 球布斯体育直播 - proxy服务器修复(kensl9ndm)
+# 变更 V1.24: 代理服务器从api.qbs787.com改为www.kensl9ndm.com
+# 变更 V1.23: localProxy实现真正转发, 添加Site-Code等headers访问vivo
+# 变更 V1.22: 移除_s2r匹配逻辑, vivo域名无条件走_proxy_url转码(localProxy处理转发)
+# 变更 V1.21: VIVO_HOST 从 vivo200.com 改为 vivo155.com; 添加备用 vivo200.com 支持
 # 变更 V1.20: 实测/v1/live/recommend无需Token, 登录从前置条件降级为可选(401才登录), 解除IP限频阻塞; _log写qbs_debug.log
 import re, json, requests, time  #, os
 from base.spider import Spider as BaseSpider
@@ -34,12 +38,14 @@ def _fmt_time(ts):
 HOST = "https://www.jsnxka5nln.com"
 API = "https://api.qbs787.com"
 API_ALT = "https://qiubusi.it"
+PROXY_HOST = "https://www.kensl9ndm.com"  # V1.24: vivo代理服务器
 SITE_CODE = "S0001"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
 PLAY_HEADER = json.dumps({"User-Agent": UA, "Referer": HOST + "/", "Origin": HOST})
 CAT_KW1 = ["足球", "英超", "西甲", "意甲", "德甲", "法甲", "中超", "欧冠", "欧联", "挪超", "瑞超", "芬超", "比甲", "荷甲", "葡超", "澳超", "日职", "韩K", "巴甲", "南美杯", "联赛", "杯赛", "友谊赛", "英联杯"]
 CAT_KW2 = ["篮球", "NBA", "nba", "CBA", "cba", "女篮", "男篮", "WNBA"]
-VIVO_HOST = "live.vivo200.com"
+VIVO_HOST = "live.vivo155.com"
+VIVO_HOST_ALT = "live.vivo200.com"
 PROXY_PREFIX = "/live-stream-proxy"
 REQ_HEADERS = {"User-Agent": UA, "Accept": "*/*", "Accept-Language": "zh-CN,zh;q=0.9", "Content-Type": "application/json", "Origin": HOST + "/", "Referer": HOST + "/", "Sec-Ch-Ua": "'Chromium';v='140', 'Not_A Brand';v='8'", "Sec-Ch-Ua-Mobile": "?0", "Sec-Ch-Ua-Platform": "'Windows'", "Sec-Fetch-Dest": "empty", "Sec-Fetch-Mode": "cors", "Sec-Fetch-Site": "cross-site"}
 
@@ -145,10 +151,11 @@ class Spider(BaseSpider):
                 _log("switch base -> " + self._base)
             return None
     def _proxy_url(self, url):
-        if VIVO_HOST in url:
+        """V1.24: vivo155.com/vivo200.com → PROXY_HOST/live-stream-proxy 转码"""
+        if VIVO_HOST in url or VIVO_HOST_ALT in url:
             from urllib.parse import urlparse
             p = urlparse(url)
-            new = self._base + PROXY_PREFIX + p.path + "?" + p.query
+            new = PROXY_HOST + PROXY_PREFIX + p.path + "?" + p.query
             _log("proxy: " + new[:80])
             return new
         return url
@@ -247,16 +254,18 @@ class Spider(BaseSpider):
         _log("play url=" + url[:80])
         if not url:
             return {"parse": 0, "url": url, "header": PLAY_HEADER}
-        if VIVO_HOST in url:
+        # V1.22: vivo域名无条件走代理(壳转发至localProxy)
+        if VIVO_HOST in url or VIVO_HOST_ALT in url:
             self._get_rooms(force=True)
-            base = url.split("?")[0]
-            room_id = self._s2r.get(base)
-            new_url = url
-            if room_id:
-                new_room = self._r2room.get(room_id)
-                if new_room:
-                    new_url = new_room.get("stream_url", "") or url
-            return {"parse": 0, "url": self._proxy_url(new_url), "header": PLAY_HEADER}
+            new_url = self._proxy_url(url)
+            _log("proxy→ " + new_url[:80])
+            return {"parse": 0, "url": new_url, "header": PLAY_HEADER}
         return {"parse": 0, "url": url, "header": PLAY_HEADER}
     def localProxy(self, param):
-        return [200, "text/plain", b"", {}]
+        """V1.24: vivo代理已由kensl9ndm处理(localProxy仅作兜底)"""
+        uri = param.get("uri", "")
+        if not uri.startswith(PROXY_PREFIX):
+            return [404, "text/plain", b"Not Found", {}]
+        _log("localProxy uri=" + uri[:60])
+        # 代理服务器已处理转发, 返回占位
+        return [200, "application/vnd.apple.mpegurl", b"#EXTM3U\n", {}]
