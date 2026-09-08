@@ -8,6 +8,11 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 0.75 }
 })
+V1.6: 修复V1.5 master判定失效(^锚点正则无m标志, master以#EXTM3U开头永远匹配不上 → 直播线误判✅且·高清从未插入); 改indexOf识别master; 加debug日志跟踪变体提取
+V1.5: master playlist变体解析 - hello.ooo0ooo.top是master(只含EXT-X-STREAM-INF指向aarray真流), 壳播放器不跟随变体选择播不出; 探测时解析变体media playlist作为独立线路(·高清)置顶
+V1.4: 探测改req通道优先(isolate内fetch不走壳网络层且不可靠, V1.3误判全❌的根因); 3s超时; req返回status>=400判失效; 启发式顺序改 原声>archor>其他
+V1.3: detail()接口手动跟随301重定向(ext配.com时API会301跳.cc, 壳req不跟随会拿空数据); 探测失败时按archor位置+原声优先启发式重排, 不再回退原始顺序
+V1.2: detail()播放线路探测重排 - 并行探测m3u8(2.5s超时), 可用线路置顶, 失效线路标注❌排后(解决"直播信号失效但原声可用"时默认源挂掉的问题)
 */
 
 let host = 'https://kafeizhibo.cc';
@@ -38,6 +43,119 @@ function clean(s) {
 async function fetchJson(url) {
   const r = await req(url, { headers });
   return safeJson((r && (r.content || r.body)) || '{}', {});
+}
+
+async function fetchJsonFollow(url) {
+  // V1.3: 手动跟随 301/302 重定向(壳 req 不跟随时 .com API 会 301 跳 .cc)
+  let u = url;
+  for (let i = 0; i < 4; i++) {
+    let r = null;
+    try { r = await req(u, { headers }); } catch (e) { return {}; }
+    const st = (r && (r.status || r.statusCode)) || 0;
+    if (st === 301 || st === 302) {
+      let loc = '';
+      try { loc = (r.headers || r.responseHeaders || {}); const kv = (typeof loc === 'string') ? {} : loc; for (const k in kv) { if (String(k).toLowerCase() === 'location') { loc = kv[k]; break; } } if (typeof loc !== 'string') loc = (loc && loc.location) || ''; } catch (e) { loc = ''; }
+      if (typeof loc === 'string' && loc) { u = /^https?:\/\//i.test(loc) ? loc : absUrl(loc); continue; }
+      return {};
+    }
+    return safeJson((r && (r.content || r.body)) || '{}', {});
+  }
+  try { r = await req(u, { headers }); return safeJson((r && (r.content || r.body)) || '{}', {}); } catch (e) { return {}; }
+}
+
+function m3u8Ok(t) {
+  return /#EXTM3U|#EXTINF|#EXT-X-STREAM-INF/i.test(String(t || ''));
+}
+
+// V1.5: master playlist 变体提取 - 取带宽最高的变体URL, 相对路径转绝对
+function pickVariant(t, baseUrl) {
+  const lines = String(t || '').split(/\r?\n/);
+  let best = { bw: -1, url: '' };
+  let pendingBw = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (!l) continue;
+    if (/^#EXT-X-STREAM-INF/i.test(l)) {
+      const m = l.match(/BANDWIDTH=(\d+)/i);
+      pendingBw = m ? parseInt(m[1]) : 0;
+    } else if (l.charAt(0) !== '#') {
+      if (pendingBw >= 0) {
+        let u = l;
+        if (u.indexOf('//') === 0) u = 'https:' + u;
+        else if (u.charAt(0) === '/') {
+          const m2 = baseUrl.match(/^(https?:\/\/[^\/]+)/);
+          u = (m2 ? m2[1] : '') + u;
+        } else if (u.charAt(0) !== 'h') {
+          u = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1) + u;
+        }
+        if (u.indexOf('http') === 0 && pendingBw > best.bw) best = { bw: pendingBw, url: u };
+      }
+      pendingBw = -1;
+    }
+  }
+  return best.url;
+}
+
+// 返回 {alive: true/false/null, variant: 变体真流URL(仅master时)}
+async function probeStream(url) {
+  function withTimeout(p, ms) {
+    let to;
+    const t = new Promise(function (_, rej) { to = setTimeout(function () { rej(new Error('timeout')); }, ms); });
+    return Promise.race([p, t]).then(function (v) { clearTimeout(to); return v; }, function (e) { clearTimeout(to); throw e; });
+  }
+  function readBody(r) {
+    if (typeof r === 'string') return { st: 0, t: r };
+    if (!r) return { st: 0, t: '' };
+    return { st: r.status || r.statusCode || 0, t: String(r.content || r.body || r.data || '') };
+  }
+  function judge(st, t) {
+    if (m3u8Ok(t)) return { st: st, t: t };
+    if (st >= 400) return null;
+    if (/404|not\s?found/i.test(t)) return null;
+    if (!t) return undefined;
+    return { st: st, t: t }; // 有内容非m3u8
+  }
+  const forms = [
+    { method: 'GET', headers: { 'User-Agent': UA, 'Referer': host + '/pc' } },
+    { method: 'GET' },
+    null
+  ];
+  let first = null;
+  if (typeof req === 'function') {
+    for (let i = 0; i < forms.length; i++) {
+      try {
+        const r = forms[i] ? await withTimeout(req(url, forms[i]), 3000) : await withTimeout(req(url), 3000);
+        first = judge(readBody(r).st, readBody(r).t);
+        if (first !== undefined) break; // 拿到结论(死/活/非m3u8)
+      } catch (e) { /* 换形态 */ }
+    }
+  } else if (typeof fetch === 'function') {
+    try {
+      const r = await withTimeout(fetch(url, { method: 'GET', headers: { 'User-Agent': UA, 'Referer': host + '/pc' } }), 3000);
+      const t = (r && typeof r.text === 'function') ? await r.text().catch(function () { return ''; }) : '';
+      first = judge(r ? (r.status || 0) : 0, t);
+    } catch (e) { /* 无结论 */ }
+  }
+  if (first === null) return { alive: false, variant: '' };
+  if (first === undefined) return { alive: null, variant: '' };
+  // 是 m3u8: 判断 master 还是 media
+  if (first.t.indexOf('#EXT-X-STREAM-INF') !== -1) {
+    // master: 提取变体真流, 顺带验证变体可达
+    const v = pickVariant(first.t, url);
+    console.log('[detail Debug] master 识别: ' + url + ' 变体=' + (v || '(未提取到)'));
+    if (!v) return { alive: true, variant: '' };
+    let vAlive = true; // 乐观: master 能回就默认变体可达
+    try {
+      const vf = forms[0];
+      const rv = await withTimeout(req ? (vf ? req(v, vf) : req(v)) : fetch(v), 3000);
+      const vb = (req && (typeof rv === 'string' || rv && (rv.content || rv.body || rv.data || rv.status !== undefined))) ? readBody(rv) : { st: rv ? (rv.status || 0) : 0, t: (rv && typeof rv.text === 'function') ? await rv.text().catch(function () { return ''; }) : '' };
+      const vj = judge(vb.st, vb.t);
+      vAlive = vj !== null;
+    } catch (e) { vAlive = true; }
+    // master 本身不是流(壳播放器不跟随变体选择, 播不出) => 标记失效, 变体真流另行置顶
+    return { alive: false, variant: vAlive ? v : '' };
+  }
+  return { alive: true, variant: '' };
 }
 
 function getClasses() {
@@ -241,7 +359,7 @@ async function detail(id) {
   };
 
   try {
-    const json = await fetchJson(host + '/api/v1/room/' + encodeURIComponent(roomId) + '?_t=' + Date.now());
+    const json = await fetchJsonFollow(host + '/api/v1/room/' + encodeURIComponent(roomId) + '?_t=' + Date.now());
     const data = json.data || {};
     const room = data.room_info || {};
     const archor = data.archor || {};
@@ -256,8 +374,50 @@ async function detail(id) {
       urls.push(clean(name || ('线路' + (urls.length + 1))) + '$' + url);
     }
 
-    for (let i = 0; i < signals.length; i++) addLine(signals[i].name, signals[i].stream_url);
-    addLine(archor.name, archor.stream_url);
+    // V1.2: 收集线路 -> 并行探测可达性 -> 可用置顶, 失效标注❌排后
+    const cands = [];
+    const cSeen = {};
+    function pushCand(name, url) {
+      url = String(url || '').trim();
+      if (!url || cSeen[url]) return;
+      cSeen[url] = true;
+      cands.push({ name: clean(name || '') || ('线路' + (cands.length + 1)), url });
+    }
+    for (let i = 0; i < signals.length; i++) pushCand(signals[i].name, signals[i].stream_url);
+    pushCand(archor.name, archor.stream_url);
+    // 只探测 m3u8 直播流(非 http 直链/回放不探, 按原序保留)
+    const probed = await Promise.all(cands.map(function (cd) {
+      if (!/\.m3u8(\?|$)/i.test(cd.url)) return Promise.resolve({ cd: cd, alive: null, variant: '' });
+      return probeStream(cd.url).then(function (r) { return { cd: cd, alive: r.alive, variant: r.variant || '' }; });
+    }));
+    // V1.5: master变体真流 作为独立线路插入(标记·高清)
+    for (let i = 0; i < probed.length; i++) {
+      const p = probed[i];
+      if (p.variant && !cSeen[p.variant]) {
+        cSeen[p.variant] = true;
+        probed.splice(i + 1, 0, { cd: { name: p.cd.name + '·高清', url: p.variant }, alive: true, variant: '' });
+      }
+    }
+    // 排序: 可用(按原序) -> 未知(按原序) -> 失效(按原序)
+    const order = { true: 0, null: 1, false: 2 };
+    probed.sort(function (a, b) { return order[a.alive] - order[b.alive]; });
+    // V1.4 启发式兜底: 探测无结论时(全null), 按 原声>archor当前信号>其他 重排(解说信号常失效, 原声最稳)
+    const conclusive = probed.some(function (p) { return p.alive !== null; });
+    if (!conclusive) {
+      const archorUrl = String((archor && archor.stream_url) || '').trim();
+      function heurScore(p) {
+        if (/原声/i.test(p.cd.name)) return 0;              // 原声信号最稳
+        if (p.cd.url === archorUrl) return 1;              // 平台当前主播信号
+        return 2;                                          // 其他
+      }
+      probed.sort(function (a, b) { return heurScore(a) - heurScore(b); });
+    }
+    for (let i = 0; i < probed.length; i++) {
+      const p = probed[i];
+      if (p.alive === false) addLine(p.cd.name + ' ❌', p.cd.url);
+      else if (p.alive === null) addLine(p.cd.name, p.cd.url);
+      else addLine(p.cd.name + ' ✅', p.cd.url);
+    }
 
     const title = room.title || displayName;
     vod = {
