@@ -10,12 +10,14 @@ import re, json, requests, time  #, os
 from base.spider import Spider as BaseSpider
 LOG_FILE = "/sdcard/Download/spider/qbs_debug.log"
 def _log(msg):
-    line = "[QBS " + time.strftime("%H:%M:%S") + "] " + msg
-    try:
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
-    except Exception:
-        pass
+    # V1.24+: 已正常运行, 关闭日志写入
+    # line = "[QBS " + time.strftime("%H:%M:%S") + "] " + msg
+    # try:
+    #     with open(LOG_FILE, "a", encoding="utf-8") as f:
+    #         f.write(line + "\n")
+    # except Exception:
+    #     pass
+    pass
     # line = "[QBS V1.18 " + time.strftime("%H:%M:%S") + "] " + msg
     # print(line)
     # try:
