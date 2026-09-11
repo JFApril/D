@@ -1,1648 +1,935 @@
-# -*- coding: utf-8 -*-
-from __future__ import annotations
-import base64
-import binascii
-import bisect
-import hashlib
-import json
-import lzma
-import random
+
+import sys
+import os
 import re
-import struct
-import threading
+import json
 import time
-from collections.abc import Mapping
+import struct
+import base64
+import random
+import hashlib
+import binascii
+import socket
+import threading
+import zlib
+import bisect
+from pathlib import Path
+from urllib.parse import (quote, urlencode, parse_qs, urlparse,
+                          urlsplit, parse_qsl, unquote)
+from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from html.parser import HTMLParser
-from typing import Any
-from urllib.parse import parse_qs, quote, urlencode, urlparse
-import requests
+from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, Dict, Any, List, Tuple
+
+sys.path.append('..')
+
 try:
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    import requests
 except ImportError:
-    hashes = None
-    Cipher = algorithms = modes = None
+    requests = None
+
 try:
-    from Crypto.Cipher import AES as CryptoAES
+    from Crypto.Cipher import AES
+    from Crypto.Util import Counter
 except ImportError:
-    CryptoAES = None
-from base.spider import Spider
+    AES = None
+    Counter = None
 
-# FongMi/TVBox 的 Chaquopy 环境未必带 cryptography，多数壳只带 pycryptodome。
-# 统一入口，避免调用点直接依赖某一个库。
-if Cipher is not None:
-    AES_BACKEND = "cryptography"
-elif CryptoAES is not None:
-    AES_BACKEND = "pycryptodome"
-else:
-    AES_BACKEND = "none"
+try:
+    from base.spider import Spider
+except ImportError:
+    class Spider:
+        pass
 
-def _aes_ctr_decrypt(key: bytes, counter: bytes, data: bytes) -> bytes:
-    if not data:
-        return b""
-    if AES_BACKEND == "cryptography":
-        decryptor = Cipher(algorithms.AES(key), modes.CTR(counter)).decryptor()
-        return decryptor.update(data) + decryptor.finalize()
-    if AES_BACKEND == "pycryptodome":
-        cipher = CryptoAES.new(
-            key, CryptoAES.MODE_CTR, nonce=b"", initial_value=counter
-        )
-        return cipher.decrypt(data)
-    raise HongguoPluginError("缺少 AES 实现：需要 cryptography 或 pycryptodome")
-
-def _aes_cbc_decrypt(key: bytes, iv: bytes, data: bytes) -> bytes:
-    if not data:
-        return b""
-    if AES_BACKEND == "cryptography":
-        decryptor = Cipher(algorithms.AES(key), modes.CBC(iv)).decryptor()
-        return decryptor.update(data) + decryptor.finalize()
-    if AES_BACKEND == "pycryptodome":
-        return CryptoAES.new(key, CryptoAES.MODE_CBC, iv).decrypt(data)
-    raise HongguoPluginError("缺少 AES 实现：需要 cryptography 或 pycryptodome")
-
-SITE = "https://hongguoduanju.com"
-EPISODE_PREFIX = "hg-episode-v1:"
-VIDEO_URL = "https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/"
-UA = "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
-APP_UA = "com.phoenix.read/71332 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)"
-MEDIA_UA = "com.phoenix.read/71332"
-
-
-
-
-_HTML_FETCH_ATTEMPTS = 3
-
-_HTML_FETCH_BACKOFF_SECONDS = 1.5
-
-_RANGE_FETCH_ATTEMPTS = 3
-
-_RANGE_FETCH_BACKOFF_SECONDS = 0.8
-
-class HongguoPluginError(RuntimeError):
+try:
+    import warnings
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    warnings.filterwarnings('ignore', message='Unverified HTTPS request')
+except Exception:
     pass
 
-def _text(value: Any) -> str:
-    return str(value or "").strip()
 
-def _first(*values: Any) -> str:
-    for value in values:
-        if isinstance(value, (list, tuple)):
-            result = _first(*value)
-        elif isinstance(value, Mapping):
-            result = _first(
-                value.get("url"),
-                value.get("uri"),
-                value.get("src"),
-                value.get("download_url"),
-                value.get("main_url"),
-                value.get("backup_url"),
-                value.get("backup_url_1"),
-                value.get("play_addr"),
-                value.get("url_list"),
-            )
-        else:
-            result = _text(value)
-        if result:
-            return result
-    return ""
+CONFIG_DEVICE_ID = '829902912863503360'
+CONFIG_INSTALL_ID = '250404579274111008'
+CONFIG_PLATFORM = 'android'
+CONFIG_CACHE_SECONDS = 3600
 
-def _json_response(response: requests.Response) -> Any:
-    response.raise_for_status()
-    try:
-        return response.json()
-    except ValueError as exc:
-        raise HongguoPluginError("上游响应不是 JSON") from exc
+_CURRENT_DOMAIN = 'http://127.0.0.1:9877'
+_EMBEDDED_SERVER = None
+_EMBEDDED_PORT = 0
 
-def _get_html(url: str, *, attempts: int = _HTML_FETCH_ATTEMPTS) -> str:
-    last_error: Exception | None = None
-    for attempt in range(max(1, attempts)):
-        try:
-            response = requests.get(
-                url,
-                headers={
-                    "User-Agent": UA,
-                    "Accept-Language": "zh-CN,zh;q=0.9",
-                },
-                timeout=30,
-            )
-            response.raise_for_status()
-            response.encoding = response.encoding or "utf-8"
-            return response.text
-        except Exception as error:  # transient proxy/DNS/read failures
-            last_error = error
-            if attempt + 1 < max(1, attempts):
-                time.sleep(_HTML_FETCH_BACKOFF_SECONDS * (attempt + 1))
-    raise HongguoPluginError(f"fetch failed: {url}") from last_error
-
-def _router_data(html: str) -> dict[str, Any]:
-    match = re.search(r"(?:window\.)?_ROUTER_DATA\s*=\s*", html)
-    if not match:
-        raise HongguoPluginError("页面没有路由数据")
-    try:
-        value, _ = json.JSONDecoder().raw_decode(html[match.end() :])
-    except json.JSONDecodeError as exc:
-        raise HongguoPluginError("页面路由数据解析失败") from exc
-    if not isinstance(value, dict):
-        raise HongguoPluginError("页面路由数据格式错误")
-    return value
-
-def _media_url(item: Mapping[str, Any]) -> str:
-    return _first(
-        item.get("main_url"),
-        item.get("backup_url"),
-        item.get("backup_url_1"),
-        item.get("play_addr"),
-        item.get("url"),
-    )
-
-def _spade_value(item: Mapping[str, Any]) -> str:
-    encrypt_info = item.get("encrypt_info")
-    if not isinstance(encrypt_info, Mapping):
-        encrypt_info = {}
-    return _first(item.get("spade_a"), encrypt_info.get("spade_a"))
-
-def derive_content_key(spade_b64: str) -> bytes:
-    raw = _b64(spade_b64)
-    if len(raw) < 3:
-        raise HongguoPluginError("spade_a 太短")
-    v8 = len(raw) - (raw[0] ^ raw[1] ^ raw[2]) + 47
-    if v8 <= 0 or 1 + v8 > len(raw):
-        v8 = len(raw) - 1
-    if v8 < 33:
-        raise HongguoPluginError("spade_a 长度异常")
-    value = bytearray(raw[1 : 1 + v8])
-    va, vb = 85, 246
-    for index in range(v8):
-        previous = va if index & 1 else vb
-        if index & 1:
-            va = value[index]
-        else:
-            vb = value[index]
-        value[index] = (-21 - index.bit_count() + (previous ^ value[index])) & 0xFF
-    try:
-        return binascii.unhexlify(bytes(value[1:33]).decode("ascii"))
-    except (ValueError, binascii.Error) as exc:
-        raise HongguoPluginError("spade_a 密钥材料无效") from exc
-
-def _find_box(data: memoryview, fourcc: bytes, start: int) -> tuple[int, int]:
-    for index in range(max(4, start), len(data) - 4):
-        if data[index : index + 4] != fourcc:
-            continue
-        size = struct.unpack(">I", data[index - 4 : index])[0]
-        if size == 1 and index + 12 <= len(data):
-            size = struct.unpack(">Q", data[index + 4 : index + 12])[0]
-        if 8 <= size <= 5_000_000 and index - 4 + size <= len(data):
-            return index - 4, size
-    return -1, 0
-
-def _box_body(data: memoryview, fourcc: bytes, start: int) -> memoryview | None:
-    offset, size = _find_box(data, fourcc, start)
-    return data[offset + 8 : offset + size] if offset >= 0 else None
-
-def _parse_track(
-    moov: memoryview,
-    track_offset: int,
-) -> tuple[list[int], list[int], list[int], list[int], int, int] | None:
-    if track_offset < 0:
-        return None
-    stbl_offset, _ = _find_box(moov, b"stbl", track_offset + 8)
-    if stbl_offset < 0:
-        return None
-    stsz = _box_body(moov, b"stsz", stbl_offset)
-    stco = _box_body(moov, b"stco", stbl_offset)
-    co64 = _box_body(moov, b"co64", stbl_offset)
-    stsc = _box_body(moov, b"stsc", stbl_offset)
-    saiz = _box_body(moov, b"saiz", stbl_offset)
-    saio = _box_body(moov, b"saio", stbl_offset)
-    if any(value is None for value in (stsz, stsc, saiz, saio)) or (
-        stco is None and co64 is None
-    ):
-        return None
-    assert stsz is not None and stsc is not None
-    assert saiz is not None and saio is not None
-    default_size = struct.unpack(">I", stsz[4:8])[0]
-    sample_count = struct.unpack(">I", stsz[8:12])[0]
-    sizes = (
-        [default_size] * sample_count
-        if default_size
-        else [
-            struct.unpack(">I", stsz[12 + index * 4 : 16 + index * 4])[0]
-            for index in range(sample_count)
-        ]
-    )
-    chunk_table = stco if stco is not None else co64
-    assert chunk_table is not None
-    chunk_count = struct.unpack(">I", chunk_table[4:8])[0]
-    chunk_width = 4 if stco is not None else 8
-    offsets = [
-        int.from_bytes(
-            chunk_table[
-                8 + index * chunk_width : 8 + (index + 1) * chunk_width
-            ],
-            "big",
-        )
-        for index in range(chunk_count)
-    ]
-    entry_count = struct.unpack(">I", stsc[4:8])[0]
-    entries = [
-        (
-            struct.unpack(">I", stsc[8 + index * 12 : 12 + index * 12])[0],
-            struct.unpack(">I", stsc[12 + index * 12 : 16 + index * 12])[0],
-        )
-        for index in range(entry_count)
-    ]
-    chunk_samples = [0] * chunk_count
-    for index, (first_chunk, samples_per_chunk) in enumerate(entries):
-        end = entries[index + 1][0] - 1 if index + 1 < len(entries) else chunk_count
-        for chunk in range(first_chunk - 1, min(end, chunk_count)):
-            chunk_samples[chunk] = samples_per_chunk
-    saiz_flags = int.from_bytes(saiz[1:4], "big")
-    saiz_cursor = 12 if saiz_flags & 1 else 4
-    if len(saiz) < saiz_cursor + 5:
-        return None
-    default_aux_size = saiz[saiz_cursor]
-    aux_count = struct.unpack(">I", saiz[saiz_cursor + 1 : saiz_cursor + 5])[0]
-    aux_sizes = (
-        [default_aux_size] * aux_count
-        if default_aux_size
-        else [
-            int(saiz[saiz_cursor + 5 + index])
-            for index in range(aux_count)
-            if saiz_cursor + 5 + index < len(saiz)
-        ]
-    )
-    if len(aux_sizes) != aux_count:
-        return None
-    saio_flags = int.from_bytes(saio[1:4], "big")
-    saio_cursor = 12 if saio_flags & 1 else 4
-    offset_width = 8 if saio[0] == 1 else 4
-    if len(saio) < saio_cursor + 4 + offset_width:
-        return None
-    entry_count = int.from_bytes(saio[saio_cursor : saio_cursor + 4], "big")
-    if entry_count < 1:
-        return None
-    aux_offset = int.from_bytes(
-        saio[saio_cursor + 4 : saio_cursor + 4 + offset_width],
-        "big",
-    )
-    return sizes, offsets, chunk_samples, aux_sizes, aux_offset, sample_count
-
-def _replace_fourcc(data: bytearray, old: bytes, new: bytes) -> None:
-    position = 0
-    while True:
-        position = data.find(old, position)
-        if position < 0:
-            return
-        data[position : position + len(old)] = new
-        position += len(new)
-
-def _replace_sinf(data: bytearray) -> None:
-    position = 0
-    while True:
-        position = data.find(b"sinf", position)
-        if position < 0:
-            return
-        if position >= 4:
-            size = struct.unpack(">I", data[position - 4 : position])[0]
-            end = position - 4 + size
-            if 8 <= size < 50_000 and end <= len(data):
-                data[position : position + 4] = b"free"
-                data[position + 4 : end] = b"\x00" * max(0, end - position - 4)
-                position = end
-                continue
-        position += 4
-
-def decrypt_mp4_cenc(data: bytes, content_key: bytes) -> bytes:
-    if len(content_key) != 16:
-        raise HongguoPluginError("CENC 密钥长度错误")
-    result = bytearray(data)
-    if len(result) < 16:
-        raise HongguoPluginError("MP4 数据过短")
-    moov_start, moov_size = _find_box(memoryview(result), b"moov", 0)
-    if moov_start < 0 or moov_size < 8:
-        raise HongguoPluginError("MP4 moov 越界")
-    moov = memoryview(result)[moov_start : moov_start + moov_size]
-    tracks: list[int] = []
-    track_search = 0
-    while True:
-        track, track_size = _find_box(moov, b"trak", track_search)
-        if track < 0:
-            break
-        tracks.append(track)
-        track_search = track + max(track_size, 8)
-    decrypted_samples = 0
-    for track in tracks:
-        parsed = _parse_track(moov, track)
-        if parsed is None:
-            continue
-        sizes, offsets, chunk_counts, aux_sizes, aux_offset, sample_count = parsed
-        aux_size = sum(max(size, 8) for size in aux_sizes)
-        if not sample_count or aux_offset < 0 or aux_offset + aux_size > len(result):
-            continue
-        aux = result[aux_offset : aux_offset + aux_size]
-        sample_index = 0
-        aux_index = 0
-        for chunk_index, chunk_offset in enumerate(offsets):
-            current = chunk_offset
-            for _ in range(chunk_counts[chunk_index]):
-                if sample_index >= sample_count or sample_index >= len(sizes):
-                    break
-                size = sizes[sample_index]
-                if current + size > len(result):
-                    raise HongguoPluginError("MP4 样本越界")
-                if sample_index >= len(aux_sizes):
-                    raise HongguoPluginError("MP4 辅助信息数量不足")
-                entry_size = max(aux_sizes[sample_index], 8)
-                iv = bytes(aux[aux_index : aux_index + min(entry_size, 8)]).ljust(
-                    8, b"\0"
-                ) + b"\0" * 8
-                result[current : current + size] = _aes_ctr_decrypt(
-                    content_key, iv, bytes(result[current : current + size])
-                )
-                current += size
-                sample_index += 1
-                aux_index += entry_size
-                decrypted_samples += 1
-    if not decrypted_samples:
-        raise HongguoPluginError("MP4 没有可解密的 CENC 样本")
-    moov_buffer = bytearray(result[moov_start : moov_start + moov_size])
-    _replace_fourcc(moov_buffer, b"encv", b"hvc1")
-    _replace_fourcc(moov_buffer, b"enca", b"mp4a")
-    _replace_sinf(moov_buffer)
-    result[moov_start : moov_start + moov_size] = moov_buffer
-    return bytes(result)
-
-MEDIA_HEADERS = {"User-Agent": MEDIA_UA, "Referer": "https://novel.snssdk.com/"}
-
-_STREAM_PORT_RANGE = (9990, 10000)
-_STREAM_CHUNK = 1 << 20
-_STREAM_HEAD_PROBE = 1 << 16
-_STREAM_TTL_SECONDS = 900
-_STREAM_MAX_SESSIONS = 4
-_STREAM_STATE: dict[str, Any] = {"port": 0, "server": None, "sessions": {}}
-_STREAM_LOCK = threading.RLock()
+def _pkcs7_pad(data, block_size=16):
+    pad_len = block_size - (len(data) % block_size)
+    return data + bytes([pad_len] * pad_len)
 
 
-def _toplevel_boxes(buf: bytes) -> list[tuple[int, int, bytes]]:
-    boxes: list[tuple[int, int, bytes]] = []
-    cursor = 0
-    while cursor + 8 <= len(buf):
-        size = struct.unpack(">I", buf[cursor : cursor + 4])[0]
-        fourcc = bytes(buf[cursor + 4 : cursor + 8])
-        if size == 1:
-            if cursor + 16 > len(buf):
-                break
-            size = struct.unpack(">Q", buf[cursor + 8 : cursor + 16])[0]
-        if size < 8:
-            break
-        boxes.append((cursor, size, fourcc))
-        cursor += size
-    return boxes
+def _sm3_rotl(x, n, bits=32):
+    n = n % bits
+    return ((x << n) | (x >> (bits - n))) & ((1 << bits) - 1)
 
+def _sm3_p0(x):
+    return x ^ _sm3_rotl(x, 9) ^ _sm3_rotl(x, 17)
 
-def _range_get(url: str, start: int, end: int) -> tuple[bytes, int]:
-    headers = dict(MEDIA_HEADERS)
-    headers["Range"] = "bytes=%d-%d" % (start, end)
-    expected = end - start + 1
-    last_error: Exception | None = None
-    for attempt in range(_RANGE_FETCH_ATTEMPTS):
-        if attempt:
-            time.sleep(_RANGE_FETCH_BACKOFF_SECONDS * attempt)
-        try:
-            response = requests.get(url, headers=headers, timeout=60)
-        except requests.RequestException as error:
-            last_error = error
-            continue
-        if response.status_code not in (200, 206):
-            last_error = HongguoPluginError(
-                "媒体分片请求失败 %s" % response.status_code
-            )
-            continue
-        body = response.content
-        # 上游偶发返回短包；短于请求长度时重试，避免播放器收到截断数据。
-        if not body or (response.status_code == 206 and len(body) < expected):
-            last_error = HongguoPluginError(
-                "媒体分片长度不足 %d/%d" % (len(body), expected)
-            )
-            continue
-        total = 0
-        content_range = response.headers.get("Content-Range") or ""
-        if "/" in content_range:
-            tail = content_range.rsplit("/", 1)[1].strip()
-            if tail.isdigit():
-                total = int(tail)
-        if not total:
-            length = response.headers.get("Content-Length") or ""
-            total = int(length) if length.isdigit() else 0
-        return body, total
-    raise last_error or HongguoPluginError("媒体分片请求失败")
+def _sm3_p1(x):
+    return x ^ _sm3_rotl(x, 15) ^ _sm3_rotl(x, 23)
 
+def _sm3_ff(x, y, z, j):
+    if j < 16:
+        return x ^ y ^ z
+    return (x & y) | (x & z) | (y & z)
 
-def _fetch_moov(url: str) -> tuple[int, int, bytes]:
-    probe, total = _range_get(url, 0, _STREAM_HEAD_PROBE - 1)
-    if not total:
-        raise HongguoPluginError("媒体总长度未知")
-    moov_start = 0
-    moov_size = 0
-    for offset, size, fourcc in _toplevel_boxes(probe):
-        if fourcc == b"moov":
-            moov_start = offset
-            moov_size = size
-            break
-    if not moov_size:
-        raise HongguoPluginError("未找到 moov 顶层盒")
-    if moov_start + moov_size > total:
-        raise HongguoPluginError("moov 越界")
-    if moov_start + moov_size <= len(probe):
-        return total, moov_start, bytes(probe[moov_start : moov_start + moov_size])
-    moov, _ = _range_get(url, moov_start, moov_start + moov_size - 1)
-    if len(moov) != moov_size:
-        raise HongguoPluginError("moov 分片长度不符")
-    return total, moov_start, moov
+def _sm3_gg(x, y, z, j):
+    if j < 16:
+        return x ^ y ^ z
+    return (x & y) | ((~x) & z)
 
+def _sm3_hash(msg_list):
+    IV = [0x7380166f, 0x4914b2b9, 0x172442d7, 0xda8a0600,
+          0xa96f30bc, 0x163138aa, 0xe38dee4d, 0xb0fb0e4e]
+    msg = bytes(msg_list)
+    length = len(msg)
+    msg += b'\x80'
+    while len(msg) % 64 != 56:
+        msg += b'\x00'
+    msg += (length * 8).to_bytes(8, 'big')
+    V = list(IV)
+    for i in range(0, len(msg), 64):
+        block = msg[i:i+64]
+        W = [int.from_bytes(block[j*4:j*4+4], 'big') for j in range(16)]
+        for j in range(16, 68):
+            w = _sm3_p1(W[j-16] ^ W[j-9] ^ _sm3_rotl(W[j-3], 15)) ^ _sm3_rotl(W[j-13], 7) ^ W[j-6]
+            W.append(w)
+        W_prime = [W[j] ^ W[j+4] for j in range(64)]
+        A, B, C, D, E, F, G, H = V
+        for j in range(64):
+            t_j = 0x79cc4519 if j < 16 else 0x7a879d8a
+            SS1 = _sm3_rotl((_sm3_rotl(A, 12) + E + _sm3_rotl(t_j, j % 32)) & 0xFFFFFFFF, 7)
+            SS2 = SS1 ^ _sm3_rotl(A, 12)
+            TT1 = (_sm3_ff(A, B, C, j) + D + SS2 + W_prime[j]) & 0xFFFFFFFF
+            TT2 = (_sm3_gg(E, F, G, j) + H + SS1 + W[j]) & 0xFFFFFFFF
+            D = C
+            C = _sm3_rotl(B, 9)
+            B = A
+            A = TT1
+            H = G
+            G = _sm3_rotl(F, 19)
+            F = E
+            E = _sm3_p0(TT2)
+        V = [(V[k] ^ [A, B, C, D, E, F, G, H][k]) & 0xFFFFFFFF for k in range(8)]
+    return ''.join('%08x' % x for x in V)
 
-def _rewrite_moov(moov: bytes) -> bytes:
-    result = bytearray(moov)
-    _replace_fourcc(result, b"encv", b"hvc1")
-    _replace_fourcc(result, b"enca", b"mp4a")
-    _replace_sinf(result)
-    return bytes(result)
-
-
-def _sample_table(moov: bytes, moov_start: int) -> list[tuple[int, int, bytes]]:
-    view = memoryview(moov)
-    samples: list[tuple[int, int, bytes]] = []
-    track_search = 0
-    while True:
-        track, track_size = _find_box(view, b"trak", track_search)
-        if track < 0:
-            break
-        track_search = track + max(track_size, 8)
-        parsed = _parse_track(view, track)
-        if parsed is None:
-            continue
-        sizes, offsets, chunk_counts, aux_sizes, aux_offset, sample_count = parsed
-        aux_length = sum(max(size, 8) for size in aux_sizes)
-        aux_local = aux_offset - moov_start
-        if aux_local < 0 or aux_local + aux_length > len(moov):
-            raise HongguoPluginError("CENC 辅助信息不在 moov 内，无法流式解密")
-        aux = moov[aux_local : aux_local + aux_length]
-        sample_index = 0
-        aux_index = 0
-        for chunk_index, chunk_offset in enumerate(offsets):
-            current = chunk_offset
-            for _ in range(chunk_counts[chunk_index]):
-                if sample_index >= sample_count or sample_index >= len(sizes):
-                    break
-                if sample_index >= len(aux_sizes):
-                    raise HongguoPluginError("CENC 辅助信息数量不足")
-                entry_size = max(aux_sizes[sample_index], 8)
-                initial_vector = bytes(
-                    aux[aux_index : aux_index + min(entry_size, 8)]
-                ).ljust(8, b"\0") + b"\0" * 8
-                samples.append((current, sizes[sample_index], initial_vector))
-                current += sizes[sample_index]
-                aux_index += entry_size
-                sample_index += 1
-    if not samples:
-        raise HongguoPluginError("moov 中没有可解密的 CENC 样本")
-    samples.sort()
-    return samples
-
-
-class _StreamSession:
-    """按 Range 逐块拉取加密 MP4，边下边解 CENC，供本地播放器直连。"""
-
-    def __init__(
-        self,
-        url: str,
-        content_key: bytes,
-        total: int,
-        moov_start: int,
-        moov: bytes,
-    ) -> None:
-        if len(content_key) != 16:
-            raise HongguoPluginError("CENC 密钥长度错误")
-        self.url = url
-        self.content_key = content_key
-        self.total = total
-        self.moov_start = moov_start
-        self.moov_plain = _rewrite_moov(moov)
-        self.moov_end = moov_start + len(moov)
-        self.samples = _sample_table(moov, moov_start)
-        self.offsets = [item[0] for item in self.samples]
-        self.created = time.time()
-
-    def expired(self) -> bool:
-        return time.time() - self.created > _STREAM_TTL_SECONDS
-
-    def _patch(self, buffer: bytearray, base: int) -> None:
-        end = base + len(buffer) - 1
-        index = max(bisect.bisect_right(self.offsets, base) - 1, 0)
-        while index < len(self.samples):
-            offset, size, initial_vector = self.samples[index]
-            index += 1
-            if offset > end:
-                break
-            if offset + size <= base:
-                continue
-            first = max(offset, base)
-            last = min(offset + size - 1, end)
-            skip = first - offset
-            counter = (
-                (int.from_bytes(initial_vector, "big") + skip // 16)
-                & ((1 << 128) - 1)
-            ).to_bytes(16, "big")
-            padding = skip % 16
-            plain = _aes_ctr_decrypt(
-                self.content_key,
-                counter,
-                b"\0" * padding + bytes(buffer[first - base : last - base + 1]),
-            )
-            buffer[first - base : last - base + 1] = plain[padding:]
-        if base < self.moov_end and end >= self.moov_start:
-            first = max(base, self.moov_start)
-            last = min(end, self.moov_end - 1)
-            buffer[first - base : last - base + 1] = self.moov_plain[
-                first - self.moov_start : last - self.moov_start + 1
-            ]
-
-    def read_range(self, start: int, end: int) -> bytes:
-        raw, _ = _range_get(self.url, start, end)
-        if not raw:
-            raise HongguoPluginError("媒体分片为空")
-        buffer = bytearray(raw)
-        self._patch(buffer, start)
-        return bytes(buffer)
-
-    def iter_range(self, start: int, end: int):
-        cursor = start
-        while cursor <= end:
-            stop = min(cursor + _STREAM_CHUNK - 1, end)
-            block = self.read_range(cursor, stop)
-            yield block
-            cursor += len(block)
-
-
-def _stream_session(video_id: str, config: Mapping[str, Any]) -> "_StreamSession":
-    with _STREAM_LOCK:
-        sessions = _STREAM_STATE["sessions"]
-        for key in [key for key, item in sessions.items() if item.expired()]:
-            sessions.pop(key, None)
-        session = sessions.get(video_id)
-    if session is not None:
-        return session
-    model = _video_model(video_id, config)
-    _, item = _select_quality(_video_list_from_model(model), "1080")
-    url = _media_url(item)
-    spade = _spade_value(item)
-    if not url or not spade:
-        raise HongguoPluginError("播放模型缺少地址或密钥材料")
-    key_seed = _key_seed_from_model(model)
-    if key_seed:
-        try:
-            url = _decrypt_spade_url(url, key_seed)
-        except HongguoPluginError:
-            pass
-    total, moov_start, moov = _fetch_moov(url)
-    session = _StreamSession(url, derive_content_key(spade), total, moov_start, moov)
-    with _STREAM_LOCK:
-        sessions = _STREAM_STATE["sessions"]
-        while len(sessions) >= _STREAM_MAX_SESSIONS:
-            sessions.pop(next(iter(sessions)), None)
-        sessions[video_id] = session
-    return session
-
-
-_RANGE_UNSATISFIABLE = "unsatisfiable"
-
-def _parse_range(value: str, total: int) -> Any:
-    """解析 Range 头。返回 (start, end)、None（忽略）或 _RANGE_UNSATISFIABLE。"""
-    text = (value or "").strip().lower()
-    if not text.startswith("bytes="):
-        return None
-    spec = text[6:].split(",")[0].strip()
-    if "-" not in spec:
-        return None
-    left, right = spec.split("-", 1)
-    if not left:
-        if not right.isdigit():
-            return None
-        length = min(int(right), total)
-        if not length:
-            return _RANGE_UNSATISFIABLE
-        return total - length, total - 1
-    if not left.isdigit():
-        return None
-    start = int(left)
-    end = int(right) if right.isdigit() else total - 1
-    end = min(end, total - 1)
-    if start >= total or start > end:
-        return _RANGE_UNSATISFIABLE
-    return start, end
-
-
-class _StreamHandler(BaseHTTPRequestHandler):
-    protocol_version = "HTTP/1.1"
-    server_version = "hg-stream"
-
-    def log_message(self, *args: Any) -> None:
-        return None
-
-    def _params(self) -> dict[str, str]:
-        parsed = urlparse(self.path)
-        query = parse_qs(parsed.query)
-        video_id = (query.get("vid") or query.get("id") or [""])[0]
-        if not video_id:
-            video_id = parsed.path.rsplit("/", 1)[-1].split(".")[0]
-        return {
-            "vid": video_id if video_id.isdigit() else "",
-            "device_id": (query.get("did") or [""])[0],
-            "install_id": (query.get("iid") or [""])[0],
-        }
-
-    def _fail(self, code: int, message: bytes) -> None:
-        self.send_response(code)
-        self.send_header("Content-Type", "text/plain; charset=utf-8")
-        self.send_header("Content-Length", str(len(message)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        try:
-            self.wfile.write(message)
-        except OSError:
-            pass
-
-    def do_HEAD(self) -> None:  # noqa: N802 - 标准库回调命名
-        self._serve(body=False)
-
-    def do_GET(self) -> None:  # noqa: N802 - 标准库回调命名
-        self._serve(body=True)
-
-    def _serve(self, body: bool) -> None:
-        route = urlparse(self.path).path
-        if not route.endswith(".mp4"):
-            self._fail(404, b"not found")
-            return
-        params = self._params()
-        if not params["vid"]:
-            self._fail(400, b"missing vid")
-            return
-        try:
-            session = _stream_session(
-                params["vid"],
-                {
-                    "device_id": params["device_id"],
-                    "install_id": params["install_id"],
-                },
-            )
-        except Exception:
-            self._fail(502, b"media session failed")
-            return
-        raw_range = self.headers.get("Range") or ""
-        requested = _parse_range(raw_range, session.total)
-        if requested is _RANGE_UNSATISFIABLE:
-            self.send_response(416)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.send_header("Content-Range", "bytes */%d" % session.total)
-            self.send_header("Content-Length", "0")
-            self.send_header("Connection", "close")
-            self.end_headers()
-            return
-        start, end = requested if requested else (0, session.total - 1)
-        self.send_response(206 if requested else 200)
-        self.send_header("Content-Type", "video/mp4")
-        self.send_header("Accept-Ranges", "bytes")
-        self.send_header("Content-Length", str(end - start + 1))
-        if requested:
-            self.send_header(
-                "Content-Range",
-                "bytes %d-%d/%d" % (start, end, session.total),
-            )
-        self.end_headers()
-        if not body:
-            return
-        try:
-            for block in session.iter_range(start, end):
-                self.wfile.write(block)
-        except (BrokenPipeError, ConnectionResetError):
-            self.close_connection = True
-        except Exception:
-            self.close_connection = True
-
-
-def _start_stream_server() -> int:
-    with _STREAM_LOCK:
-        if _STREAM_STATE["port"]:
-            return int(_STREAM_STATE["port"])
-        for port in range(_STREAM_PORT_RANGE[0], _STREAM_PORT_RANGE[1]):
-            try:
-                server = ThreadingHTTPServer(("127.0.0.1", port), _StreamHandler)
-            except OSError:
-                continue
-            server.daemon_threads = True
-            threading.Thread(target=server.serve_forever, daemon=True).start()
-            _STREAM_STATE["port"] = port
-            _STREAM_STATE["server"] = server
-            return port
-    return 0
-
-def _b64(value: str) -> bytes:
-    text = _text(value)
-    text += "=" * (-len(text) % 4)
-    try:
-        return base64.b64decode(text)
-    except (ValueError, binascii.Error):
-        return base64.urlsafe_b64decode(text)
-
-def _branch_one_bytes() -> bytes:
-    if not hasattr(_branch_one_bytes, "value"):
-        _branch_one_bytes.value = lzma.decompress(base64.b85decode(_BRANCH_ONE_B85))
-    return _branch_one_bytes.value
-
-_BRANCH_ONE_B85 = (
-    '{Wp48S^xk9=GL@E0stWa761SMbT8$j;R-wN{#^houf7QIIVU7<Ew*6C3?&vQR7`VixMIZH9HyzSRN)dgt5HsOFl)*@6hSxGmq5aA'
-    'QqcTJ>uEXt3ca?@+^++8<`vdWaS1a!^(@3piHN^UDea^utz&m68PwK)la*43U*mNYT~Az3vWRR9M@u9%`>|`oTuVAm{6Xbi7<B{L'
-    '+9%}E{{R4tW;N$iTuuPgJ`u;tZ?qE#6f{J&gM{zloCXZoG-hquoMj#I1srY?B&~p9xgbUzb@!5*4S7ma&y#>iUoW)6rJ_BOyLIpL'
-    'xODyDEOHDUy)Hr^$hEEodD$hbGrZQIEu8`Tb_H;~Z>VMWKW5~p-hONtZJoi*u&tO=m69!Z>V7E`+W`F%rB6Z`>9J*SJ%Azqgna;j'
-    'pyLxZi;ycJaM~j<o%H|7!w`?YyEm7i6pMnWxuw4z`~B6UKR|wY@2gl<iXrJDd{_1*$qp;ibMN}xIL<*Gi$aI_ToO8niDZ|W6uz1!'
-    '%)Ofu3qfRq1h1p__0g|vqG(?;aP76#`-*@WsTbSc98!AL83wt_4q^NHqSkY?D&ko53i_{F9n~l_{x^5C{H|fMAIX4f`wb7ERjZ3y'
-    '+#;VMHu5P=Jv3&yp^-ASDTXYC%$TxN7n?j-=xsY0676yMQ)eWeYkG3JD<>_>t{HhAIxC^4(?8&VcUx=ux(qrgcIAXU5Yosc?z1$('
-    'FqfP|)2$ve(&}uw;(uxdO>E6dMMn^`79eTmC_B=qkOB^y=1A8sQi<MgW~fDdW0t4{^<IjM^J?x<&Z1M)pYO&uEA!yRw?Np_Eoi{o'
-    'V9dD%VA6x*g>j#h5;4}+#ILn~##Qh5V8-%l`Cgcy0u7DR!N$07Q0#BWZ9icP<a5UiL*HS#iW;QiR{)ut8&c9ibCtR^s-hvxT<B5I'
-    'pZF*<3Mz685I{5Bn03e7@&D%xea0+oBiI=#Ay^38D377%<QuMZ-O*%Tv;8|=X7k@BR9~m7iE|@?x%zlQ3NE968S;+Y@OKTIO1nRQ'
-    '%$PlmG26EWG&hsL(A8Kvzr*S5Ay&gwR^Qs5EP|lmJc;6eX{5+3>-W3P^XQYY)|Xa<5v$^`p|naVLW^*4x>oTf$}?2%{6bD};l{wp'
-    'UXx&>{O<J~x}|>(!V18p93xBW_5+H#yeu03vRjESLXD$A9{yVQwj)I(NohO>ORrTjPEA{?DAU0dxSX!K7471{McHXwNi-H;o*fS{'
-    'A^u%?y|GH!Rj#yLuLt`!o<Kf)Y(ZpN4Tz3<fO`#$DE7bF-%oqDst*3_DWg8nZiEfL0Og$<i9XRgsx?2^G>t{jYLYX|a)tAG>|ahQ'
-    '(CvT4r8nG+e1c=US5#<;4qieQKmF}v#Lir5E|do?DhNZDSa32d|8J@+jja&PG#}{s>QAtW@PV$U?q=(1XE9c#V$_wg+bp&V&B)eE'
-    'w|E7%&@=fW46%KQT|hx-6(^7@;GSAuQiVAKWj{$=N<Dko+Tu^~&_g4k&tWyT+RiABes%c{2GlZizn~-ml%l&HeCQ7Y89{*{FhFJ$'
-    '%A0T5Ok9YTqU!Y`FOD0Vll<93GAUvEw{f##S5Na@_<&-g^C8;XNP;Jns4P4`9G&OuVy9F{ye}9pZXFBGaV{9GqWseFXXDkv-Jtr#'
-    'X`v5*<V}u7WzA@LlIItpV&L%Dnu!B`Tlz^fO$|&4Ecr^f5@l|Pk*?l`Q0k`=`(J9}mTP!oxXK|5+g>iFaV|-^t;>U+e*p}pUxsGg'
-    'R<;C@A<@#B?1bIdg$yI+yA6AxY23cPa12A79#Fv)!=h0N+GRs0Kg078`}Jx76kkmF2?7`fU$Lt8m3@5>LUp7)McaOF3%leJQMA(V'
-    'z#j;PC$N!2YwiDp$FdZE3B6)aNBYUa(TNaoy8X~=byBHab^*nv9%*}Rf54ca_b0AXoR_G3a@6Q#ZFpU^6?~3S9&n|oyDT=y+-aSh'
-    'n_@mxq0;KkI{N4=aOj0w-G;T1{5|jUk~rpYu}~n&xeXONR{x@w=wxoIjOh3^cwp6#*_zNzKwGmt%gS9r?F8cMjKT$lB|br+51yB2'
-    '=wZV7fy7D{`(29#`6Q#QIa%hm)is>KD_ry#_H*-F*|Z?%Qv8Wrj@X=do{p=*x3Fz@7wS7@0b~~-n@Ufde^yLqtQCm?0O`Da6nn-j'
-    'r9Pog2fjAFwY<gel`&!+$DANDLZf`IKhg4BZGPdEYX1n!8rS+gQ7lP{?{KO45vsUu2dS7*+lGbck?L*-g91mpEav%V%JY1;m@7bb'
-    '!~8*@(PmIx$hM4)kQD#-N9l_sU8UpQyq;#!2cR64Gr9}3BImqV(P!p6uw?K%E^%~`2F*P-WIQ3uw-kIk4m<8@RYF5W+XhoQx`p6k'
-    '+9I#{E}8>IJkyQ%q6436nF9t#Lsz;}b$hp5{_)$_DwZec8D&xJpU4!-(s}b112NIK72XtvrrGX22}y~3_iro{&MnhETA+DaK?Xi('
-    'Q0J_&dFeJ5#7fK#kt7e^e@c1D7iOsd7Y$~wsRTJ#qi|^(h#yWd2}FIU8B9IG^z<X74^tO-6ur(^CZ13AW`UFbC{Pe%@)oIN45MqI'
-    'PHdq9D!Kbze*P?h!OC)3qiB!l?49WS?)rHvoGtFxap`)w1=tf8AMQ5IfrG3!9*(uQp>&-907)*(j!(qXjiLbP^#}@|w33k4F~`7m'
-    'K~fLbR%d?z%hl(M*M#B6)+ez&D3$JDYg5AF2vDMPEE2G;dt-P!gtE!qaJ41%TjxghS@IBUwUEIbBB|AJ4?hq}BLavJ+^|F^sE80o'
-    'uLA?B96n!Yic+9jWQ6baLx|+P0BjCKJP6CmKDt5GssWs1oekHG4ifxLAKG`*ebaE=-5kobMB}Pz;R0REqN-x}q3%W$B*jB?E{A%B'
-    '2MhzK1%uoumz1tpa`{9cjKqgYo(@1|z(N)PeGvIibln>rkSAlt;@TjZ46mVE-PxOR1;;0DloppysYZl<liKBRKRt?9$YPa;+3T}O'
-    'tk(2rC{(dZQ`ym+rqP^|wr0OI>e6G|A!P|?bB1T7wCbzf01t(nEUGrFWjeMlraZ}~O%Xn~3S`Ij?3XhZJj44r^n=^V1+N&4lbxGo'
-    '0!x)@u1Oh2G558Kzoz_xRv^@R+Sg`Cz7G*Hrru<u)3M&MHearUo8*q=Tm|q>F#dZW2&@Gr5H7wXs&LAz?4wE7`UwBTRkeMY-w&~x'
-    'xYPt=bzf(89ffpeR@daZBH>+i&9AQXz8Ag>QY~)CA!cmHgH<ADaviZ)5dYJuj+}hxlHaonh`lzE$v|TZ2F?t}1iK6w3;xx3i`k5E'
-    '3fT8$h)$9gl59pjn9!Wyy(CiSm)fITqjj_HC6bB*xqNUV@F%^;AJG{&N#upHz)q{2eGtJ{3Vt*~?n6mbI5?3tt&&kjlS^Jk`5AKk'
-    'stC&F!}ev&(y?w&Bj#pL<xuFqZlgCPdA=?Pv0St5C9@`p^%+}>PV`CM4&WXiAA=p%;HSE^I8hyHb@HbJlKm9(B<&rvxIdWJ!Ra`W'
-    'hBT1d#{e#>cz9y9sU9Z>FD5Whu?djyd$z^Ls@m~rs_#3A*V$?hFlmO6p0uz~8wP--L+&#T9-XiXKJ4AQ%8r0jK1b6h*9Wi$-*5_l'
-    'O#gg!K%y%um(KnRmO)=2JlcF+X}hP7Gn{v@AW+9!+?D4&s3dzwJ?<}0CzFsHw)I`q@f#x}7%g)SCviR=d%M!Rmu0E64)p8)od~J;'
-    '`uAVx3hx(ZmT&ZB5FN_#N-S9Eo!g%GuzQb%boa1Ar5RHkT*|?FDT530rxbxdzA|UYb0wSBm%7Qn@nee@gz=>xU=<{_-qSfw5uiL;'
-    'Mw2t@X*I@v5gyeO;Azw^vnq!jZL<eeC#YGoyR%FFGgKx7>CTY%Y{$jEnTUhmlE>vWa&xR^daeIgtPS9t@UxM+5D(jQtQ_K#m>{iU'
-    'O?L(Lsk3<&K&Ums!V4(!0{&6z@!u^0I%2ikvMuCv?M%o^RU4iL9Ul=Tq`Qq@Y|gl{oFV~Pg{3!t#0?>Pb^@f|3o+DkcL3`=U&&99'
-    'n1ipU;k(6$Nz26d3+X9kD2Xa;);f=qm`iT8!@&Qu*cJ5i_@Hd;W4ON2#^@~rt|oiREpd1zc0fLvL#d((Kta6BI3vAn-V@xZV6?gw'
-    'BF+>*#3Zvm$iZ0&*L4xFf>P65Fs@w&+C#wM^s41lRJlT>3OUK+H|^M(l{gmrAm#*VIo*I{)6)`Nzr6!nmw#7l;a=;Tn6ly2vS7=!'
-    '4~fE_r9)9&$7RnSmaUHleEM)gsGR)UePI2Z;ewO0?U{4Hj^NSpP?ZKTS1ny~#up6i*JvMIBxfjm6!LI8GWXS)_4~GP0Tc`k@RHlb'
-    '?H*yz0Ro+%R`J|{HtsE%xxbx|k*{5o_xZfD-4bteruCah1ep@1vlv6^uCy1}`{fpW42@`+Mu;V?l$yPujd?<|dg(yXnEsC)#1?($'
-    'zKI!)WJ{_o-+z`%>g@GCWa}v981h|wyGx=%oNo$4GCZGs6t-$my{R~~VT)-|t0xOmFH*mG*~zgs#tB&P;ZmopQC~^2%k>{0d<p}3'
-    'yiuQU#kl%qM@J@o1s$0?AI$+a`tuRJtV4h2xCDaOMA266*nM}E2{;$JcVMOTdlEtNJv@?I-2L%@2q=VCUrysWM}fF%iaD0e+pt)O'
-    '8cDVSi$j093_3X&BFLbb<ehj->IwfZ|8hkc56tni&2PBSpf)>hw3C=z-?+kQb#d26(o17askq>W4Pr};0!JE#@sxOF9my2)h<;cb'
-    'qT6pG$%k6+f=FhWam9}cQRXZN5wlU$%U1vcZ{jIriu^h(0M*xQrm~b4xv+A)2*h{|*OUZHRs|f|)GEKa&*g~)W2TtT@sp!Yi~Jp6'
-    'wj$ze7Qh-nn-d7f*<Tva>4;;Fh?D`p1icS86F*iA9ztj-WD$>79%gsB#1FbG{_>5LsYa?X69@8s3xd{bEr<N~$Y>`6YU0#ux0)++'
-    '_%@p1W~Su8mIu&SDyjn!G5Qr|8K|Nb9}JFJojQ+6p^;w+uT6lnyKtZS=3elR)`hl>nFV_s<6^h;+(3*4)YFb;uPh2sE(;xkw=o({'
-    'rYtN4S@zdyB7&z_aWQZ;0%0E*48M`@aATEdR@V13+j;5YhV?niH+U<3IVS)kl|v>n;TU6E(jG84m^*Zt2HF%yZ60921r25wAoevU'
-    'fmk@6FhGsIlMK1CsV8Jm4?>-}sW4nU_xov}%a{Q;0GBl>+%-!r4`9mrOw6!D_zy3Kwa6^~rCkp^A1C1|-Jv*l9M=p(toY6>j|X}F'
-    '&J*W-E$Lo`K*Nd<EoHO-T}2;3saoc$h$~Cga?D2<*&5Hg46wV3^&u}eJhkX|agkeS8;CBK7iTXMl!@!z3#Xf2x*z*nF)B7N^U=Vx'
-    'B1}XSW_z$tJhrx*(Dmrr(Zpe6?bMoEU}Hd$5nq02d;8BUsG-9!=<GO0R|^ib3p+0%`}yu_v~J#U1ypv5yk<wJ>O**eB~TiY`XMSO'
-    'jw!2tgE@FcbNS9HRi#}gs*>CRWVgjZ+WHLslM%L{zLlX8<O*U*kHTO10bKQ!rz((U%!zunm{*;U4v`f=tki_GYSn_(WA2Q8P=Uk7'
-    'YSNM`v$C{T^NR!Hx9ak32Of6EQM^virk&Mt_!gSCwpt|c<Bx7L(PQoVzQ$tp*1$Qn_;wc}g~yzw-duDWuhv`_SQ;@;W)swM@m4Vb'
-    'W8AezVn#N9$eYHZ>k>UAErfG>z6II2{1c-NL1G~)I^m>#6?6%=NdcxVnD#ni3uWui)jx9C4=W~kLY|Oe*bewS|N8*!A|#x($!+mR'
-    '&gaDU{A&eA&TJ~XwQ`Fl%NrdX4IS10ui2`WfEQ~bHe>|0ky9r;QeKb->WHB`kP<Z+-rb-v6%0~3m7?si`($DP(UgVNbXscA-z7T&'
-    'BXqY|qYp+5s?p-tV9KAT`%Lp&5FG+vd$KsO$q>(B+bZ<Ei~zr+3)btP8>-ZV!rzOtPOZt8Tzpn97eQ+wLh9Tl!))xz{-b2}kkE)X'
-    'EJG1G<A2Xjg)~Ie>3IPJPD;I6su@*;N(}z!o7+h>cAl{jEcZ2<pFrdhcbK-&I%8!iASA~9B`vDzLN3vW`c883<BT$M^gS3-#&^WI'
-    'LaPGGG|E;t&g46)d;@BlL&Y*3TS~FomoxyY%V}Pk=!S-=MV^{`_4HbM-h9Yp8TC*Z1}*{l<!U)PYL@jc@=-i0{QK6{pE8y3AC#bp'
-    'l9ydw1bx^a*@@o{E{{lozQxm*zb2_;&9t(7?XIcrpX$(_zxvcvGE?2(4pMG#-_Z%)u7M(X#=t?VqDUmnx$qkPx5p43&eK|G@e;E*'
-    'bjQLK!U%%6Tou#CZjwn|W-T|PT}A8LCPa(L@7n%1m>lfCJ3Ne0NKDBGgit}LYoOSmsl1ef0PEllmj*@Js#r6w08Lh9+bSeom$_*!'
-    '5|r6Y4Dx}JPapC_RA{VAT|+ZpKEEoA@4)`4S6pmCKGSZTTrRNRB@V7-ucDbG4nM^oJlA)h97s`h>~c&iC{2ig!d1#Ms|2EpI4<pg'
-    '5{k+uapUbX&0|$96o+LU(VI+VYjGtVqIV$Uh3`7JiA?nYTAi`>VS+bD+GS(^tdl5+xK6nJ(&b5xU~owi2wxtJwuQfZM9MOwx0S&Y'
-    '0M|tBN1P+_SY#BSCCwPqU4kW7U(8c0F&W4nF1xcA91f)B#zz{gL3*#w7izhnq>*o-vc{mLA5QT^YFI*ri12A+GoT(*4sD|;Di3L;'
-    'ddvAmG-l-X;ZAVo5xfgM2m#Lip2TfW%kJ?d*tAJDuo;B0EcW}mr$d+~fQI<{!iGQe0|xatE}eU4w=svBpHR<fP(6WoFy&FT8NGV8'
-    '(&Q+7Y;%mbwDXyAtMj{#^RRn?x;8cRw3_SKOUhQYa!+q1OWqIlj)JZrOT^1u$Bu;$Y{3nEyc7#(9Oelrup)4yx6w}}2nJRD4O|)s'
-    '%rB{_+nfdK5eNdcBW`Z9BIod+IMwsclUxn(!bp2P0C7SD8_EA1q+IBikyuTHEyw!3xuIJaTvfb8c7EPcg_1Q!C~I+Tu`$dQ^{tD8'
-    'gUR^F@;|pVI(>9nV9L4ct5-EG*Q2vOh7|QvY@fsu-mx4=)2$W&H%Bv*6Pkqo!X)sGUjZ*w?($clu1BKNR!cvm&l_A4!QaMjH<)|8'
-    'n~62K-9(7nUGvuX);0QFvfsj__uhI8O;kdf<L3V*IPRzzDHf|ly5R+Y${!EQG?PpmLmZcy7n{u5$Ua0QuI(2yZsq;qPVdC}peq^0'
-    'z<@pjzs`{sAq=EiGu9Zu+w$ZG0ss(;51f8bw)di87Zb5v+Ng67DfaSH=IO^;AYi6tkt^qUHR;7g(k?Vefu`^xoQN4#U)%-JB;8EM'
-    'fQT`aG&H`LFoR8qO}2be^6`gmM;n?H_TU9O4M)BE6(zNvxy&tDQKK}R@Gy?a8rvU7vhZ$)+ei#!QQJ+GjyN1|T=)K-%FGHQA}M(+'
-    '{CK+xt4R$YYgYPkZ+(JWiO4IwTumqD+v@f?=)w_CvftQMa>TFkgOHe@qOnFRSEJtXUJpu+LXnR*N4v`Q83l2{m1<!7cv4+eKzRpV'
-    '2($w<QJ-5OPeQ6Sbs3`oUsgo-SIo}`aMI5R709Et|3kbwyohKtqkky8-SiNU-g&<Xqi5x&!-HhOoNw8lf3gR}HgICxVvi_#kSC9)'
-    'wB!Ay+V?oB77Gr3qCQPEpF`s{=+%{~77M(Qz%mS?J$rj8RIJhq*k~4KsnvBFZi)F2=<j9bv;N`cK71xsd^U=)`imfOGvOI6yCL9t'
-    'u&`eXa1#S>pvspU*&UREpagCvg(lKkm+jlKin}pFVycXE6L%w(vH&1}baI9hBwpzi>I<c3v>O466<?IPbZQ=$JR~w7xp*k*VFacd'
-    'Ev$B@D+QyksU7=6>7L%@%{_50Sj9%@XzeAAOqip=#fq?ykn4q)2(|F|?HnUV5;G%>lG*m}Au;xPFQ4(+j;)-1SD^9BtFjE^O?z}w'
-    'uU|!m6Hy#z2M>UblgTLeaF%`8f16wkT><Ui+TSp}e70Y3l6@Zywj0Dv=uQd*K9?KRag-yLHji0#P!`p}>fnKbEb?e@em~s>XttyK'
-    ')TceKHQ-~Tnz{k+grpi-x2T;K=yM_^%S`iDEe!1{lj%g!G~tdPIc}F1V7n8}8Nk*~w27SR70RK(##!BZ^@G6-XQEb<XjCmyJeW|2'
-    'XX0>9t|3(uBG74aC&5gMh<}|_L8@RrOvt1qn^KyK5@*eAErDMMa|H4mlpeX~;P@EIw^#%8$Fs3W*5yK!O*hzqcb-^@pHmxbYO?i7'
-    '&%4x!c>e_}-F<nWRhBR%3=2)xzCHs^{<K7x*m|<326#w9!z`yerW1}xe5UXui?A2ej9YGoX%gTbL03dT!(E(sf>%GGS6Z3v%bqA9'
-    '4&dC6(7GuQAaO7{=>r%0nX@Q*tc%Q^bME5x!^o=9e2DXGmRdV?tK*Ze`U*vd^Cc)i6G=%2lu6SA329j44pM323>Q}aW6O}TIN}PJ'
-    '(Y^EKmiAHwt}ZeXj;B$)P;W3qGjf*z6K>R6{s4ufaa%$47e&d32a{7%7`^=alj<NPhZ@hrzhw;a#18X!#z3;X>ldOIo_7_`9PMfV'
-    '<86~9RK11O2Dr2@VfeqJ)icEr(oVh{jrh*<GEoJ|tt|5^L>o6W7ZNCf8jo-ka?*2<v*ArvW?28ls)^>>c9zWz4|pJ^$coH__5~}='
-    'Mj)2(s#paw69f{;*cw2J!qurM{7Qwa!$noN5)<Y#1iWs;q8UC~2obh<a3<t9LyEgExq<yEfT4Mm(C+LE$m6s3$VS9bKkfQ)EW0|@'
-    '!lyspCdGd}*}LySa=mo}lm^U7;%hc6_b*`k*A>PTcp)EoZhP@)Myju?zy}cv6x0d0J+gd~7-ByisLI|O>X~<X^2b7+uyX?^w|Qy#'
-    'cod8xtTucA9uQ#BEVOLX@^ZZJDym^TA&G^UOd-BN3&jFO%zpa1qAQBQ$2$KwYFL7gnc?1|NCtBU)c5g*+y+O?9GPn%0BPvtEY&Zk'
-    'Y906LZ{vwED1*AK5pGUF)e!*f0FPgD(Ecs+F0R<)qqRk)^WcrAhga_e#QaKU7;tDMj0Qi0)yCV!K&A&}V+zYx9w#aTHoOz6Ws^NO'
-    'e}@L5x^ldz@k_mQM9=dhSxYFr*K1pdF&=LR3FTQz=m0rD>HCtJRO%=b97P3M=iYoR9501E+f|zhkdjB-ml5ulYLJmy$;X})JU$+3'
-    'zyNT=s|&ZPb^&RRoPE7Wytzt^5i^-iyOFQO{2n1MjAr68i#lYjQNZ>4=eooL+zpM&E4Jkv6N6AKqDj9<zDA8vb>hEF2H3f)Ehqph'
-    'I$`&19~xp|KthQK>8t|DOAF0Fq&AUnTMuf6Q`n`VsVE(_4L~E!cl}FQDg=W+@HIkucI9Q2%PY>X`q)7P!lf>fPm4&yX5&a%bZKEy'
-    'm}FRrxHg!l1$y9y<eVyWWULXlDoC2j#@XxmXGO+0F>Ss$ukj&~twB;p_?hAab<M?AcX8KE2>Q`}9Mgt9Y23OF3A&X_>oGi<n#;$j'
-    'BEXenz0@hx%7?+1$S)@(_&&O+g8x<~E>GXT>tUe>LAG~6d7{>2=VA?$j2svmjI9LncaGVXPfjK{J9fDKJ}7Z+(7%Sy;<ZL>Z?g;K'
-    '7rYq|cO>Ma^A(!fsLpc`Ov($85(=_aJTcHz>vfvj)8LIb_vkeqBjdiddaQl$Cgs@;xAk@-%pjZ7;VnIFoD7wecc47Pj<RPokEU=w'
-    'k{h%I+G>S4z<AO|;h%k8`JLh<>81ELs8~#u1ku8y@4?1EzR}~D^1Xc-^Z2{`=hMlANbzs{o6#@S2T!_-b^~V`zxQ4kKB^mHF*;r*'
-    '6Y@H<<CsJa#Oq9;Y*T66-+(OWBOb*~$-hGY(K7#g?h&LUPT{hU3VT6*2i0(+uiRoUs&{rWb7?y8c*ao7<8qnl%F@!3zh{8F`$Gg&'
-    'b6*)k5j6>d&y(Wf(Y&q8zyyKBlvy}_Y&I{%!f#$Dgrs}F>QGh*hn2}#WNst6!Q?wz%p0W6njR>>cz6a+No<0vS!G=N!4Y^o+q-*U'
-    'yD$@p!i|$I@`{X;v1fX|k5z*J{TaL8RKb)T!vpi_gd$?mOSdG)%3qc4ix46SfP;eZM#Ii((=+We!%sKq3UCXmEEi`{eY;(`rmdqV'
-    '9;(y1{6niqWj$+zPeg4?MY__EReO|KGj2}I%NObBmiEKx{CB!o=SIv4ZU2KJOMhs^ZQqbs7obl9^|8){XqaNp+(039&^000Sa^h&'
-    '24%u1SGd{X;_&jh|1^|z3t%L-=xP*V!u%w_`$IegUxv>39@ku+aJiCq1DyW6ayl{SLUVR268{cZ7$oh(Yh~pAabC9C3`>B^8i3jw'
-    'cgyaT1*d%;V&x2?QGZSpJyN+@7O?W_)zWXN34Eoez%c<|^4mu<_KPoCRvjokm69iJ4ACJ``8J)wK6{|9dL=2{C6~&fSHc!~4x&mH'
-    '_m^imaD|EzFcow!V^y|CI~T6}1`sCH{ZqL`LG|rvl7UeLtOOY@id@bc${0dnFCBGw(}}p5kA*qB*?g^Av553SNeW~CO`9#pr~P~q'
-    '%2(z1>q&+-X%*JJebW#_MD4<r^+IaE>N8WZk!u)-rsr(5H2#)1>;iC;@*8I^B<*_|q=T2tOtpm+K=Fe3%P2`ymsz;GR59Gb&>srW'
-    'k#lwi!x3Q1M?^Q_<cIisHUzTJY$N3z)A9V)KS%uUyAm9`?zuUXoQ8vEg0n7WrlI?l*AF8zz>enuOH=X*9c}(leKhA-qQ;462_!#*'
-    'Pe?r;M_4Nwfd6-`X_Fb!6PT-;zt-+O=^Jz`-JR1V@B4I>eR+ho00s6eD;9FgSLqH1wV%@F^$gs>b_zxfvulv|;zIweZ5Vbbca$B6'
-    's@#B6JERzQvsUQ5FOrX6>Ta#RVTbm@km0(utG&Ke1hcv4<CvH{mGy&ILfBTA0o8ZZ1yM{x%H^Or5jf6J?=L-8d`Ya2m=(uTGO(Da'
-    '+OM)bRzW@xBd(3xkWyM7Sk5&>&zdr8=7AX+Cb8!iUv`?$Cq*}DTOxb>yY`v7Cd1^lBF*GQTHc<l`m>8cuX*^|dmbpr#7tt6J$t`2'
-    'h)c&z03gs}>eWqo9~BsDzYw8VZ6t&9<r_cb_PL<iu1K~&p<x4ObUO@n)&_pV((HP8j(!4Ww}-b-@l3#jzoJ^zW)Jo46N+raSUzhe'
-    'o4wrTSZg;LJ1h4I{|#Q%(7-J<6D|@$s3p&ODUo<=7_k%O=0@CARS{8;_fY&6rPJsyQsdN=7DTusc*zmfTSW#9-e%EgiE9KQAk5kw'
-    'P#)s%h|B`?%7FRrlADbY5i^sEZ?Mf2zcdq{@_fYD`^h=Lb+Tf><b*ta)$~*?$wYK3e83b!e%;JNFx@0zqOzKQZvWwq$BWy6$9API'
-    'VZFw%dKnNS5G{^7$afAKLlLTtPwQCM61v<iaU7i84HGLfXsmQlak5RJ43|%i0sgQ!s?GS>oB-kd;m}c>Izd7vAu#xnYZ<?hz~f&_'
-    'MO+7}p@|VlWy(`;rl}eCv@HpK9@mUp=M^5uaE0Z4`=_CWa2@hJV<v*B=N%VWl=bFii>TO{a)*YzAsX^Qw(@XZj})i?G07nV$&I;u'
-    '%-}gIAIQPL7P;M2&tpL#^K}aqG%oNFJ061=`7vO4x-ZAbJcX|RkE@67);I>}p(7-Ot61m>5`pjRH#8yI+EnmtUM@g1|3oI-8o7kQ'
-    'XFxJ3X{~ep;*5O>;?GCGNf3Ik+hbD|lDo}<_L0>GCo1cOkABa4L!<<fmJ!BQ?Hf-8V!dr8IOEP$F}zZBcRVol^D#-;-~Eq0?l>eU'
-    'DiRZy@DdfK8_H;A2RBmyBu5ZmFRm|Kh^9CX2Dc?c6B)~b(4p0LX-x-@DseT}jD`^fcOOR9jVk-wZE`NTC<l2ZQJWS7TvShg%Z(*E'
-    'r{T;Db4-Z)Wjw`1c%U1gbN9^OAQQkl>?z!~Skzxz2-410{ur4^P<f)v|DZ}t_132kScw^ni-t%9k9XMrWAC*RoMY0gP2|l7wl?CI'
-    'fX=R%qA=dXXCFt;2%Z3h9<+nW(5GWU%O+DyU5xND_xM+(3p4ggSuW|atHu^~y)H0&E|IuYsXqh3h}*P;fn&8WyoXi?V)la^6zOKu'
-    '0vPp6HamL%z_>17CZsM5cApJR_U{*36Rh0h1qlg3`kuxmj1&4b_-W|F?OQDMg~ISMnec^>kZuYed)n)eYCT;B;t?v6o&>CS{dIJm'
-    'h+srIc=rKUx*PB&ReQB1P*m=|g>X^-8n@c_m4^3iHpF~BR2j1EI74nv+CT=J`mNSK0i?*esv~zHAWK1x+Z%Yz5%)Oas!b@;O^G+P'
-    'Scz$&p&^ff`xXeMo?%gXzQkm3#=HuMGK?FzmL!C?%B#M|2k{G&_vC)4OZVM28#w-UaR0hi;XXd01qr7u-w6jPmXxv^G669<bmU^g'
-    'k+MH?ay-OD9|W;<mF$7y>9cdq_xA7mS@3B-o8AmW1LfQ1--jU<l8po8B(RMIo!<!Fb{Lh&1{Sgq+Uh1dOGN;4W@+k{BojfHpr&UA'
-    'oO%t3YNigNl<aCMd9FH7xz7`w_R8vdsng;ID{aN*OoF$jqkTB3IEb2X4@4`kt`e3B+FVzcN>}%nDEQnRap1LS{?U~c4DpUHhY0S6'
-    'A25$sj&A}-vlo!^Aj7uuHfJo4AF9&@aQcBJGxwBs1gSWVx_uERU~L*5S%AWc0x{~y*^HAe`tvS8B{lhL!;4_w)`h|Gd}2C3lNnXv'
-    'D%j)-sc+g0Yqn=4?L9(NP}4E9ad&rw1)lI%AV*+j7sEtnt4A5pN*{C(Jf&<7xN1};$2>_POQ;>Il&(22NkLQ`Bou-_`OI(4!JWTL'
-    'RXZircVC}Jyq>2M4z=*F(Jj?T{Zv>@X{h!2aAq<jyp7FRb2c9oI^0V46t%WfhFk;cd#qtsl+541VDLDia;TeZg(OgpD#k_6MMBC9'
-    'VKMoyj--blBNw>I`O+zniuZIe{-amNawhrOslk5blTTIXyeg)+>r|=?Qr<-t!EHSMqlhJI4%Nkm3hZ_Y-<|;Im_2<>Q?cf3YCTp}'
-    'xD9UFPR6GR*P6ZhzS25DiP4&TSD<oQpT!6Gs>7Ce$--6qbV_n?RF?+>$8I2x5+}Wy!@D3%z@X%J!!nS-qms$q)YOrjaNG@3F2JeI'
-    'B11G89c#!QRdEil3SS2Dcnx1iDNx4pwR7xdP$NK)7b!FPocY>_k@q|ua8R;6)J3Qk0h+YL_iRENH_!Lu9RP3h3_ksx^LPNmXlY!{'
-    '7y`-skrRe=0^nqUEM%ZKm{T+YFg+{ama`H$UfOu|Wo}{~Q`BSA6bB`&x3baJSvimiBd(B5ZRC?ntIf;FDi^~|FS~vN;b7}SAjEQE'
-    'NTqu30xy1@Wo%8r|4vgb{Yrd0;iN5E6jIh5Rqv4W^h#gT-7@MKFZ93v`_3A;JN=uCYZaY$MbH~=2QSWKOa(W-8el4Rrqrw}0UqvW'
-    'P{g<?Bt(*K@H)3PwgsJ2FAd%whMYD`#D{0sxpx!Y>0e+C5|+DNKFUJcasKKjYAptG%7uRTSR<4>lHQWJAhTvl%mRf9J|F2jA1VCT'
-    'gN{3cA?R97Pqm#W3xbIEg_2nC;2x1T=Vnp5tTwP{Ju9N9BufCnfhrWLxnbVa>Nbg9{u4TMXk;+<XO)1>SDrjnN^zdI7K@#L(GW}r'
-    '1$=l=ni>jyarNmc<82Z4`)X3yy%w^5i0Y*JfayxJ_Qa-04?vh6Fk8s&`+ej56KkW=49@=^@F07CsUMw7*jhgv%4+P~bl*CSz{!U>'
-    '0tv<kS^Y)vpjZ06U*eTPN8;lIA4NNo?DdCQvS8?5w3-@;=+Ev%Ll7Ej!x$LO$sz?n@I4~$|0`L`SQ_;kZ5CSY<Kxa0^i9u|s|~Nw'
-    '1~5HbpuddQ^Ls>0M2!hDjcBkR`HCnm|M4_Zd35d!3Jl}iy}c@|KWWRIr=Ay^i6q}#uB|s`G+6{D7!;GO>PnRIcm8C2<lYzvT>lJ%'
-    'g-Qxx`=^<B{^573Eqcl#pWtT(pe$O5MQlBxkJGtydEiQN5yXoyI~4#ukHZgC6_hqaouEeiEDV^SV}&gd_|Kg2iBR}rqVapm%xvks'
-    '+_d?6R;8{Ne?lt&9&8h|bep_%wskas-S03-<Dd#?cRAcX=fQi)-~%&vdi_wzuc=b0-Cn15PCxDt`9i|kR}P(Ix=cz`W-phCNH*|C'
-    '$~;?wMTXi1Wr%iOGm&&`tjV30f-9zi!?Rg$!A5>w8HU%ynm-43nYiihePYn9HOx^R;5HPrpPdt^;t*iC0Of7gK}Chl1FPoEOA`_^'
-    'm17c>k;23<nRV#)K<e9zZ=+#20%d|kP6k?-Sme<)C;_s546EzYujIh88D_MVwUz6H?>UIcHHbN9-H*(*c5_<;4{9T#v6(WzF3$t;'
-    'EYj9-3GTeJBGZiFNKfZ5l*&M>sm0<WfGpwL!Q2|l$&f=h<<)TL9cRRh%(r#<`*CAPYAhKG_Du3T9W0QY!RxRsj@S+GJ=_sC>VdpN'
-    'ME!|1EI0i7DC!}j!F=O0{r#|e;TmN9x9#V+$?D?@8kBrC7+}JyX^5r$l(6F_olq+fQsDS`-zif_4dt3f)<beuhGeLPfZo&KLAPMw'
-    'M=(g;79BJhMQwx#5*JRT^S8QQv+p)GzL&Q~$>C5IDd)a9lO|(VGa#SQD6ufB>rh;QXVk#)HCD>Bs=K#9oL`T(odYss>huj7K4c1I'
-    'y*S~@u!&`zXR-(oQ+u7y{IB+?57IlVH^Qpk*l7x1?*jwq2@A{)T~eLshb|zTAx>`{)%2h~vcMAj&+PCLt~!4zq7UDMO3ZwxhfGB@'
-    'uWYsiL7L8yuzEOYXQt?ICri|!tliMAM+#h@$cAQ#foiQnkY?e-cVsf$aJ>5{r4R(9-Fko?JK&q6ghJ{5f+M(2<vkq0iL(e8$KZw('
-    '+d%060x0%>f<piGCLK^r?LNFFyU{k&0k7}RgHx^U4*(d^kWnD*SbySY0(izxtv95wcJ)ipKUj<$3$nTvw%y7=hV%U*$>QefYLGM^'
-    'T~Umh53Lk870J46*~Ox!KPnxp`iD#S33?+Kd|fdDS8d4&TD4gepnv>~(u@UL>;eZG!iMVaUqBy@YFr+BNO<I7ZmokXvvew4`hH5G'
-    '`oZzpURSOpTv_ICs1AbgE`Wf1DO@q?h+k-gy5v-O_BP%pQCb^qb^$_b+afLiAy%tz@i9@W&!~hx(-SSF%@*d|Gvgc~y>a3HhMq)E'
-    '-18&ss>uppRbGFzP^<W{&wIK_2*T;BI?3o7odv~EUP_#eg{Kc>Mpiu=4+^?@;m+KYjDRFo{za}^k{a<U9fkam3lZo%1v(+(w_NXp'
-    '?{(sHuPZH_hRsv+fNFL*FW9~I9}$tucVNTGvgamlc2R7|Y{ol52_NKx2%v*FVMH;5OYhA?6*bUhj~*-gkG^4-A@b~K8aja1j&rg`'
-    'm#+0wCifK|as_}Wj@L>Q>YyGPAK9M43FD((nusW0IT*+ly}1$@8pI+c%49aac^b+PHy0vf4s;zYuri`)+HO7=O($SHgGK3dRS!R_'
-    '%tVlLnUq<~?=(hz;QUB1uYz-PLxKWg2M7b(%hVJ7$NV8KhCqc;KFuEdcZcHS^%5v6TF~?Mu6IMhHgd9(KjXk=NecW=DOiM3<tQ5o'
-    'w@B<(`RDmcQ(~Lc&twS%Wznhn@XT#+xB|?X{cSx0QGj>LX6^#%xSC?oJM;`w-lm-8DNY)2jd*QOv;_C3oxj2VQYx$4u9HyCMt*02'
-    '>TbVw^KT>+txMSW?gE38;peu{7aJ_#Q%Yp$rngee1j#KQm|po#ODOzV7`HwTx>NJ;z5hg_zSvdevUyE20npPlTB&@&hk^WNw;Qe5'
-    '9?rlvL%>R=UeauPL_M2r!3r`F6|@5&=Gu>tPE$PPeJ=-ClQm6vYTe<!0exa-Ou%Xn?eCH==^DbO!7Cy!Ph0f^iQF&cYdj8!hEPe;'
-    'lY*1z!QTsLiCu4Z@GGL+`=d>RpRm)aX`JLg+H#}d@`Dq(U|J-fo5Lme&^`s)t=@V`o_maG&Zq|AJW@T;h~R>*pEQJ&!{#3HRzo#v'
-    'Q85b|&tv;Rj`J#XLXktDIwu`Fvu(>LYz|eSD(*r9X>q{0Qmny<`$-B&K!owrcmk&`P`DTd()hw;9KPkXSn}lU@+72T*+c9X!p!D='
-    '$K*OP!Tq}sEX&>);@WJW3uLVyn^jj0GUq(q>++wMq7wGo1gSc5Nk6TpVG<9)^HcKJ@j)q`BCx3XqFFHGj>TThkZd0*!EYiPI?K+n'
-    '^rE;EHs}@#vcp7^SOvg(YD93MwOC3jSB;(x*NRlv{hZ{5&_bsiBgNkFK8i=E-gf+Z(K$POGN<eHgH=$yFkJ|zaN5k_MRt%46gO4S'
-    '<F<N#^;cT~IKdf@zcFK;G~a~25u#lX81ig1ux>5XS;%%&fAZA4J}r6bGEb6JF8OBL<11D=ql-*c0LTwkH(ZLaU%+KkthH!!Lp`96'
-    '#in#0g;9i?%;TtAR9#r0I{8rj)(5EMizbJN)7~u~uMZ^-L2i?IVB3E|jp1F;)aS#nvGCry<vf3Rch`0)faSg+lp^$s4mD!59s<0#'
-    '@|e)#yWSAG#hJm;EX4u*aP>svlwdad9&#wZoPW;99cjSie{SuwaOJ_XgZw`6ze^wDH(y^9itJ)CtrOIjX9L{yN2H2kV%ip^uyh22'
-    'vu;BwHd$IZ-rBx^yj=t{?jXCwe-??jLwBgB*b%db9Y@}*SBj7EkRQDLR@!#mD-6sY@7^iVIW;@dl8?vS3FM@%O??6{27M%m@@L{q'
-    'bJ|-yyxxY5>y{ETUoKIG34YGX_w7}E=tAk&XI<`T(DJ=vEX8SbX@r<6q4+Dw+%H)v9w+lj-{MzzKZ4fu|J%>^wo;3@KKBlmYN=!n'
-    'R^G$2EPlIA2wlQU!5)NYp&hm;-pM}VJ$pj^nzg5fYnWxSxD*%zgZ~iHfX*{}-7U&o46emBoDj$b@*7`qi9q%WV3*+6qalokfCVdX'
-    '#+;==oWs6^e)Nv2atQuTi#@>N%pL%GJL<PtLx$5_vX+;X#+5Kz;dCVHX4=;*71k^mLXZ6@MuH~Axo2K@u+98{e@h}w6PA1Z{A>Qc'
-    '`JevS0ax!p1P9{~B|h?cLL`=GZ@)OUaL<(V^|Xfnx_>uUv<%F0#rBCV`93{2r-o&h>3i8GUjqH;I+>(+U3_5R{^}+60Na*X`#OfQ'
-    '?<l<FAZ0uS9XPEt>=|&|Q}~MxI3z@Y228_}eSbC>I{fnsfzaK@q<sk}EO%#7q)l&+O+_rG0cFqN*eroM4D?lU(e9jJc&T^a1OWyT'
-    '$~vt^{@-J!e3g<f(3#ZRhO3yj%*>nZHBa|<G$-e*5AtIQ`#+#w$mxl96E<3p@{e<TmNb1sw_HZenAoH%T0{RtOM0t>xD-3Ms26qF'
-    ')qD=~o2rYW7^%FwH(Aw`GMUFqMAIQ78>4ITjp=^q?Y7-DZ!vd<lHt1-7}S7yE3EnT(NlWg0;<Qw)r`|ejP{bFpL`+gl?;{`Q`<is'
-    '73)<5iwYB806>2UHeW4twMP2!x7EP{`i*Gb=VtdncHYhU(S%x4vA)gWO9cJ>ev_@q^s$@HuelOqzx^%2oc|<7ftbi&#?l#L`H3*1'
-    'AmSV3(ov@c+bG@TE8J$gKTUdKMIyL7A!Z{&w;xBRH9YsAdm7<{z_--GVD+Hh7+GvUj!U<KVqhhEImTMKX8F8DpwD<*-_>Y3A!<%b'
-    'pW?3UV(64!EP%Yls1FjvudIFch8XVZgLtr0%q~rTvP4kPv)fdAz(dq3OHLuYPmip({U$-D4y|(d{UbKzbc(jT+2Q&jO%3(}l`u|f'
-    'f_-c-`b&Fnnwxo~`jTetvI)s6Onu|bxIp?N>o~S^5`aL3%Mf`Y<r^RZ15xwuRk2j&FDkt+sU7YO`H99o6H7Exc-f}-)Y-aefpr|{'
-    '8g22E+sOnDBx(vL^x6EqS0lnd@oFEU-*S6HvL1~yaRaL3_V?Mh8JYev0cy3j-6a2rRBBFLEA8jAzDwrYDz!x9gH@nx5aB9o@)D}s'
-    'RX^!ov~^^bi)f?21<h4Dkwth)9OvVs=jH&UupwJ59L&VYjM<66)!!>Af%KTD9;V1{EO0)x!;D-Q1kT>!s1W)P=n@Nz?`iU@pYozO'
-    'VpN_br9K_$!Pp?$9&_+l_B;n@rJ(S-%-obrSw{1Fwz_!ujwm(4Rpi9rDwUlz{~cy0-v`_X0il0rImnuoBj0lCNeTFXt%s^&#i|HB'
-    '!@6v7N+G|~#1riQr0u<b28$fFD+Lv%dke<?R&I+eds`3<H>!@_W%#i7J1IjkRb03f5w%O*!G%0yD9lR$>Y+7;Y7Us~<NL@TZ9;Bd'
-    'Y9*16x?#^=Lr@UAO3dE;{(pJK+AT<JbZe=QVio?1)uS6Y_v%FKD@lq0#lik1hBVrkjr#Vk|7%d@8m3yeY0~M6rj|{e<DPY!kVJ`E'
-    'IycP3Etdxbm+u-?f2(yOF@->8p;i#>=rQMMb;z_+*MT8HU{V_A)Qi~18YC1+>}OW6c3x+>6+7_YpazZ-K$NxsJjxeLZ~`&$zxE{!'
-    'A^Ie=5~$Rt<s7tV(J!Pjuh8K>O6G;P6l5Yc<n3HnCIZoeTT@TcfVV(iWi0OsTdMPZyk}BPR~DtEl&mL_Rg=9OiF*14c5+xZuv`n-'
-    'cdwgFEYPX$xM?e`yJaEpflryM_&R38Imep~7lt9@_T0#Uue42e*QXAK@@GY#?(o{pED@(G&w<lXonJ?7xR;)=1d_catqe^_1V7u7'
-    'ob8zzlT0#^@FlhDHC&du84=FEp9WOI+_)*S>3%Unf7~3%0%yU<fBj9PZm}O@%<e>xJ2xEL_^JX!pN|<0|C!gh{HMijCoCr-$W@kc'
-    'B+Tt<XX^vmPCnK#A9B#!MOv!CBLh}u=1NM@;*wmTHfBjg&py@arKmVd-jKxI6)gk;n7b44qwwGwMB8ZkwaHlnQ>bV5PST0NmdLIS'
-    '2JmUE?0V{l1k{**-iJG2gsj~g@+y2+0PvLpYAlHD);P94gSDuV(hIYC8IxhGI)%1Qe{mjP)4mHGC7U)F$nxy>)39taxgoD&DXz$q'
-    'Pb;76%2-ufniA5KYZX2rR&U|X_aRC&SR#fF-+k}c(rH0e;5W0}cPIref*yb}$9yP81_jHWq4A7&tOg@A4}66o>2B?BcyD44JgQNY'
-    '+#<@RF=sHtBm!&&8y0b}Qj4LNY?k*`-?Pp$8g39{S$-{i{mp~h6A0lRYq1HkvZ-gaDA;M^GVuHGuu<($c*&}I3hok&01*7;tq6mp'
-    'EOVB<fC<(kNj-2i*QtnpJPy#dtSC2{a9TqTNk}L1Ijd0I!ys341)T<e;Cx(~XO9z#f+VbYL=5MNCmtHG=fgM8?pU{YfsBAc04QF1'
-    'paQNJvA<12N*iknmAAVOrd7|isR@p`vv)c$Grq7%?BLkHPM@xq-I~zd4ZHjy0_dB$q_>#Crf*BK^DQj^AV7bQHHLYNN+vc_f)w!d'
-    'CioL*WE~eU+5%7LAH0a2;*sz|Y1DshF{sqDneAZI9CX?=nEwXQe>yHBD2Qp0Ghb*<dHPXF+=8TQMXK*VMJM7N%}4jzGYF-y@~{WQ'
-    'z|wEQgEZLr;g`Ta`)h;UG&9mIa`r*wI$-V4&zq5`TZpV5lnAoAMn(JMTiyO6${`%o3leyFVmpu1EAJd$4tG(a<OQ>@0?#B0%&tCE'
-    'UErk2-Jt|*$f}k8l-W(kD4eyQnV|-0s(oDmBz2UIi?%V6Au)ROf!?F4Pu7?6qfyDvslVqiDUF}(Q>u|;Z6h6{7e<LIalS<H1xjH0'
-    'l)<%Sx8C%<kOc1WJ&qMGty68S6O!>jTh#$-XLg}5!IIiDP>)6pD6fruQPWy?R2>lvnK<3!;d)o_z?;`A3defn5W0?QT!^Eg#3o*?'
-    'h*7bB2!FXn#e^51^xzfCr}EbgIo*+qT`#AWEmm<h_d1idl0n>1VvQ(^8{?qyLaZL53e)-wl_#fGC0e=>L3aot4lP7u@C>Z<ZR^p{'
-    'F-!YS9+LWQIvt=K3EZiLn5F^0XWpLf54M0rP^dU;#DnwZaaM7v+z_M_sf8#y10Q9Kze!|yoNv*NNVWti-^eOml#L|=r1n=WFlPN}'
-    'c;rwi^RSpkx+_!Ohd;<*Yhu_-P#bVU77h+<jeWUF4n;`LI3&YlSut?>Q2dPT#Bb=B*!*{29i!*_hm=(i>UILY)3m(Y=n*lw8-LJW'
-    '@EP8kQKnNMBXo`OJkan>WAzT?kQf}r2N6H%CxiwA5khi$S)r(Uq7m@#WtEYf9^dFj78!-=nw6uw!Yl619#A@CPUb#q00d(*FkhXb'
-    'N3dAvhvhl6%^QdFe>M*cpi_h9Jr>BGI&R&06Py?HUbm@X4(SHRN6At!XK@m0+k_8;(Uifw$uZ|Ew%k_i`_Q~07o3D+C4v={T)W(I'
-    '-TFS++nEkJ!dzrI%_<ynq1Q!^nOdJuVb~6Nm5u2xE)gLHdtm||EaGfJbkPm*t@*lG4`a%rN+RPyk4oe9<5Kky2}ka~E;!KxC>$K='
-    'j!48gUC6<5#6NCF4gM`3;Zl#(BuL)dUb6{@SnpXEqYXwJI0qs_lcP$2=%hfln%P4SU=no%QTpM`EivFGgHiYAD?70xS#(q%Jv%!0'
-    'xVg;%7Ot_bq5P4IDq-12K@rql$TJ7Y{jctn5+N$^<@%vs^!rn9U<fmh+=8BhXI?`YmalNkId&f<Yy`=dPBUW|asE*Bz5LH`sN3kJ'
-    'cX7E5?x$NfHxufSw>kb$^v}I8w>n<(Y+X#khf$dx<`D+(=yeAg|Jg_EOkf4nXuC{#3{+aVY4m#UY0rH*aXkE)Bxpo?jPCni=p@3?'
-    'Y=Z1g%Gh5#FLMe`f9a*b`9dG&2MTf6lwdXS(P4`1sT+Gf^v2k4tGFL2Fwsu;+N<fAR=ku05>wy~Z~ugtt^Q<Bz9I)MLGl!buRJqh'
-    ';Fg#9d4$4gKv<8Bw#!H;S-q`JqTV}>8Hv)4^nSpLa02aqKmx7FQh`Ilkl2aQ9QD~t`!oQGL7B4RCM)7)FCwiu-F(~3Wk5>K?v#?i'
-    'PhG3`5Pq>9lz-Q!R$|2UA-8Osr@y(^0gld*bGa1e)-#GTO=sC_FxYWrb!CrdgTxAfId36?$wkqB*nNChJRIc_$P8*!edLw?NB#m_'
-    'IOj9vccR(-q4#lD@gFhW*N_e44jL1z>4U>}#_0epu=tbIme!p><0%H{W3zh=3_JO-NYLtM|Kg^hL+kZ5A(O!9!&3)s{z}mWCj0w*'
-    'X*6EJB1##K_3BZ(qJMV*t_?ies?qcaVQCN4grm!KxpP0Mz~9Ja=RnHwWp83l%^&>epGNRVKl&EGhQ5T%;W9#h@Td@Irmx4xYg4cb'
-    'o3<)AgQVV-NerpM1ITi4BkcP13}xrm)vHFXmfh!!0*qto`#oH7kmrjI(48{SeW9@&9NUYf+rRf{@8+BvKvjXYl)7m9E}1qz^DB`%'
-    '<$awn^^-bvNx$kieD3hj1b$FJUnhUK0iLk}I0?T2FMhFDB5nsH3g98?Q{`u|Rw=1Hlgqz`f6<|Hg<Caj=VkI|ccbunAPjQzj4s~J'
-    'TK_Ff$BsiUD>o@#8KUw>+cJv_YsM;tz1nPIZ)`M}`F=)G+i*p7#5L&0Mne$APjX9$2!dTdJMCxN7c?@^Ry;3Pv9r~Ag1*gV8*Y4j'
-    'x!(qmMI-N`y%WS)G8G@xGpy-Z;7{r{iQ`fqy}sm1z2gMy^4j+GI>IN}clTxp?BNc)N77w#@z2lK+U(O}_A*75Zpq80tV`id2wW{}'
-    ';nT{5_HMwb=|3sNQ_-ZvW0^kh`lM6Mv%I8zm=M3oJ)(*NxN+9tSb9xnGh!kbSf5TybGnlsQ$VCrm+$KjSE{+OBM9@EmjqrMUx}>+'
-    '-8c=@sZ{F%0eSJHn_lX-0w)wWnIOkYYo5(~+?dWQ$Xa<XC*s?WtS;g%9<&z!c2y&Li&dV9T=FnuM#6u*&;7Z~pHT_YRe#G=l3BWJ'
-    'QZYFAHODnG1cud&BE}tij6O|dB?HGUYs}>MFe15G4CSPj4}nDKlN1^672=LN@o@;5HM?gD05x|XM*f7`CzG)-E>Ap|&MzLZ8-fli'
-    'K`y-TgLip(HQlv7meBuimanXZlcp{K+hUsTOqJA_w;<;SRGZ}*TTR3N=rGV9TR2^ds<+61jUk#A%GJ8dg5KVR3J><2f1x2>%hM8J'
-    'K2z$a^u8<D5CVCAlCfq-kIergmml>I0M(nQU-$MzFzMymW=c8pPB|2EaDbE87Xh>R5Ry@toauWkT9d`49kxd-mR<&gkO^Gtj}R!Q'
-    'FEK|U3xFlqoSEjcGO8>^;;YqZqr-#PVo9*%gC3a?C51Rm-aCVe;shaTv8`=%RHysx2B%2>c_}FubRjAA+4HuNIzw<N<#n~=rD|Tt'
-    '&p1X;iUji#jBUr%Dmq`J<X%~VwDYxhV_m3PX75=nl8NuYjWX5QH>N;+36@+DxQ&7y^ID|tP|ECKnIb)(**9cac`EpQvpm}wvg5?~'
-    'G^O_Da@}gO8Iz2C?{Q}02C3COVAmlm+6cdN8I2sw_*xc}K{ZBc)DYlCi6Bm??QPvsOT(=@VX0|r1cF}>Up-eboNAe#G0%%<tWzwW'
-    'W6dU-2(`PO)1rC;0~N~j?N&HG{Wmx1qZ_)-?iuD7ST!Lm!X0#GVw-eK{GA0%8x(K|adzWMWhLlWKq&oWQw|<?hgAa(flcdKT>UNN'
-    '{j=FI9~I+j7;EBBXCN}KKOSqH(V$ZjG-c=n4g&5I9GS3~?!3d_$qd<`<?_Nw#OOgE6UXHx?7j|Rt-l;Czd|DAP+pu<0kPvfKltQ?'
-    'YwK-Z$iA4a86@P5{h~4X@#G)l=cf#8`_oo<S=C|kg$*Eu^>W`T>RpC>0M$zsDDo$ajL9KV;$e)%>1Fqn1LCRKqPtS>`n{sn`3PhX'
-    'mQCme6?r{%<}O?y%+v?Fmg$=aQr&iNZQ^IV^rdr{nYEAxJBJlh&=syagaFqR$ws<6<f<I(9JVFA2v+e=x$(LXCyqPMZY^S0SDMlN'
-    ')xf6n$=yYpus=i)X~h~<{1C5%wp{}2?|SO51~=nD-K^Njlakp#bJrirmz2#Idb-9gNq&`Xx}jd(z5?6LrG(6*>!@D$bD@-0F?f%<'
-    '!+~4!ZvIeAH%!b{@;~>!%KOF=z2~T4{AL)iQ|@z%;G+buZ=+Va^kZ?-s?~8PxxaS!?Rah{dvpI<gvNjif%;;&4j`QlTvgK>2T8UM'
-    'Mxnlxx(xdoo{+kF{MiSl9ltA|JOJ_N-ocb?lsI-MuM$@+vGN-jP01CY?!dUaTL8B007-GbYvbG@v8?w7e1YSlD5DUw#V+g_Yt|5{'
-    '(hTyL)S$|)N^W{=pu*lVI=$OgQFs0|EGWqpaHP&LhdgM#1n$Q_vR)4GPog05BIh?^Cl9HcQu6PyX^EGvd0|USKQGugpaW7f@r3Uc'
-    '?$%(6x9G+8F*8$8E5vaR1<>#f3G^n|0W?nfq<ea1X|9(vSl_wsSFBfQe_)cV5pJG_(V;7RUS?Eqc2L#9Faa!blrV7(Q_}}QE3cN+'
-    'gdHw|2)RB>UxK9sq%z~0bG>*EJ5jNB!yz}_c3_&6a6FD{D4P(c;50agU;tT7S`z9^oM)Fps(3-oL;6mu8?kTkyQH!;8|ZG?d}1Cy'
-    '*&_rjdHQ6&aF2v=S<6@SZ8+;MJq~C>AHD1n)opmIyR`040!+!g^HVx;s&GV(O86#EI^u&5=j7dZ>+2aET@E!vDiCv;LXM)EuKq2#'
-    'Ilf`1!FD{%uYv$QRE)Z&M`?K8_4vCeL2$8~DEgm8!Gkl~-d@BXn<0cg`Y*Jw!E&+Mg^1Q3fTUNV;43~s_|2d*y{9B!{sK$Ic7t8b'
-    'ErEKcWG{%fFmmH;6OJlxe8^VhMwt|kwD3)H)O-G`PLI=b4firw*@|fy2@x8;1A&Bdx9aa8C|~FS-s)IGou*x+izxC>LRZwsR6M1='
-    '^RqN5+j}|T6Any!0P{>~lTFiH(r1Y9AM<C(*(D2PXP~(usR*=^+qM*}*H%qu48FZN1Seri(nVDC8ZIwHf$uYmT*KP%WZFN(2SoDP'
-    ';;``l0bA2-EY^kzd7kR<^4yt~&x)-y9(&Zr3-vEW+}h%c5ZYgJ<Es*eR_<n7WQi-9TL((jlOx!6NtBVQ#k_F6ZZ;1f>AaJaIEoMo'
-    'Br{?Ht&8m3DxEwk_t2Kq;ADR;tvqEn8{*aG`qm#wwp{&=$|o%e?PSlP8>yz~J2GoU>-uUAfJbUKk%zIfgHFR^J9ld*aER6poV<j!'
-    '81gH=<cdVRz_@n#<F5uEssnNV@z5@85N@r?AX64JouwW}pvs|4%*ppou?*k{OW9dAo}M%c(r|q9e4XEt<d8@6=?EnV+)?%AP|Z7u'
-    '0l>O9XSjmJc3Hk2ZZUH$)ujeo@O~L5KA+|lv>7Ioa`EHzWEQd}?PkBpcqJ;}2ikhvxDfHzS>uT^6UFxuPaEFh)vMGhl_C&LngPoy'
-    'S&J~2e<HmHpa)jdpBaO#efxfj7$8O&5a;EQH1UHRguZ2o{AH#N1IhBaEf&^g7N;EFth(g~NE%y};D5XnX)-IF;F`tw6n*tN_&&?L'
-    'SOFsSVi{>FT$>j}A-g5g#z|mJ?sv(z_(KXMH>9SX?|YQMNjAGa3?7s<cX1XD%!m<0B)nRmcX7&F;sZa-_YaSTFhMMt*i%v#M|_Ae'
-    'Av@+CWxTA8h{U-+a@YfPo1hO+`SS`MMlAxLPC3>tnPIj1+GoAf^H<VsWb*56slz53VVmp`&Wg?Fg{>5$h|3R2ZJ4v`mcy0~<IY(&'
-    '?U>mzC|3$*z9OLqU@${V@*_c0o(j8Qb#AV`fShD^rc1CjyBTiKM#nIlS2ERo1~Xv7HJ6%+=B#<&Md{X&sjJ=5lAXUd@_juCQW_OB'
-    'a4nZNS<vtPqQVbzf2|!DON<IQ7F+>bO*AL?R8YCVUI<%ZNQ*g)Lt6vH?DM_+M+u;qN3<K<gkEq>$Og*ftsicv4Z_AI#qI?!Mc=gd'
-    '_=s8)7`jE)&`(9yeN6dOuw~nmD1Z2NcrXlFAn6nFT(5ED)Ym!)1}yg5kR;~ZOC8k4feN1CxbkK$2ROd}=_ag`O0Q4--c37|3g8VX'
-    'n32v$?z9RxYtz`pqa@ar4GdFz!HUnD>vw+Fwi)&+a;C?2R#Ox}ozdO@GQ+G^L|r>MsAjNozsGbAu0w)#nUa;i%&1q7WV5sihap58'
-    '=lHwZt2p^gVacaFos1w?7O<@HP_-F?6B*@eOz2~{q*X&vRUn;-ss?4w1%lMQ?!bqRin7^U6v=Mpv`fFYm1;68a*Q4G6oqn+`LC~C'
-    'ETaJazDD1OwjNE0NfM&Qf2c;Q(^<nL=^!0p$HNiUgn~lucf9rsif?<DS;kc<B9Iq>1}wBwx()L&4lS?YvZav5cQ&?GyRZh7N+lEL'
-    '`;-qr-m3Na=AbpNRwBKE_y_E(UhnqP-t>H!ql6cz?kGpXo^f_1l*@rG7wK>l-N6FfY1v237Qv5-Iu{#|Ew1VaGi+YIn&N+yqPb=3'
-    '86}=3#P2lxdJ9lJ3HPNDm!AVwOB-gzjPT{mA)82d--w*9m^wxyVGxq70tF8cX2bhe9`_Qzh9g~pOcgUh>4|8TdpAg=Tr7x8PbD0F'
-    'hF61<WId4oi7Ii2NFbq#LIlifO9<)*TN<8pRg{j2*=S!i=jET%RrhTqFx8sXp;TGee~CZy&#-NB9ptoIIkY_f`ciXBob{fu-2fas'
-    'o`a)#48&}l0!z9vIe(*O#RDT68(@iTWD6%EzAQR8t^`5otmt*-V<~$%3r2kD+h@u+t(C<1+1Bqo)!kh~rRQP8R<1>ZdYK@F>5(R1'
-    'QB1Q0ssk-ZMh%bK*GJ}QhFTY3C;!JEMR6*P-W0=D!5?XGROPSWk*DZGti*dfFCj%%MVVBTD}E^$1Z9s@q&FUJJ(|75?P@t6-5hda'
-    '2a4Vbbj4o+WCHbnaiD)D^fj%UHjh9YwEZPrp|W$?4$X|w(ew)iD~HwhNFqSv$L6W^nM`KUL>YRvIJVpHPfoSey$a5uh0RNqktmkQ'
-    'QvTV+?fGU?dG0Z}S>$bH@VIpanZ?@ojRc~-7f~*5g3!#P*G`I$yu8-Rdh=E8TZ+4`IpNrJ@1xc1ktX8_t7bj5e4U=SjL@{&Zm^_W'
-    '#6-R#=#eWqAPuDMS;1u>Ed{nI+66w|R3dh()~Pbv$Ux;Z)GRIN=_>kaRf5c;(m-z-V;5F{l1Jdio>qsLC#;B}t~guxIW3DbtuhU?'
-    'T+jR3S(UdT!rM!VLgBH~9$vKdX^3lz@&OC>m<wQniQ9fG{LJnM;m7{~vTfcpdu`F*k?HmKIS8^U|4Xv?5D(ft^}nOd7^P0~xQ0SW'
-    '>uxa`KS`heFrEBe+&Cch!B(wSi`bcA08q0-RjC6p`TuM)eiU=2%dTDo{s?lXFK?hjl1sF|sp}hiK`A)f^aBl+?il>sJ8`KwyxHJE'
-    'Vx!T>V)Y!em{NWlB)nfQ4C^&dbjGD&FEBJa*XYH$WQXH(1u<%*vDO&Wr{6{Pv0wbk8Bwzbn)JP~nk7Nyir@z~lMX%cX<(Wc*v9i('
-    'k(=K>SZZ>QbEK7Oj^;}vD3RG$MKiQ8qV2^=3o?RBvGVw^g+^6P1^HZtWGVR)=LTGbu?UU#v;3y_hV|M6pH?%ZUn5tXpb^UXxz4Fs'
-    '5vE`_?xX#ln^B5l;)KS>Q%Z{Sh-VzRBPLyj%rtCbu<;F=->IzMwx)!DW5eG4$+ckhNsTD&0|e1*1-*awdyMwIt1J32j<@Xq@h~)P'
-    ';P2MqabP3pw^R(hOL3@-*EI=3*VUo}w((}b3a*=g@u!P*i<F}knzWIaKqBue9!6)yy(;%-*g@yfmxCW22Mtq22on2_)_)q|7}s^m'
-    '1L;h9mpJ&LXGdL@%!6p#3{3nC$cx)Ffk34o5IhO*3_$^3*Ku4dB5v0@SzQO~ArvFYU1V@Wm#?(_Lk5t5()?>WI_P!6hc5=x2O@VQ'
-    'zG}m^S})!w*|%O7Bd;KNYyTow9US?L!M>7rq3O{D&uE|PD01XtQ{r}0yYc>7P;{UC4_ychk$Y_OD>=Xr)iuZ#AyBqH`}Yu|3|Z3r'
-    'j$xJiR-RNV^xXKXHz&X5ED1k|K>aZEqPrl<070gqyr@6V(ll9cIfsSI-|uRqeNAL;dPc{fg&1lT=B>|FJvW=|`bJfitY)_80D`BH'
-    '3ghX@fAXXtV{x<QZshq&NYDNTKB5PVD9wQK-Km~IVzH@RF9%h7E~m+JrPyJw9fLlOMB?7oCnIkq94?IA=I63<yFIM#glui*`Gvx2'
-    'Hy^#vFAkYM)Y3_A3={JgI&CCWE?J&X_{lu?B20eXm*lkbHjV5jRf|O(;iJF>4hUW&N(uPq%oazy=7Ays{f#&@zq5%=f>K5Jhj_|!'
-    ';+&ay!%z}d*A~u`JnMi8&&}$bf`BG)5r(<7#d}j|uF8pFqgA$p%1m@uVG|y#^I2k`${3{(Wj%;Ou<rpOcvxn6Bm18JEa60_w7Z?6'
-    '7U`a3zv9eg;$WAbT_r&&n&6}+?R;x)nb6G>3WCO;Vo-435GXi;J}O?;7BMNI>XdSoLCp=5_`;iayadJ@<4EE8HDGq0j4&cbe1UXo'
-    'ft&a^1iuClwDeg_n;3`W`Q@BWWS)y@%O`Bixdb6{IUo&UK)hv41-M>sqv7k5=x@4BJc^)KHTDXj0BX8ok2W`mh8ut4`Jc7)H%QjV'
-    'pF?1qBW3tP#bYI=J^vzqB@)Svf#-clnw#K_2TQ>(C1uXBYZ#T3BXUy-lDL~^&-n_WaKY+QghVsS$Wg+GlfS(h236bpZR{CtwPijw'
-    'abx?UN?T%Ysnj{*bUsdri;q?{jX*Dgx5QPOA$4ow|Dt}7ig;bqjIGSvJL1Sje7BLK$$4n`(~H+UL*-ih#3um+uWem21|I#a3XdJ2'
-    '8CM;SD>YRn2RZYtzDW<WdYwZ($U-l;zC_9V({DHcn`r2|s1CR0k@&m<D1NO)GHX0b_yP_7KGoB>+`yP;{i;(64xQ2{3K32DB}l=A'
-    'm6>iRj;)rAt~ptjtB;K0%w!Ynq%MFP6YJVPeL|z#1e8ayRhVs$ACE)I)@6qa*?u?B=KD+j7wl!v`Ww-r9Eq%4@4d=Jf5y!*-jYWS'
-    '(;rH7>DZXoQf6EH7=8j<9Tb=1JpxKrI7nqPlpN2lDnvasHZ@YIYVn!`<H+H-32qdrYq83USbY6NQP&OD<O$2aW-xLU^r?A~&Sssh'
-    'hkYbDZ;np15nRg2R_At?3DS%m)b6H=wt|;|C8zsy^ZuhBP9o{IcmsM<NCD=;yXphr;M9*nMR`X~l2-DwSOT_{wutnurbEve(m;8_'
-    '=H9%SbH2#nwLhq;N5zrc(gMeJn&`P@ZD8>YCW{A2HC!Sci01+kJ$M$6=XAPW+nZqaha<3>^%>lT$kekUHrmrxd#O`cD?JgNBKtrl'
-    'of!0SvlPOAfMUEsCEx5d4sMx-oQDOfKIP2!A#sL?C?11iB)3R^9d47M`_P*p5<2tw)qB%0co(Ny_ZwatA!9W~23uVsM~qIIY&6~A'
-    'QtMR1-GYs)&hmb=@_#~YY}~Lk$%MHLU3b_MLoIpAEI$*WEh4TIacq;e=6J>Cm`HiEd;fz~&-{>O?lg!)u#SuTobm{7U_Lu86Hcc1'
-    'Nfs17ZJPeWzSp4h5R$z*<%3p%IaYpV5$=lL0FX_fXdm6lUzPl`8f}9dz`JaCEC~*Q%wF_0U8=u|8R6)F!vk|YRE3buzXxXqI{5YF'
-    'h)K@gSWL=bR=-{p3*Q1o=*wv@FggYo1_}B-e(yB;GfnpwWKFEN5H65t2CiKyrL5ViNd((~rn0Be+9*LtYhq5eyEADG3mItMPVN;^'
-    'kCfja9ub6};jVo_2DRw@06jd|2jT73m(OU^R%Xut+FYObec`vUZaxP8{nv>&l#o^vI@)Wog&P*xPo_D#cD{hU|5kLbnbCH}O-<Wu'
-    'Xi^M*I<@`o+l-N5INbbjfYIN>=NdEKQMBcX%ULmyL~gTgPP3`D9FbA_;>8&xhYj-XFcQ8iZ6%OP>!vHMa0z-$`70cmU<^6o92+M9'
-    '+!HzUZ%`O^Pp&nG>qn0pKL1eW>XdN#4vlktqSc|+a0VAn;FpJn?0kqt`<((4w4-|92ArB==_Mf_$`%ubD>o@|0<Rx|Fld@*tO&HJ'
-    '3r5+NEL+7sjodcWL=ptlF8b#hVl_rcAAEb6k@JIaJL0z@HBAn2E;Ai{OvJ+@Dov_CrPr7{pg@xt-kP{62omewlCRao_?Eu5nGuuk'
-    '3zd6K8tE%(>?~pesO50|Mk2s`h*<G5bf?l(=knk+Vmb|5EnwO<V47|A;4<sW6h-Pdh(NR0srFO4tSVM$=yOlXHaJoQe%8jNW#}iX'
-    '^-opejxae<<ICh9q3Nhj){qiY=uXbg*KzM2A!#JC^s!-z5s6%(RuW;;?Erz@7SoKtZ`aQ$JG-Ca%mGsCxM;mlU;$RFjkBho$fP2C'
-    '_N6T_z`kAesA2t@X+fxHw%_bW*d^vw;7TX-U;ao3C)Ie8#U_4mKrKMMAOAsz5(C&mfjn@U_(!~%-l&ZN{oa7J^0%Xjne2R7omLmf'
-    'x^{=Yv1W0E7R0L&aS8U%XpLOn;c@DCqt1pdZlhQe`Vhl=x+dxqB{C<PU?43_gt%6{1{}BYc;jBTtg*j}c0yW8Dbo1jB#q%y&N(wU'
-    'zklzIE72Q-&c@*OMTpD3_*H^eJu(#P4VvtR8sKe9<*p(8kA2%DuMF!g;^Qtr&oxN5TrVa5QV<0KBUGCu1@FcVrogFQiv3a~%Tj(Q'
-    'S^XQbwp=Kgn0{b+VULnvt5DW0wvuHjhe!+SNqLF9YW3z)G{X|{oy(ANvP&ubNz7#CanDp@w4bzN7H)_SaHU83K@~gI1Y|bIiGzU{'
-    '6(ZbHJe}SFU~WEN65YLiDpF3OqO@(XzE2TO1>ivWoxD^JE33&4^~YSuIF&(%HqeDC=(>Y^HhnI<?Oe*x!G1F5W&k<4<;Twt+gx`2'
-    '0&A$r>w^Gh>D{r^6^mA|e(?)!30Gc<l?xT<%+_Oq>Il2Q|Dk^v2SGGr>GH<CKQX(IX>O!I!4Me)fa(@2*>+^zitS$ec6$?`>@`+B'
-    's+q*v*h`(MblCnuHB9Eo6$r~WSs=0WWyEu4RJVu7U)s)-2b3cQ@v4;R9$=qIktvF59A~3Zt^cWtgPJJ?Eg(%>dlTfZLka(rhej$;'
-    'i>fu&giuj^BbMVGBLJ!fHkmm{N9M>sM(JBw*!`F#Lv$K+A{Jam)9t1D5_E_d4B~1?ZwrE=e@}FtT7M<-vmRh4eyv5)ypXY!dyTSs'
-    'HQ611@xcT9H5#bX6>vIep=BrEiSRcqVsrW86raE(bLPu?P{-xRl11U?XjmoKQJM|@aNs8G{5K`MhD6V(BeoHA)b`K78n@p9#xjR8'
-    'LuEM`tnn>SEjCK^$xwG+-0Vx#8e)KZ@OHEZVe=m`4~Y4~m3t{~r@n)2%ofUi`dm5lF=w(Ws8MnmX-pDcmuUXl4l)8PX@AXb50QK>'
-    '7h?8fEzEd{;cUMgjI9jA`H|i4j&#kk{9DRzf&iMAZvs(r5$}D!vN#$>XLIJw(y4t8{92bm28N6fa$R=u3xZq;P4pf;;Ibqgik%6e'
-    'HC-QaLrCO@aL8XoUqMmGjQI#GUUwwe?;_!vh6N|05Oci8U9g(pp?<mZdo~dQtaUjzz{ylCp>IS#o_x{h^#ZdA%!aap&jTSbG`XkY'
-    'vy+6i$;PgDl2kvSWBeyzsw6jBKME&A)oF@QoitSwHHeH+EJd$?JgxxNU~r}Fdcqe&uKAJhHdl2``;bz<vX@iMF5S`fkPk10XDj+l'
-    'dM*PvN1xSVGyTp<-19JT%|2gq*>$;6HGMR$LyEvd+Vy#xU}7zD+te;Pe@ro-cWvoHER0Fl;njlH+bCWGs4g4Pe|omtz3CUhd^UzL'
-    'K=HKrsf$`55nc-i%%Kf1w0ww{HhVPWi#<!2_X$1S48EJK7=N5Y4Jz*(A1&iA1~VXR(|-4sx;G4ZP;vb&=>CG*!0LSX(Dq$uB?D_~'
-    'B#M4i0ftxcNJDv4ZWJVo@z^Q>T|Oof*ZT%6!Dm~#lDm^i8iU1tAhK0h^~A9u^DI+gXBv_-#Z;M0qMx0hO4=d{9c#rPJvO%#jM4gM'
-    'mHsN*d8$bK`S6T%OqZT_!Rzu~{RTm_iNaSzZ*Vx3K@xk$X}o+4zZc_zR`b7A(`=$_EhVG5@;@)%aH@dGpzmM(5K+MMN>U{Hn^50a'
-    '>Y_7?Za<HvMWPK_a(Qa%J?v%(o<~H@!+rnAIzj3QoLG4VhkJ13jxt>=s%N{n0|CuFEZz45#LK_>=dj%<S6J9V+Q<f`@Fe(cW0u>0'
-    '#(8lEh?i+AVfPIVu20p;#>q)Gc(sj=$TwX5zUQIGl<BactZ@g5Br->Jci6~uewzgx3je0xXvSCw5~1#mctoUZ`3N>&m9?8Ty0&+$'
-    'UL&ei4F>zI%ceT+7eO|wl|uqYaF6PCo1E*xswYpCsH(k2=CCMOGQ4~<4dFV6W!{XDirnh$n(M1P-X)p{@i^Rw;OFQ_yHJkUQkGH-'
-    'yGjhD&HojK^ZW@WlnrfZt-pp;6<nzBZs(p;p!Lg7*y->w+JF)#R}rHu<TqpBP20lBe?b;;ylygGC~-ts*!r78Lg~htuP^8W?NuSu'
-    'C=R;0i2sY^tO&NK#Y8=4em5)co2eWw*r9*p`H1eRR;mfG`n7cbuN(ey30DcN)?H>W^tZ@yZX@1`;C$JJyfkQ9T>2?>g_#aJzxj4T'
-    'H8UhjK2`W~SIh=rrQJ#1iBmzB07@O)^H=hCx}<Z3;&_TT9nsJl!tt1<67O4UGxWu_r7g7iVVPj}e28<1-BAkA4n#^ddOcxe(G#+E'
-    'L9+K4XXYb5H}}1j$O0HjiY6Za(ddE)s41r_?d|iPW>+O`yMvi0fEULpuxye?Yuf=ZM&9Sd0epP)qKQ(IF&oiq{RE0I;xaYprAuJa'
-    'wp=a;zWE$I(CEjHmiyZcL&`K)CWeQfQ>%ZTsAR(cflBe$1qf=>Q^pVdBo@BOKRG-TlQznN9Jh8#yR|H%I`=mj{_{-gn9$os^bNwC'
-    'Q->5_^XzwW8p>i|jbV)_352F6{S2ADY$MZ@myhs_*L@t6Y11@S;B2kAPs<W}7welq9~1)Ok8KeeL2~8;t0&y_JT?G?X$3C#w*qhs'
-    'D48t|QM*-kte{^9la;23ED2uqT1z`kWMn)~hBHF)tFq!oSi%ZkgDw4Z^}EkXyIc)=wXUB_>0k`zy?PTqu|X2!61zc?z~%kd-yb;g'
-    'e5~hUmB1VF&+wO4Zef?PMWSA5F#({`CSLY*?ZsoHDpf91-Y$~c4?wWemU*GLg$|qfrsw?U7sXU!3GZ2V8&BgH+OcR^F(ec-`#aD5'
-    'p%&Uft4}I=_D3R)g<p@u{dtB|KDeRp44Dtei$>V<QSC%K9vt>Im?W!^{*FS_J{Xw~jF$c1&2B;v7PQ<#5JJ4hr(iJ})ww&tUI|P6'
-    '7v)^v6^ipk53T_wcX6pdhyfpk?ROmxuX>$f<uA9b2enB9dG(TDU-H%zqV)Bfq4+b)b}wn#SV2qypgh#fNsoqXr?sQR`l|1<pB|mN'
-    'kGwMLN;c9Jfy>ceX47E?Mff9D)5x^s&N7w-1UOOBDH}DiZ-^$+R;ra%FLa-n_x&Tl$Rne&aRge`L8t}l2f6XCy1{a!YYcS`ad-KQ'
-    'ZL$$Yv32a&2^^lUufA3Jw02heA<iN*EVOMiI|L2y3?=31$YPME$&qzRi)JT?*s>i}U-9f8U{B+nb`Bx{{P@{$G6I-(P9I54njWf*'
-    '5NCDW)B7AAu=W?_&UTW6Hq;LwSI;v))PYSqTD7$cC1q*vlse((i6j9S-DUJe(gD9PW&($0em*uj0;Y#l|D`gyoVlStFv*Bugw||C'
-    '9K)6<zWt!NlcfcuqJdbXx5_{|@<fzwO@#MDC28=}c&E)>Y#sEPwy@;OOFz<FaVJl<Na^+$e$eW5CnEz_1wRZ$5O$}Fj{qFX{%nNz'
-    'Jv}kIuo8QHm=%L-Bo7@BwH_|p_ddwbtTc?B)&8|j2l$f6!?Q^D&?dXO4%qsyes$TF%Cb?#<j0o}!0pdqZ_Wtj*W^PmOFt)&U#R%R'
-    'X}A)`&xC3IneG6|dJX=Fg~e4R6E;T*V&(G4(gOl~DH5;K%($zr|5cQin4Ml(pGewSjcc4Pbfm#Ww&10~oxchlBkaGqP$if9JVBsb'
-    't&1ZC5Y(LJzcnjn&LG{4I}`F%s|l-V5``WOy#-)%4(VM9Vyc>yUDTSzC8p9^9=f_o9ncgO$kV>?M`E&#rtA_tfMVO+HhW*&$Syig'
-    'yn6GU-pQKFF0YH%l!m1*FAc6ypqu+`iGX$4a936uw6#GgHd);=-XkP`W`{$oFQ9>}2pYQWdH-I-N9i~W_WV{%4vEFl-UvdH94mBO'
-    'KYGVk2}8pFxmWE6T7E+l04E?Bf2lsb<NCXdPZYuZ7@J$`hhQP=!g7zP<P}87EJ^Dq<Y9K{C;F`nS2$D`-P`r3&v*lWCg@rx?MMtc'
-    '<Tq#))3T+63T=k{>lxCf$Z*-5(F9VnNh+T{b<+E<rt1v`weCuli@;H=7{5%alLGmE;>VnY)X8P+-6nkmT=^g-15?3k{2R;?q}yv3'
-    'MwOr0G{vHV_dG6E{*NY@%_@oPB~s}0cYv#WZLWPGz#JT6*r;tWtv5kwh-*tWB;x6EA~uM{AOTbsZ2oCqm!N&}8(D@j?2w)nQQ)BP'
-    'rX7$nEk}SL<b_&ioPqKUotKMhn8V4;_0V@pC9;!QRj@kGVFzLQpvCkH9H+wf3Wvkyw-nM1+kX<4f!>wWd;W4cok=DRb{BM@lqbr`'
-    'EXq}%Cv#S$3b?p2H$u6<4D4wg5RWHNQ50?rl5e`y`91w=cZ7BU48+mZ;@M&K*A*{rZnb~`{N9sWs0D;|tf#6@`~|d7Y=?{I-d0ln'
-    '0a&%o7j>MbNj)I4G8P$(i7F4mA95OS+T3<(!Dr5{yv8Y0=W(`$eo}J!RVHaAzpIBhzSpZ8zEcBJsZP(@_zX895S2(UH6AK)MtI7j'
-    'uFLqthkTz|B&eA{txq@qP)~_tH6b(a$t2_y@WWn#MsCD$3iTBc>fVYQj<PeHNDlPc!pfq-x3st=8)-{3Z<rFsZ+o4Ew}yqb$6PTH'
-    'D$#X$KLI|j)=b<(fIZank3q;YjWn_FyUtl5x*3oDjO+3B8UW*4x%Ce_8}_40OW8%Kx#pUtVofMPB>b=jwJ<-qR|woz9LUYjV<Q60'
-    'BLb^b+z%E6g5ur~L=#Y$L|U&Cb!*fszvm8avUi5$wVZGW?yAELRS=k`N`tvxlZ@&r_tP>xfusP07rZPKXZdg2KWFzft)Dp#vZpW2'
-    'j*3aM{Hyz3kN~uDO$MG+QJL*`COyRr7E(}`2!9-JOceu&tg-FrniY2{9C~{P|6Nn%Z}DW^ylBN#8zsGo-8x^-3aMTL5l)l)**HL('
-    'FLS$Yll_eH(?I?w6y(h7sqo&@dRln2yz-Ci6D{7cFVNESd-<8^-PY=b;Ve@2P<Kyml7SKZ)JnWVuFCu|A@dWUc8&Wh0@@viEN%oI'
-    '1nE1+?KSot0=;0?^vzp?`8HAFgf#F5l6ZGgzje@#UX{6wcI!t^z{o)`H|~&Z%3^frDJzp{QNVz&>j%DPn*(PjKx_IsD!x^9Yz*?J'
-    'goAs;w?3petUc^yTb_!oO~{5)ND(1iIm#UJTOJwQZBJBy+aEZ(dwT?$PKZ-*0C8cT>W9F@M-V%j{|u}kU|%!-+IXkUI#xzJuElZ7'
-    '`hEE@KQNU+yh|b61@k9my>4JgtG;Kv)CdKHcig{Co`j}wV&1>mt<MY;c#4PiboBOuFOF(_xxx!Rgsp6Pk`q+cRNq=@0?og|J)>3J'
-    'M?}Ka2cruN8%@oJwKZocb{r)*JFO0i4+$_Fq-&)Ty#vfG36Yk#2bCg9n*y6CJbu_<)g3-0Ild11ZK^+1O*(uOKjTmDg=J_@l`Ah6'
-    '9x@1>(`&D&@S100&f~zig01{miL}bfDCeu_!x5mQQHY7hhV<xH{ty#p6Z64CP1{XC`Z5r&RbgX!U+D*Xs8O*f+Jxaf@!?+RxmQ1i'
-    'mc)EL2E{_{Poc~lh1>f(VhW?$Fus6>vtpX;cx1mKTx}H@hDP{RVar06SF-+;UC+@%Z-tafHU&o5=1=2*jB2{446UMqAQsr_^)-Qx'
-    ')y|9mFu<7xiQgB(*Mm6B0*>yVFFAry7}Yy|LN4+)=qiiVSt;BVJ@Hm1g}7+a`d=h?<_@fQo~{dXfjGqy7~@#JYE?fWgmvs+1UAu6'
-    'u=B($WsPctS2Spw<i>uc*S{LL#T7ZIMk)1KS}>^_%I?j4OpK!ihBmVxFOLGKi}j;|XkrHY$c!wO1$BpZMvRnj4+6C3^shUyk?N*8'
-    '=z}ur!sKCQE22r@risB^?9h!c7duwKIpo$kmuc}NO)J8hne7aV3RGaqUAJJKjvMLJpaQm@rGsw@McI^7s@Pw+9gD`9C>N?e`_s+e'
-    'kM4+dE)gDABx?vssHLSXj2O-5$iGG1NDmsVe-c6EA_POwm3!gKe<G?zENnn&z?&aEPmGYVJD5dymo)lp{Bs%6g^%?~`8+xbc&Px>'
-    '+xa<{E8SlR-f299*8?(nMun2oIjzOC<rFE*Eaw6QSV+yYB}pI%uM3aOT_M6VH4Q)EwsTF4!&!LY9Z@St+1fwu$%b1e|Le}Fj%$U%'
-    'tkOY-vTR*;h?b>F0d-#i2xo812Oy)5-`YZq>#QutTTbUF>jwEcw59Ab=rpm*-DL_H`Xrshi3ARY7r_>=X@tL3mJB{Mub`_6)Lw6l'
-    'jp~gu2^9rlE!y=Z0aK3f3{Ha_`SmXT2|eEwd72Rz<`Hr9^fBd~_JJp}CobTZYxbajESga-#!E$J7#N5cNqgt~D#V~iR5VqR6Purx'
-    'GKBrOO=%{$8$?LZ#1H7RMoU&Vq)_pv9M+0;V<<R@Sr&b+M_)xjLr7Zst{VT1lrB5uZLTwl%cg1-J-uOqnyjH`sVwT{;Dfv!%txj%'
-    'ez%7QrK>elbC_}hrhxEzUO&ivz4Wr?f+5uVH;r<unC`ul`-Y2keF!|UIaOU}R63d;niCQx@wFq8#c>&DdePhp06i!qn1A6%R5KrI'
-    'eJf{C6geGsY+kQPrVG;4?>o)fH!N${Pw|}v09KmATQO_wD;Vpv3WDSa#A1~p0}~!dU;*jBVg$feDv;;UH@42#7=7FTY$b!Exs!i+'
-    'PdOt;k%EU|TrE_kizVj=fZ-G)KJ3BWg=T5$EtWkIY~QBJJ;0xDwDEx5I6>poyxVg@Hk6$Tx(5Rh%x+sTnyO`fFT?89+((M!9xjWm'
-    '1o(MLAYm{d!W<wm%+@_PgQ_Z4CU(fpC&uW`5<!F5|3SW^pjYZZ%s$1KZ7#*4%)wg_f2bKd;opW<(<_XZIL_o)+@7QayTaH=z|X6b'
-    '!1wx$XA-_R+(vi>%p{p+t3g?gFg;0o>+a(XjQ3;Dz}1edl!o9hu)2436tmPzzf2*%^3a7ujr8=bHBX_@-DcpZS_BYDaWG_YAGWXP'
-    'HDTE{8FMCz1p}MHj$b+wkUvztnyM7Mwsx7(H9Cy5_vZ)}m|E?>S%#t(S*~ZW#nIV<TSZicn_el4ojso&{61h=C`*#f1!q9P)z~7?'
-    'j^ybL+rO>C!F>ONMZHFw?)+C?h>_DMX`hPsOi2!{Qr0?Gl8d^_j$Xs(L9~&nN(zD>^NZz`>d0*ChU|l5JHHGxRtu=PNgt^pO>-%I'
-    '^(+_0^LXaS!cnJ=(M3>~yiIFa=Y8Ci2x{dljWG|^sdNsn&qH*A?p}0CAFahmC2>nDj~$`cys~a8H0O0EIcqII@>QLjw40C4CU(6g'
-    'ieILwM(9RyANj?&X8w!nW(FRNus89N_|r!@)W@D=6CW~K3usE8*+t^fVUHgId2{%UuEM_?1=-WS9!iEPXan)2Qp35{V(J;^#SfbK'
-    '7iJFc&ponTpggf7fj!3Yj2OxCT=4rq5)<4rn1x+-1fZ^&gu4B1pzWjUvEF4+xH6MO_$o@EJ?DVlPJ-;uOw_Z=RQBjjwg`ey;%71u'
-    'YX+hII(c7T?ADu(qz!T>5ED%HUu4GhJ_Wl>`C&3vg75^YEZaS}5rYu=MSAIFiw*9`lc_%&1~ut1El$P+gnprc0~llsmGbAF6rF^m'
-    'e{H+Kp~R!XAxGwxc`BWFg+ew77SN&~U=!`im3Dv&M^371)GAv5v*r{IX=JezaS!*mEL&WL2u2LxYA?dG6*}z(qQh@XNaPnep0j%#'
-    'ItF_{he{Qp1oED*zID}X&l&10X*;mLP%5H4J~P3ay484Q54!~z7V8sFy(m|f_p$%jO^!Hh32Wt2*~fNzKTyNw5yII^j7{O63w4nJ'
-    'm$LT6kL5)VvjCaM<;e`x<OyK}Os7m(!GhZ4sIjHt;`vyR`fVwsF)%p@quUu{-v(xt0<xK(K{OoNfPa-!gAIdLfogOMn#|6!W410A'
-    'Nn|t-hr<I(VS+OOUF|@Bouu2CSEDLK%K=`%s}4JL(Bi<c)KlfRWZJiX%?ZTsHpsyYaOtm2qdtm6V#b_~H)!9h3C#pam}gMFHaA2G'
-    'TxF%b`#^<2dUd?O_o!DuB|hB*j$V8c0upBWmE`*f9gKGLe~y*@2=+tXJ-&|=U4jov>@7J3;*c5t1kIoYuB_dBBRg8%#pF}~&M<bZ'
-    'j>6hxEHs?Bo4h~xs>pBnhYP)GZmrE~(CHdCAjx@YD2ZLYy3R?6V`nyrPGwxZ@S|$tOm-zuMFs55MJWYwFuENwV(%^v*){)3r$1TC'
-    'w^w4q5VEp>OnaM}d{sw1>rer8EVGk@$Ke!@GgL{G-ao1yrKpu^Z<z#e1^0FZPGZ^l$Rr1U=IAeS5md{_B;DHScyJ!?frD;Bwlw@i'
-    'wd;yfUQ{r(wnQwe0w3k<4mQs<z+Ia8irJSR&#fD!lGOQzV-~p7B6zRhR+#mvIcmYf^@}%Z&XU5txhuM@@FM^Z+s_r6==*KYq)1m2'
-    'j&@&ObNeRW(teN&r^kAR)6mBWvqmOMIH!ePr(SBPU!yiPgYtyiy!7!Vr4E6_5ksbjB>@QL&n-!ae&??YQbk>5>W4Q|k{XDlDoU3u'
-    'Y~VP~zoZv4>Km{@FPqr}AsqgL$cg}PtXe$oy8@K2S>{K}k^aTIW&<U15W=6_F?xsOSa@FYtQbJBBBfN(Sld6io0@^A2Z3rCkxk&e'
-    'E_vxrd8#G(-{ZaNDyPY?Hvzb35B%EwwP_I8UGj_)ptS0knbY^#Hvgs=<GV7S1>Gyze@Jn=%3QQmpsp~CGKAf#;x4!`NT<~eRkpke'
-    'c>;qOw5L{#qD{fOcj*x*&$KRSw;2dIjR?T(l2Pk^s2x&YR2QQ_LR#wMPai!kOio=aeY3I^Y$LB(NqHB`<NnjuZ!&EJj!Gl_m~V1<'
-    '*qbu&*Zk{kyomXXNWWr!-}-zjIpjW_h8ewV4HVOn=Q{~+sZ(iewRpIYbnM0Z_IJKLSE}^ro{^MxmgK(r=t5$DgNeoanQ6aqXvn$@'
-    'qmsuVGoLJZQ*1655P&hA7wjEsqQ-Xl72Wj)GnWH2!BnbI#3smYag0S6!PU<N1bi*sLA12&YrMt&2`z(BTt%UB=@!lUKk6mfJ-`Qo'
-    '6wE(6JMZU;enUK^1_V308UIfoB|8&^CO&gpBJT4K2Cw+>BVvq?f04a^g->+e^1YOk2nm_II6JQ7Z9q@+<4+^w*ee_iuvC2iS2hQO'
-    'ahAw_!RenH;#fRTI35Z({y7#ofa$j=J`Awnx&xD$+j3DXR^lja<9f<9zJ!TOyXim%2!ChiyhDp6ALzIrig8d%bXP6~@K+0n5*EpT'
-    'mL*F?ZlM(O$}d#M#g$K|6Q`n+mUuPfPDg4*=`t#)tnuI+O(m3NB@SQjhWUl1af|y^Gsp+0q|Qt9dFtyb41T%(u?_%afWqD2vY%ea'
-    't;IFlJ5in3C5$=*OFMMjz{9RZ4>lQ=<U|8I9Lu7+E};kNoEiv;J^xOsR?KxAZEHzfNV{P($!P+#TsmL}oT82Ehj(_*SjK)kp-ej?'
-    'obZsa*GTG}Jm;ZOh&=}bItBM{GZ*fD?PCNjKnFIEJ~c7#BTN~Ms9Ds9pe@_W$X0=iPXp*C(fl5Pwl0Y&591darbgO#3`tVfGk-8d'
-    '+ZPx0G7x)A7sZ>H1CgIX3DTC$c8gGRHqvy+dZnrqNfE#2;ut978$!}uatmU68YEG(+MdEN3-?LF2&=iV-!##jZITzt4GQ_MvLh~f'
-    'h&`Vf_U=A|r{O%gA{^3SzP&DpA3y4URBq_9@c8|z004A?z_^snHnG1Yp@dHp#^gNiC-aKa)i*uGe#cML?D)p$<NSZr$?fj~zG<Qq'
-    '=cvyqb31lGQi;>I;%O=UP!@P(uUvr@n#WMvZCJDbFw77bq_<&bU1+>sEpz!Jk?!Giq9;2Jsr1vi_pgDSbg%kKOOYy51OiJNpJ1&I'
-    'qpO>8r}ZfWhnKZwEsXW@c`#={^du9eCh0stM~I?v0eOKtD@q7ITUE=SeRtM3yAK}}!p?Zb>Wdsl$Nht_8n9SqhGtn=B(ev=Jc$9W'
-    'S-6&OgVGlEaSHuF?!Qv^deT&HlH-UScqFC;^1`V%424I_znjcT$nDijrCX2NoMNiN9!#nYzg%#aCl}43<+74-`ilow@au&JuWZGF'
-    '0h<`=7>1QH({_@CbojC&=>rd1@NO4WKrEXO>zxCzj1J9I>Fxl?L-k(wE%rk*=PZY5oac%_OX}XWu9C!U>14wFHy}})ka0L8w?`>7'
-    'Qn-({As;$yWK1hlgL9t&o3cr7s+EHA-C_Xi<Lp6*@rp02j)rPexYIQ@mrcw(BrkxMDcbPP3s0V3rVGK2GqbI_`mMyRqi1ZcKz_oY'
-    '+zcH(^-)?XQOGz@`V>Z+={PO33xQ|Npw1g18aQNXlN43*9EI^Eq5Bx{&o%ebQ?t!8WndF~S3D@>en=5tp2C5ffB2VZcTuZc==4Ss'
-    'dvLs!8W-)WJgZaG^YoI#aootxsHQb5lj4Q~gaVy#j2*E|IYz6Nee~kkt?I?Gk(7=3`QXz&QH^6KnAb6A7A<5HH17*p$lqM2jjrHP'
-    '5)Af#<ExXbNH#zS=z}d>>`XpWfj4uY<;H-^b9h($#}Re3N@Xb6?}*P5&10V!inykP*`q=CW{GO@E>Bj@B)cn1`M@lPOb3Vu<Kqbn'
-    'vmOepyEt=<r6hZ9S3>s*Xi9!1Th5eVj4b5ham7(rk|?cL4WB?49)s+6?}m2Sb?PIp3tNBc6W)t7xlAu2jO;a(BvFC(QB^jLgMB)s'
-    '@1L3A(-6df34C9RiC5~%nDf&X{dVd{-ix#CPuED!u4CRX(P$~?DaY_H9sG{WMiBTwY2XrS*NO%$Y68EaEk}_?4=1GCS7pR%P(JZ~'
-    '@^>KiZI$gOZovC}wjeNRB@)U_F(%C7&W7yxYH*br20aIwYe)K%KeidLCTXoW<+%9AX`lD|$kVItp~J*BMtrW#sBra*DKw9<=2!Jk'
-    '?cN+D*v2p}+F;a-SmU&;DIBZ9`6A7WH9#wlH3%y8jG%I*CCw1U5c)(x(BrN?)*pjX*~h_Jgd>+1t%rI7aF5K$8Um`NeSw@X-<;D%'
-    '6$18E0jPTK(kChh6lilRfb(v&2vkw(=+EY*BcC7rr(zIL=nQ0n*tw<217>ZohUu@i??a^sE$_*`!plg_<6_v$HwFxnxdK$DAz0{m'
-    '6A&oKq0a_4{6HoUlG*F2?HR^U2M|<OMID%20WGWRr?%(_I<yLWpfLDm1t-rY&S_~GC-4S&xvqegWax~i9x5WzJs5s6%#K??9MH$C'
-    'zIc9Y=dbBmksekqVfDRW#UP{#_~5CriY2Um{S@K2Z&fmOugN77j}y+EFqVH^cU;9UXs5#|RKp5N?`-C;^I^=XO#7<5f{(sdFQw6j'
-    '*X6M^-sUYeK-?QT9*3U*Keribaf`dJFTq+YPp4nXLn(I)j;>V0ZIPElpxQj5Sa|7v4?)l_#k4srj^6u8_yS#~<`GWi!rPaB(dzYh'
-    '9pVV4Ls7C46Ety6=b<)f%;20?pNwqX7Xee5#m^-W(RZW<uE_O2MevO?Pl1kE;Es%knV7&p_{%LTax_R|6~vjQ%d8uUk@)WRn%o_S'
-    '(@Q4-rLAuso25RX+20Rj9$R5&{8mWx7KWnZuF;zwejdt<%dgo6_Xo#k4#54V{e+V~b%Wmhxw+|ElpSI5-8g-zv7`Gpf~ST@=0E(!'
-    'Vt?HhNJ6`^z=U*qzQPvn(geFxe$Y*YRXLot0RU75lQQFbLp^=4U$~iT7$({VPGvOfQwH!&V#Je(Qeu>}$#WM+a8u&<!2J4+1zw#?'
-    'KUZs?&Or33?8&Eu9>ZF>)aS#5SDlQ7dcs}<6hTlffv+6<HC2>Pd3VUAAsP!bsh9T@ka`Ti*P~vg4<u9SHsZ5YmYqSTkAJomRyaky'
-    'dplYd1uw4@m#Ak4apIuBepa7-yqBwA8HB8Ib0@5Z<a-2VU1L`5@|N3c6eH#%^c7Ontt1dLeJVm@blH!sqx{f9rLVHxEi4NpIX`1B'
-    'LN1GK6*Cco%K`hcfu=QT274`O(Kmk|Vnu{rGw=nEFH&`FD+1T7LX6r^dO_uA_O^qR6*&S)d@4zb24*r-Ad(|G1OzO?)?s+W+e&@e'
-    '6xTFwTU`u7Kqp?S8DGKAm{1}W>j!*C+1?u1-OQany&?`|5{?g%R$fUJ(Cm#7aZ8j6hH2Ed@Eq%M^AwF5l0>y9W5&Z|@H_)3+#Mju'
-    '@j<E{oZoc(ae4N9jq%yW40UIQX%ljeEdj^=wq>?!cMo)Bv|zD!3j&Ya_)5hl8c>kO+~?quFyq%2?wg3&AStiuR~&%<J`3DfFwW}?'
-    '-zyUSeMi1w5m!AoI>^6<<IJoM@`wG#bbKpi+ngHqghEo#WW?wMsoJSqVn4NcdQfb0u>?ybM0iSp0wYWf;f8+cNy^oq+Byfj1!Wo6'
-    '_;lpdruG#XD9}PICcTLtU=4^ZmmS|V<8i}Rki<yO65f%N<b}>di-BJmIfxqCl505D!`up6eRas1LQojgrb6^ZP6<&o(hq~O7q-}$'
-    'VVp={Iyf)uAk?b&@Uz3_nxYV}maC_F8hwR`Pb?DH=0am^KBeH%R<AZj0GLU)`pkah`JRCx$v~RAz7NxKWkOTYFVmXYdB4o@K(p{='
-    'L><?_sP#bje~=m54;BNz8V1QB*FLgjvq$Eb)p4J;*}4}z2LoIEGy(LW+FKSc^nToU`C(PmY#R&>6Rg=FNC|p$2hc$+&{`m&5U__s'
-    'ioIovC5m!NBc0mTFH-zMc57`RJ?5wFwk=myhMi&jS*QP<;%~!_R{O?3`3DP1I9UO&pBlwdKBFv8x*-qncoz3?3g@tU;%MdyMZgO8'
-    'q|loP>m(`)Vzj=FHuKA%c1s0w-;GcaR)E|p=C`Zu=+(v|VEbS$98~}2rrKOrub&+uHwF3-O1m6yDF@or5MO*xe(^pVI!rhHV=vN9'
-    'C0HMM5hKNE4gS(G(+`GT8Rfg~v+)t|KM0)pYy-C>^@t_?POjHxf*Fw-=9{-OpsHm!rg#kat}8Om%Z{FAyJcV7{z|Ah_B#@!Vj7tF'
-    'GiWq}e8r9K{sg-NZ;Rn`<-O3PcP4)_-$@R+$T!Sqge=4jypT(=O&yFTusgNij+w)3QrJZmVlbitH1;V_8p299e0w!4z~?6*i}IHU'
-    'iS{s|uAJ0~Ek_6sJpqU=vZ@<r?}hwk)~VKj2Qgv}L{cNj5G7m}WAyt^-wYG<p@}5&F-S>vvL<+|g`PNaaPYFnv}B>Yj!5B>x{PJ~'
-    'l{9w&*M9S1gVHxHuZu)Nej#STfCt1jUN>x0-_IY{fFR}RG}wPMz7%1(rJp6nD?#XIuN$fy@su`MW#2GsVE%Ju+Q_%(9mRDi?lpb}'
-    '<#hD1o=x|r3lnnqIxiK*WDf>uZE+AkhphtHktKZq%jj)<u6gWqR`8Rzx2G*R!#f=5d$-xY1y6xU@BKd$b{YaIKRZFosudmsoczu('
-    'VZSO&;z);l@9*jddhj!aysP&=&U@gi4UF3In&bLF^}R>DAzMp64=Lq^?UKU(<eL4e#NY#iB3}M2W&{M8>F}O=9C!|FPp1v3yUt98'
-    '2J0hS)P1_vqAu=E9`pw;AG4J>1TI+&;f%sK9Ft_|Lx`<mqdR4WBn(wrM|`X#LfuWr>L!x7d7503GQYt-cWgan=)89tMRISnWQhJ7'
-    'zQvhA?NMBib(+>1H>ZSWd_vLY?^NplJnefHxLfLd3J6}%E}%GhAR>D1FGujsEx`Zx6<BfP=1cE3pw5A<L&BV7kZx%AL0gtN3<WU5'
-    'U{!E$15AOEtU{vW;;KRlySHil?=(fDNt=(%by#uEQ=r)IQSGB}?vv7=I1^}j+>bX9%Lq_>fxgF5Y}iErW<Vz@+`wmyVKFc7^oRZZ'
-    'i>pY&QVhMxcKFvVlY`!damiV-I+@(KYq*h7Tc#=~VXP`J3ctvL>g6RR0J{l(Zt{p^jq7XCq%&>(8RofIWCDX&H4B0Kj);yP>^##1'
-    '*h8(M0dXkTGH8gn`K|U@Fh3$Bxa2&aiu5XOU-G1_;Ng>XQdte!ZVh^9UtvWc>7#aG1W9X1_QiYCdRurSY$Rj)^9E~_#Q!D;amg&y'
-    ';$gmk)^9twmr%DNTXI7}7sbvzCtt8zAyBdi!^?KEEB;Ri>5(R%8)<LQTF9g@7HIVHCWzlSw*-5W`*h9cK`M}nY5Ra?G%zIT_omf%'
-    '2D@}v<gT<;A=M(}!U5pReuX!tALVI~8-@IsGZt1us`M=wg93Vk&q^kPrVQE(>(^@?;WbU3>Y3E+Z&7|^s7E1a$P8Dv*HA*Q?$h*D'
-    'a?a<Bv%Uk=Gn2*3@wkDgF-X#D(?_A9BC4mJV#_yx!-tu#N)94-O`yNj@eP_vlFwcIAUc^+hxFegXNbO?ykSamZb|5~rz<i7>qh>G'
-    '_K^jtIj%&I>V3T2nhV`jp?fdd4E$J!yM2aVP_D#8$=+IdSpmIjO!0m#f`p=O0-h{AQ+=?~-ahFMk`6m*GECn4`?*rJwj3BhjM++r'
-    '_R{zugKqtB?M-;UDp8l(q}M+qR)Xy?Dc-rN8L~!g?C?sB<957uNfUf>I~->R>R0NR&AR;xilk#%Vk=StIaCNGt6YTULKA2o=nJiO'
-    '(dn8%wc@S(EDWPMk5Zj<q{jy+js`dgMcEMab%2Jx%b+CPI_vcvksDWZ=?EMzpKmr)P9U$mtKBW$%$954x+2z3eJ4M`-izHBVbaez'
-    '#XEQ$(a|PFw)R+CG<b{~kbl00!-8H<hG%CnjZc&2_dGEuH&2s+4Zl1!#8Vstf)+<5RdfP%jH8Id|Hv8%K#!D8Pr0&@VfuN~N0;ik'
-    'H2j$E5#Z+NWL|D>@(~9$mv&~M<T`EXHVAF)q5Q5drw3@NDmxBT6Woa9*p(xE>6=AF&Be@i#2!|^0u>XUyy**@laEUNc0%BKxKbx<'
-    'r2Ss1Kt`HWn&jQV?Renut`{1_Lq|f&Y9Zhy4*D@B&M@SBNo+tH{C`xV>00{%&{N9kFf);Ev7I4>uK(<$JOn7$5flZmQq&2Pt?X<q'
-    'u6d(Wi1uuC$T&dTL;Df%SgF&-8fF?wwWR$*&y>7}+frf>F0Wu=lmyXqkJ-oB6=NgS-aw?Pg?4$)h36-)=APT9(|+MeaD_j-I17^$'
-    'X~u$g)7uv$Zw|{`zq9@vY;1Xgdc@=Lq~4xVZzbFk@YlsLL5Y9>vfoO-4ULXbJHJ4OwnNi_+(pX2=ATLET+JL@XEv92Wc){5_2-wC'
-    '498E#0t!sarZ`v<HAR{L+MUW`K~AI4hfzUrM#GPHE%Np+U0Uag?{tV^K&OK5I*XU7u;j=DDmK~~Dm$c*F;DIgk?L#@%Gc(}v%933'
-    'cPRU`>-J@(OUKf#JGdo|{8$^Y7TTUIDFbofiwly+y+O1VUAEWn>IObe-(0_ZR3pKb?Iny`g4cLZ`}O6<!im&~q$sE!F6cmE*BRYl'
-    'mvVfMc&zy8^ew3YzV=z|*~B=PX;iJ3aEdhwQU0@=7@3c1r};ji1OxZoST2nw!^!+~{0?+&n*hG+<qpV*Q`~z${i3eEbN{EJb20|u'
-    'm_Z;6oN5tr-1xC;i%6TNUEI=<#}TE!J~K|u{87iJa?>j#you!c1fvB@5Q@jkTr8dxf#E5;vh)ssuW7AO>sOsOo@BPyrB!W0EAs!C'
-    'c}&?h*L3;29bf{`w2GnUy-6`+@ItU#ml=6_&uK8H{^F7=Rg<$i)npFT^)#4-aOhUmdL?rXO!>a%OR*MqED~5-t4^Qvy5MIE0u*Ko'
-    'd!0V(kniN5W3n14^NlM6_Smt>XD`LB1Nd+dZ_}JpR(y%&>ssrs+VT$C{(hyx3>o_4Mf@hpf#v~)k;0jQM9w38wHxdap!-J`-P4N9'
-    '{(G1{;c;pLT00DbK^mX}^HnT^)^IZdy(q$sM?^~BlbFHmwJY<tFTPNw7$?k-vA-14F}&8+nRqq$4fxnGjc9C!VhS(Is`O=Kqdn~('
-    '%`8D7j?;)vA@(ToTycsllQoO6PFIJ+#A5*$^GLKsp9jCQrI{K&qF>3P2g%q|0+~4DfKDmZDu9yS;}Ggy4cpDX{g|Y(Bg$NEt&`O`'
-    'C~1Fx3Z;3<Iox1w&&6GryH7#hyliC+f9;&g4F-^J3X5HCN&|^``f(c;2k}IsUL)T`;C6OGo=g90@}`ulrmk%`bY`*gIa_$g7s5}X'
-    'OC@kfp->besZv-HL`CFNze^OJvxcm<2}sS?#yGA<wcfwdIad8vijn4h*xg2Be#v!|o?yo0dPg(w)=C=SB};)!Cof3=<>XOlQiw~-'
-    '*R(nynCmP#Q&1=?Sm|9J^PrSENvT9Qb~J}*em?0%=W`F(@*oSy76!$5S=7tK_oVG?^Upy`lT!*af3Lm_N!1?MFDn%<QJz{s!V|!7'
-    'aG`v-NKy+n;j*Vbffs^}f3aN>M+f)KM~fmI$1*rVWhK1?b6c-;kK!VTo!sUuM-T$(+wvsBJ4`iBK@#Ye_L5m0qkwH)7U{9r*jf<k'
-    'iAs~T+-pjsE?FF!mz-PkV24?LcRO=Syrd--`p_{YE~w6;mmv~|#PCmz3H9(fCwJs@{lRwB*LigW55&FIeOR-67T*Nu=00R4jpOw<'
-    'Zt$-#`3(`qqO~}Wqs~G!Qs6z*U#80KG*bb=N@wvW_tfiz5W2T8D-dLjzDjsr9(bA#bx(R<|80O;!eHX%ECVv*NPq#@OVN3O*J`P9'
-    '>ewj{C_4&{zlw?g+2)RtO5zX~GBI7&JjSfcJRyGG-H3^I$-(1iZ#IG9M{F7<MdMB>8B3XDAskKqL>+93qhCAU!p>9Gnb5qXP~?~n'
-    'l_Z4nR%u}0(1LYTGbH$>6ts?is^15dR%8Q+N=l0gl85PN5Lwp;G!WkVt9g8o<uKN&AzBC(nIc(;=;bqKNRC#|kKQhlW-8d4!!668'
-    'ZJ|dsA&je@OGq&c(!*LfTZ7ok-(nsp0)X~;he9A#$Dhb$*KOL64Q~&T@OR?V6V`<9iB|(t^1)ER?j`vTSa<~Z^4)vj+^Tlk|J)>R'
-    ';#SCj{nwu9TetmJ<e&8i5ONy?zi7P@zvlR8zXe}yW;vU)ZWM&1^nR(x9GZ5;?|f1RD#2$`%qd?2XC_)7>7vXl5|J&qFn$F1g8#kx'
-    '?P?e1!otbn&Xg&mJT{Vj>_dM(@i@x>uKGN|y2f%3kPWe?sW7z@2#0xRtaJ<CsU{0ekRm8Htalu{Sd)FlOEd0a;N3{f?MPA-4o8ZL'
-    '*{LeAF-{#7|8}5|(7ow#&}j0EWc;b&EZ4Z>jYXy8#Vt~@w<g}vMs5-82HfDftmcvSkYkf|`4$E1S^6FnOF@GH%G_t93$$#gzakTa'
-    'KU#4X(`w08uPyi3*QP?B-{J(k8(q);l1Wd&c4}98=1asvH|H+gV~2b@^bV!%rnJ?xk=ZjTG&g^v?&q8oTwuQJ0(hx(m~LTZX(yJ@'
-    'WEzBW^Q*(><KO+KxeNsHlltE=NnXs+(RcYH#b%78%muhMPpYdVl3Qte;D;7C_}?YVgXEoV)UGt{02~fv$=|Zq&tBy^ZkIbNZV#l9'
-    '3tuEHvn`{>L-?U+SGn={jooxT3odQ*^rf>}OSeK@t%?V|FJ{4&HdvyWW&Ft!gH(>~m%=+EA_RPIyfe)-48mG`=!YX>I_++t7QG~?'
-    'e7Ad))?=%~KSpp5Q>YwSHkoWGDN)I-uB*DWiw6p1HMs*CUw*D!3?sS@rRWzGzYp;0mUHL+9~6syI4+q@M@HM}5t~wqSE)cBHE{he'
-    '$4>$#`R}LzpOj&<+V&AQJBXk$T@8+{YifM!jDCD7X2lEVz@DY<xcLwbc?Dx2^vF~;-R84Q$4a5~zW-2YagcV4zS7PHTht&Qs4QL+'
-    '>&<n0WR?IpZ#_SP9mJi#x8W?*QdN-S%53#UtcCj!V#k3}b-ULI5OHOHBfOmDuHm-kxK~~v;WQ0-QQX*&B-9<ZnAdv4v6kIu-Sp%`'
-    '&}i86ef7a;ezb{<B{xi?-H=R<Fr$xWxtTeZ90GJXLAH(%jN-2Z^^)U@*W}frL&_RvPB5)KaT$jutmPW)x*Xop*PD*`Tm{R>mqNIl'
-    '8l_p~H4T&H6(?5IcAKTstD&O(?W64h`8h<;j~vc$lEX`-q`2?=wpa)WIX{iSE3v48DXRp`q!tpXzT%CRDYr-5!t<N0b7^qShXn?n'
-    '`Q|bdF=hZ@e#ZXgTpgHr^gEl^W%aRYyA{JJU?J4C{+bgvLx78y(KiCnL_%TY9Pfb5TtbSzbjsVnaln}Bl<hj`1=g{s-zAb2p#fy)'
-    '?gIY%o}|sTbGJb+{EaOKG}KFmNJgOFZH1-~rE!ucP1;`B@kf!|l~tM7etM4B{Gt}mmv)xc59+tS+`=%@qy@<HxpdRd@!H`4_7jbx'
-    'N9Cpc>+!M8)fDfsTj-zje5lK<5z#d_j<&&FXG(wJ-fM@ZiTquoyD5`AL3a4#XWZ3tB6Gbi+EfkulW%g;KQGo3x7h~iE3T1x<k>0H'
-    'Ht=HSq139tHpvP(mGTzMLf-Bn%63~tyw0+2@3|X;Y^u9(T^Y1>?^}V+?dI@G8AhtZ<qL+BxGVfQKF=B>6?z6i0p_UTFMKuPo`Thn'
-    'f?f>K)@d+`_bbwy`YMlT#4iaqURDMNmqxn^kUAB{51-)B#{}&wseZ|_YAB5JTwZAcl&w486(H&CArd_Rkmc8|!9k_}WuwOa6QA`$'
-    'sfr_fG2)3EF9udB>N+b|-j^!eN{4&?mKd05dTva<a1}<M;atf8)iRFSipEZ*2k+#u(b>Inhc?`X8Zut?cb{PPi9+y<#l?qI`=5JY'
-    'V<p2j3nF#5ZR7U0byYDRR3<)ICq3XN(Q$2yh==jebO7aw+T%ZJ_}I6~uu3d%9+X$ah~q5?>3H+PB<2KYXsOBm?;B_0x;>@g2Z{Vo'
-    '^1J4$3a5W*ZUy-tJ&#Ck5#sZLKM>sh4HqdFD*n@&6yw~xAgQTN=qLz7wOYpM0Dyi}$k-vxXZ~hKFZ1PevZ}-zAIvW=<YqIQv~7p9'
-    '^?+k*c~6?VL6}NhUdtzed*d0=I@lkn5?-6x9a_sq^KLJ1nRnIan$JAiH0qCbA-f+y4j&m2ntNax|HZ2?Zc4|yn%7#@eZ)i9%{G#9'
-    'uTFtgA~wVxK<359p`&J^5^OO37O--MTIe$1%5U-HW3NY7L1WZ<Q5s-VCh053!buANOinQS3;$C6DxDI1>R8Th+(LLBaxh}djk$=x'
-    'M{4PLi;}tH_F4<~BaA#fkR(4cHvGKRhGlAToKga&S4ZX36Rr8f5F4VCZrS*=5DI*ftxW5nWAU%>0iU!_Lcw-&V#Kjs`EmTplKL$>'
-    'tO}Jeu==wk=dvhi6>0Np2MwG*=_k%p2S$)w2%W~wzCR3Tttp-%@Z?0pZFKYNAv(&)x5I~Ho^tZ+@5HRNvB<rv-g3fZP3Iz@XLZ~m'
-    '!vc-Kz#&IDYcX(Hq5tN^?{5fBIQvPCrsDV3#-t-Mz4LILXaV&y8e=Wa>^tDr7?v2ehFc>_J^YU^8qO*26C-@P4$Tz8#c!8v+A*;s'
-    '*VGI;{E`X9i9L_7rE*$e=cg@c)UQ)a6MN~`C&8%wzh4fts8XWgKK{xJw*wpuXivcsMXiH2$O>%ve>xj%qEfd!YoEOx@)T;qXhPuS'
-    'm*SYjU|;XtGI_t0MgLC>r*e$?L*Kw`C}~-8t|NRrYFsW-jt_CCJKKs+A`n1X4!W&+YukWK?4%*e{`2(goAX%@GELDo`5TOpoH$<c'
-    'wVwaiVxE_JR5uiC%0^e0Ej8^iT)^hN0B2i>+8K5!8@Qtp6E`MjTrAz7?v4Z|&rBa^GiJ=+fU2G!m!|z&DfP!u0x$N{;sO(jrKbZo'
-    'dFAfPZ)65i?hVhw>gv!7|H{4zmX!&4c{LSK4U>(}#2aVMx;+Mw#bWj4zi6EQFFrF14f4u1KV4X+f;ns|)L@}sP`ZMr6V47CJW>Y5'
-    '2Z{iLbu?S0l35hkUu6VTrG5xfTWRB1EM9|)e!Sn~I1Sv*+igmJ8?OV&5>y7fIX~NEs%nWrqJkMV=$QuAZp8oTWvb(-^C#L<;THLa'
-    '8*K9qTyd=|Bm&gK4z6oQ-(=LlP*!fuQ6g$=+6jXM(ePulm8DV#9O<<k^F<$}Ftj=vOjZ4jM*=l~=$U<2g}w}whp!DNLU9jItLE{o'
-    'y-Hw5+_VT#uYO-Tpn+=zXo-z6nIAYM8A$Fvta#5ye9l!hoJ5Q@2Z*4#f6wB1(f9g4M2y;NHa$ZDkh~|uzeuOS>qg<_KTPmZKue*f'
-    'hAbj~wSz)szh>xkydILXnHl3u_ICk|N2T7N8KJ@uHtQcGCFpmtu`MO(3{#)@l8*3XG^@qmz7h<wG9E!t3Hl5~a#lohhAvUP1_=5e'
-    'z*kc1hrGitVeFqn8kV0trKcsmGSJFd?G6DT%Ai^4Qc8jlAY&w$!fH(*k;-dZHXXqg^P3f{)j4(qy@WFGxbp-hF!kc)bh+rcNK)Zv'
-    'ddo2xaO1?EIta3ZF29i?Ix=~3ReZ1lHrWHUvKL|WDO+!BuC3tLxV==jvng|o9&Y*BNKhd;F~yZq`+4-DBN5@8hvtqU<N8PNf6)t%'
-    '<PL*h-k&j%p2JslPOT=boSF;US@W@vUr(OY4pb+)+P5PU?C_zYBozvhd%d*j+vALUfY@&o(miM!V^;hfiP6|mspBMJ8qa1*RHvX?'
-    'xXbTeFt_l#u10Mr+yZ8kUIR9UGVC#C#wx57@oN|5^RzIdc*cs@8w|>;X%VI`U|LmnyG-Of`A-<)?U0{%K%6Bx0$eSJQ~~Zs4WOl;'
-    '20K3Ol5cPiq5UqC9_q(VyqTa1H9#Dw)!a?t71?%6?hMkZu(c7;N6=oQ$NH<s(rg>2_~Z2jW+cQ(HOyX(Y2`sZS`x~Qi2nb{c+*v2'
-    'zJuFOuPPO7Ib<~-yqr#1ZQfMC?!PyzL3YnA2ca~<xyj2C?q?t5*rwPR6aCl=)y=8@4`Q)bd%3nMQv(5oKl-{}NJJEMM?3#n>=m?a'
-    '7!rw4qwk+SU@$WG>M{BR-O<%_`g}J@s?6na1c(6zL1Ywd<`DaJ!EBuT2}@1L;-f`JP`z@z@GO4in#=!zvPk?ZrTbidPj-2bAT`Mq'
-    'FoFjjUIj&po%;q;<Kl!`*Y{_@6fW%_ufau5{}5&+dCZZkOEH-PrDJZhGA3$jmk4Bzmb{j6FLOOFjcB0epxTX6(PX?hi>A}PjV)5~'
-    '_l|$B=d;PAJVFfGB#7`f{-%`_K2&N7%7&u+QizqoCMlPDkonIvg}rB>smccZbdv{Iqdt6rrV;}MljJM<pEhfw*Aq~)y|A1z;T&(J'
-    '+B(CNL1Zrfg^GoE-1s3D`anJjETGa4Ae%p0+_9zYTsOS|y)Z}^Tl)uEOV!GL(nTX6_85C5VDy9Iz#hEzbM`2+$(rfFW?(j5<&O0Z'
-    '4>~7OEko2xPkl&?*|%%4<%p=x`9)YeiN}<B4dKY&We_QB%dG~SM%jK^uvu$QEX^>VtW8VlZajMm^AO=06^aLsI%8d4!}$YFV#Eq5'
-    '#NgA}3B?j_va;C?|D{zcCwdt~7JuTI2+OfX#M-B?Igv7Y^r*()1Qwm;Xw~Dn?9F4-4~Fu^_t8tNY{tRx&UKCROa7T1Bv?83F%o`Z'
-    'A7wfGCHSmSJQkwjRs?2cC)J38U&|&BsECL|AWc>9hwt*gFXlA{w8qEv+&tPyqNhIWc@~kc4r<eQ&$a?3Ye0qWt$&7N17zTMhk|Ox'
-    '^4kjHfmS#Om?Fna;U#9`Q(Wp79QOBC`96lacvo#4JRcGBG7{(QuQE(AF%rF?oOT5%J-s}*MdbQ5wj21GChHVr{NnpV+EWEa&V3>z'
-    'C7F+jZbT%h^37M-ht&>yJFecFpj@(>sseTGjo~O_A&wz`aV=I8?Q!JN8|4I4h+r(C$!1rB$@y0koTiNcDOA2PRn-%@`NHNGO2&)t'
-    'Mg{Ei!87_v+r$so>#gPsuHW<%ANTL@OH_{Aa(?+@LSXbq6hg6mb2&VX;A11~{z)vZtu#A~jY7}T-9WtHEO=kHrM4MSmGz@F$YEq*'
-    'o_WRFOgOe}WBuM0D4{QLvFvD*171w7ibWz(%cc~KS^A9+P0lGMV2klaz7nuU$v~v0D12gaa~CNFV~2r5>>gJ(*RFfz(p=6C#BgzJ'
-    '9$iu7RP#Ly>$c&mK2zh-J<EQ=NF3w%jGz+*A=h2sFCS6@d$K=LX-ejsgGCf`<tgH7iG9M!`X6vPZf*$53)zRaVjVyS7raTE0le#1'
-    'UOxLv&r%%ED(^$N{YY0imu6$RIX_`(^{dy_KYOviTP7!JDjXQ=KiBBlasE^D2~I!;EYEskqi)7~DrYlE^^V57FVrUjp5p(ot#)`?'
-    'e<CGz{Mv7JjYz<dRM)3=jlOL?X1;iueA6*~a72L@&|dt^YxXS-36+>#D{iYv4cPgB93<h2UN_-zaJH+|-owH*yYo3ZXv~!%uX_oA'
-    'f^^tB-W~jIj6RLWs8mJi5%Xe-DFbM5*t+re@Wy@KxK;;!9%3l+p@DOBy?Oavh`Ux5igL|r{lzfcG*q_pnj~TPpDEPG%2#}f=Tfa)'
-    'I*PeY6yvNwUyP7@+#y7JPty2vqtXuMS4R_+QzD~U%xivO2e8O;lt$fCl4Z$WdC*@UN^0vnTzI=Ox>Uoz+gZG9l_qbNW7fJhU*lN='
-    'F#QJqtdt{w<^P@f>2Rr82FO}=H*eiTt7`=V!yqQexJGXHbuOfi%)HZyaJ?heCh{Rke2Bp!5HU(P(K%>&$dw@NMc_n)wvzQ@0M5zt'
-    '9&+zZMkvdqpE$`O-dLkX%cOvQn+Le<zExi`<8@`Ui$9ZPX~A09y9qBvRF=!XM(0fN9BmliQ+?LfXQ#^FN|pVCO7bep{N^o1iWeuO'
-    '-w=ZIHR9*da+3~*oSm?rJcTE-)8A5jm=D^7;4rSWmYrb|UZ<gZV5MieSQ9+GTC+N<(vqKo$ARB0bjeL57~Z%4r&oH#Ldel1a_Rjm'
-    '&T4GF-UXXFm$C$r8Z0qoGo4*SHRbN_IjYa<EiGQ3i=cD7Q|Bl6{pLs&d#f_MQz^#W)(cJHWVC9g8sfXEw{W2Vse@*ARm11d#^CI6'
-    '>-&{9rkBpL-h2~!I$NzzN6lLOmwK!>QHzzNl=9o@_}rhsbs@tRc_g$%Ar&YLy@s8*$H@Ytamz_#K(ES2Tow3nklFEb5P1<La|b%A'
-    '3~zG-i0|B+xzAR~3&YXN7Fj!$s2)c+hWu=`rVy;<_67w*mK#~iNM`CA(x7@iU!w*vQHw_i_L>;$+AYxf;-*Tsr#A`;OP2(zMWhP^'
-    'Iy?UE8dY*NvE$`y25pR!F|B|3!DT5e76thELu3r-BideiczfZJ>;o*e-Wj=iXSz#8#*A7?y~1g=N<|4JC{5-TE*1y(iThlQHw62h'
-    'AR}RIZ&#AmCD_5M&}>C0mJ|*9Ws{et5{`~&rMjP|gg$47;QR}%Y;W<A<LpmRwfc+0%8AFzs_YC7rb0a}JMIXAsAB}S*(HME#D}qD'
-    '5d5W6Kd6j~PgEUaF=`$4<ufFp>Bn<57H~D-IkQwyf5shZaJyj{bk&^r6VP6gtKRgYr0m|{YtTz&eT(R~r}Qv{C<a5OROlri26&J|'
-    'Zm1phiHyR@eAYjd<A<QF=6#*e_#n)Hq7+lnKtRDMui>H+J;M)wt(UmrK(GgZIM8&&jSmI49poK$_>*MZp`TEk6MC$^QJuQI1OjLr'
-    'tmMXNN-T-W5o1BkTRPM*OAUx2I>|Q+MN#O45;CDYF+;nr@#tEPyH;F(4%7(U`tgkrmpwama>^O**gGm0!~e=BIcpMZ5}bnU?F4`8'
-    'n?$!dX)=GMo=C^EJ&;Lyhd!hRl}cJj00h%y{-HWM&A|>vyHu*|*eE0dt685d&g>7BpxUj(=kT#|1y!l9gi=}tRrGZyG?)xzQK<T!'
-    'O>gMMhB$Q2Z%4S3s6}nP4)be7JONAKjf3m%Bnpg&9b7@tAk)r;@-D=ISTdrJ!MOoK*B0EEA7<=p$Wxz(d6)CT<l?rG+)4c6&S9Tf'
-    'ZW~n+bmrYKhr^m8nyar!?z0OKBT-;%V>ANh0Z6?GY1vPzH@Od|By#o3=cDiL<df>dSi&Titmrd|36BR7L2rWPT`F$@$1=+TJBe?s'
-    '$0*5O>DXu9fQsWQULca~4g8r!&_xswRT(8%{Rs8!$2mo)t<tf+8uAbj83sPaRlD|&t|DNq#{)PRr>9Q5OI5?a%3)9?DMbJ`=sgh3'
-    '+tqP(0-YaHSxecDpXIsLNLtPB=bBAV0r^DhU}mH;Mj&hK<yBSYbxuWxbM89?7W&Yol7{nDa-VlWf##FNu(TZNZzcFh!bA4k)5>JT'
-    'axAHazD-0J3;WDWQ&ibO;#7XWW-%{rVGf*y652d53tK=sgKfSMdZ&%48rDQ#H8M3wBm4{O`Ki{oY+;qh7gH_cq@St0bz5k4KicRT'
-    'd}f(q0SA7bmQ@rLIp)%_`&L1I5KYGgzcztLC0$+__0v#tCm>J%E6FFO|G=V7g?@t*{HnAN?&>s=shIbLqg_lqUk47ZNa#ChH7r&k'
-    's{*5m)v$+HT?e(8UBla@UvNugS65PT>!4eNHlGJOrThurCMRJCZ(^fWa|fx7R6Fv8!iXhJ3oNX$dKe2*mdw+tq-OyN5DZj-Bfop~'
-    ')<D%buGHVsuK(VkNxAvj=Sr(DF8JS?wEhlh!;zw%P-riDkhXvD536mWzP!=X^r3uUwvR5++@8YjBMtOHiF*7uc1j%_-T7xGC*S)s'
-    'Zl@p({N}2vTS{%sx}__qV3gq5CnqER14rS;<JOD$NXb+tDMU?49vv$SY5|)NA)-TFI1lR$iI+e@%L3KQ6R8^}w6B(7s0E01yAh4w'
-    '^C2<)rh-dCj|K8G)h1?dZF|T7WXLpT9Qj2Q7Z?Y}qM%0^WN5Octy2XDeAzpWoG_bZ7uY_rrcVIi3XZED+n)OO)mq=QOSAKxoLpTk'
-    'aTDS`Wu5L!(BUUv)4wH7K1#-Z1q4v>2rP^7&pjqX`XjKQuvNIxdz}}L8QdN8rvG}e9Xei>8k*kr6E$Lst3K0)qHaMyh*uk29b9RE'
-    '0MO-H07S^tC$cskj|}8H+}=gEMHn<N>VZDt)l<pG!Wb=^PsmqIpw@>Z*2#*x8A`(XJymeKqCqjjTkfdU=OiYGcvvwYqxNIHG`h<T'
-    'IC>}0T;7L!oM%=`bC-6~xz-vN+4lk?SfLl?cT!ZuN_-qOlkFuQqKjU~_623qx1w{ywy}(+^Yp0UAc60}53ygxySN&jGbb3c&A|$1'
-    '4aGjFp?UKP0cqQu;$<^fJ^7+SYSTp0;C2sLGG$n8bnWul-#8-yMWv}w!Xamw!Vn&A)jL*}eeMB8wI#gIe#`BXiD@ZLZ;kn?w|=s+'
-    'YVA=`gnW3U*H1-+0NVoGn=~G$#I)SmLt&{0>)wPw%dY~z&kQk98}o&M%TeD^fNG6x5?i0q+15rQreNw#>`i1+LoL6Y+J9+cs1<et'
-    'y~<LzHs0KarLg-Lj@>kK{06S`*F#-ZZ*q56NE9^i-p+%_=2q6FdEgs9YcNXOd-WItHE0}|4mLRzgX0QyJ1@$F)R=nF?gAKr=4=*|'
-    'FR+BrbO^gP!hK<&&wyd#Cem|5Bw}4*Se!Evmv%Oq43qSQlD;l{^$Rn7Ls3+ujG3=KFhB2pK|nndlU6O5)a;z*nf#+?Jc|))ivsnE'
-    'Q==xe89L`ovs~&+N;7N=dxV?mUboc`Udt*=z-3X>2#gPv^(p6V0F>agElp3d3y2eKrnzWcDH*DSQ-umS@*wolwZ<tLKs$JK!O)CH'
-    'EQlhZ-_(U5h!Arr_L#{I7II`$CFki&y*aQkn8Ua!SjDSEn!P$}{_-Q4t*f_=+1s1I3>B|amIzxCowrQhq8;Bvq`V1-kLA3cr|1<Z'
-    '9JmV%dX!3$G)ewVwxXDAjoXPYG8zd=@ROE$=?+BXGTA&DO0|pXjH!_jz(QKUa)zsbO0{R|ZpTr>@>G23l{O9Mo3>P9hA=nIGpb7@'
-    '!maG&osw-*3^!(l=iq4|Mj=sIf?s)_F|R2GUIgLLFrmVPdShb*i}Udbr4|RjI#3se%%93)wcz>-#d;6zZ+-pc*m0wvnd=mNaFsC}'
-    'k*XXqSYcEm>V$Ey+O{_bwO5kP@ZrN^A{M7EdW0!W|8C`AiK&URQKBtMX8zZv)<Ca}>J*0$c`Ym~14ZXml9TJUa^+OU&<Q+B-t5qa'
-    '%ns&;bLEOxgxz9$_ODNRkkE{*CjQg+)1d+}UIi!(Yp3>*H!lJKaBu3f1SV`xS%G%y14e^Nxlg96(qRhjY*;I>%n0hhc41Ebs?`IU'
-    'U>g`o8MeG@Fl?;wS*m_$`Bua|V=$5%%bl=qh(nl03Fet3lQu}pC@J+;=9>DT1^4moum&N2%kQ9amDD+fW{!scKzhi+X9j$f89`ec'
-    'kyFX?AS`-YoDC)+3tZ}?GoAm7F%R$x%I}<_YZNnjXpa%O5Z8l-xS6oi?+3cQRV9sE<D>uMlAp$0)aE;(4(2k#DQjd6Cn_6mQrs<i'
-    'szxsA6JmC}(XYNct7_`~CeFsdYY_DQlb`HL3Qj#0h3H5)dH-*;r@AP3JsLE;6i2d|n(m@&)PEzGqdz+#8Pj@${I_huBP9DPAC~x>'
-    'XFsQ`LMufBmNW1JmUY(kWQS6qf&En%++fJE5@3)+w=&Ik6<n0$WHdzvmrDsrNE+I1et&e0s3lM4G^NAIzmJ~?@wh^n#M10aw~feE'
-    'BsF$^kKEY!viRe1V?)YZMpQ4q9b<I?#rk?}>fbidlo^IdWab-N|1;ZjdYNFs@(Bk2mZgMJm=DJTG<-CLDo5x#{9%0j&c$0*;`0c2'
-    'eXt{nnt}c{U_}5T4u&1BlpnsXW9J+zlu^^jVVn5iDL-%ykFDWiLo=1jGk4*iqk!jT6NX*C)vCfX<!$y^r+l5@CNa~Yhng~PDCg{g'
-    'zk`iB5Hn<a{3D%<&N)j-M77YH{=JQ@pIjN$vl)&J<qN?FuxD22Yj8}*Y5(aMkY(k%`ig6E^%(!Cj(}OzK$s5O9!d!&jX4qe0B%31'
-    '=+VR67l9vynmG_6sd9(+8T*sN?C%{*WdfIPmreV@lf$Qa?|Ag(WvYs~%y=>=e7oQH0)4geb&uX<uf%NG7tJM^Tf{-+jWDwElLzO5'
-    'rh@9DD6NWFW$Rvw!vgem??G6U!RWPnKr2`*skS=?W1ElHujO=Zm9duYsO<xT-<J<@it(Bk%**ChyOsh>l~^TQECz3k%gd00z_O<Y'
-    'b$nasu64JG49`=TYDAVnVlQLViDtm(P+=`A3h?o~m=@%`|CKQpK5FnRD#?(1Ua{gidco}9?}z5N=@pO=kbQWK^5<$0L_E5rJ&YjA'
-    '!vE(0rCL*Ktwqx`s2<BuiXmkX4*(3prPR`w8&HaOCP-{p`NL9w_uaD*nNzQ<7!7bEi@-D<E<dzz7a#96j1FA+ULPYNM80t-R(ba-'
-    '#e5Pq)krvg*s|33uw1dUO4SV%6FRZ!f*ryT*DMFq8AvJzEyrEzQeE975=W708s<eWoJbz5HqcZtB+OvT{&(HmCy4>)3T>*p8^DzB'
-    'buIk;4Vzl1B<mg_9Vut5@9`rQdoDfx{<DpW{oILNvwFwpZeKwA-t)D%25LYk)je>U8j>$HmP>~w;`)3%xfgwScC_M>a+WtFf(PO#'
-    'VJB!~T4-Jf6l~OncLq+X@z(7yy_wVi1N&%n-GRRJOfLCeVI4_Af1+X^?Va0Hndxq)b+4U+u9US3KVo(8AhB$(c6me`?_$w1gI&NL'
-    'yP1qn<w~YY4NWC35Yi1;RnpTOalv}+hVQ-iHvkye_w&u<$f!I_yv1dMyamW_;nl~Dn!!mj{gFnp8#z_p#n!ud^9lu3h|*F_M>}^V'
-    'F@XgUX5%UH#+rM$fufz{`(xkCE@ySBl73CrtuUXwsWL5C1{1WEX101I5OA6qH0IE3JK`eppH&+LHK;aEhx7smk0X7t@vlb=`;V(T'
-    '(J}Z~ngTP^r|LrSF#tU=tgRY_nB4oo<|x9@oxs==5DPKNz|S_2H*L92m-K&qnG=RFnJEg}QF+1a@?7pc{vE=9xwxne{?0fc_0sW7'
-    ';my^6-rnW-oO5Y(QY-kdH3mDipDK~|bso5bJLniskNLYjP2W9|$)Q*JrB-Dr_x~TzTMRKc4@e7*kjgzhuQr<VQXUG@hR!{Mn(jf7'
-    '<n<9U0?-6Nrm)oqQDw(@(%fdfenF?9+$Y9_pp&*QR@H{4V#(l<nQ7XxN2=(u_i+7iGEUG#r$4=7!l#6n5%a2zqtHU`!U7W$c<^m$'
-    'U~U^<M!#dOY3H%r4U8hm(grT)H)B{54TBvjlnEi4RSpMHqOLgkmCbVW6?424P~S99K4+Sj#Joy%V2%QmH(|mK{;<wx^lBdMo}6Ql'
-    '9wzN6l4nfDKnpBws7FUN{2^ibw<rsJB80y=B0USi%A?=I9~F<K`|mbTb0H|NaLF-+3ncUyF$YiNC_u$#V*MUu(UE}54z{MLPPR~>'
-    'Cm5{(8rdhZN6hIb(Mr{c!u%-)4n=wrYaaIl3l6=#0o^5l%t7ds)S~9ENNoM`iX+@iw$i&Sd4K9Jm0-zq90Gf|!ywZL>BzK~<*s(>'
-    'fl*2PGmbB*$C&+ncoWF4ZUlrJbgj>clOeym$S)(*ne}-j<s4n3Y1N7nRss)FS5bK5O^8x$teTwMnO$7iJ@TLDz-}6nX5k(pH!VCE'
-    'tItdWI*_}(NV^$}@GVAI_}nU+HAH{@mb7-$=!PSM8m$;L^V?pm!f!X(DV(L1U?r?uT5GWQp7rzKoWhMx(!i}wtD;=c^?hT2{VZ_a'
-    'lOp(jnE7X&Ovk_whV?U%$v_Y3CmMAqWP^^&wK3jgRwVZ2u2-aU+bqc67cn-?SGHQ%-(y!me2{Zj1%*8Owd$d8(xl={e5hxMRc1i='
-    'BUaOUZgMd7#DW0F!KY1!L18t09yew}M$*xs4wRsihwZAqsp@15;R?MJLReZ_#|8FDS)^*)oGJSw81LpK%P;g28#6r{(iCT7)lghp'
-    'acF=2ymTq5u});r&*uyt*7;^tyM!Jg@^u`?_qssob7of;Vi1j}*Q7=`qJCpOmWFZV&elrUYN~KD$(}BUyWjqd&I~nZ1@D)>UmN6a'
-    'rR%g!2Wiu&K8*#-@TFtL+k}v$f})K!mi+-#1oS7`VKPsQuhxS%12rC!l-$sSWkWq#K@F@NLL&aAwM#y`t5LBU@FQ`tIs&5zAoZi<'
-    'Jycd^03bF)a5A!a`~?YE@Lz)7wsj+JOGuA#>|J+6L3H6N0O4@pMUG~Fl|tnH?^+<%V&Q00!0B$S9>ded9c-iE-wXIzI*#~OZy1C~'
-    'jBjHjC>be_MA)<D1s@TH!LkvT6oYZGIdZ#!!n5dwz|ftNv^N2*Mr~*mkJ(&X1OH@%cb!>A4^*>S6N|Mg%4(eXc#3*f<&>Qn{2=m<'
-    'xiG-fa~MZp556^Uyj+m>M1Iots+g3#U1Fh^x!WPZ0}E)kv_-KNMM=4ZBLQ1%K53JCJgF*XK9@9_)fmLndzkt7p^$kTr@sL+4XjD<'
-    'TgVg~So-e_jaJgZ^}_sd&YQ^z3iBAi%AtV9s4-VM2`UP_m^?nGHKQ}VF}_Eyu$_swiwQ4a&YnoL1cY^nr<!8jAHlQwxUiy}IQLHh'
-    'ZFree@Yc}GU~qsXcy$$v93Bw>G@!06zTuvQ5GtXZ$35n60Zq!ZJ=%m~+%N@uMQ%;RV!r(qFL+kt7vnadMA-u#Pwqx@^=5Sq{h6*I'
-    'K669J0kZpvQfG@mPE=YS-%@mlL&__X*y&lk2Fsw?b{A9w-kSf+2MMv0yOU-H+c%vDQ(O~$46j&rpMNx$(7199OdAcK4_q<k002vl'
-    '*rc|u?<JuCc2P6He3;vRap3o7efNKY75$P@0|VoU9ezWo3c1b)9{(we@P!Tdir{EA0Zyzx={+Id6IVcSKzgq$LyP!o(G>3Kdb1Ji'
-    'O07ex-at)iq#_4oVL$6+5FNvTQ?{TDW{}yFfSD}D`1H|o_j6?(F0n6cE6krXh3uRqs~gw**k+WTZ=UHI@m+edH)0XF{|2WK>U(W3'
-    'HYdMo?i;o=z1A$M<K`FJ<l^4k+7qcVJdlw%55dT1{AtNh`D(E+3$b~HGaOTBWGMJ%jpx9MJ!d(I6T(KL{;rW|xJF#o^T`Ey+$sv?'
-    'Fclhstd$;rl=!T~Gp!DHOQXGSZieK^qynH83X5~6Ym)EaSk1WZH%c2^=oFbLJi-tJY#8J&be^K+C&I(7?)$)m$L|ff=^ix?@L+F$'
-    'QWrcpyr77$(oRs_C{%Jr%cb+)KGrOJQq9>AI|e}<BIcJ6%+kU+N!qozcU6=TbZEu}j~G5WjIQNMGYGgS7l%QIxX72Tx2+BHulX;g'
-    'UG2=kA>1_Qf!}Iu_-gS@TBIR?sTLtTo=>8t%WY)|+@+4@p3H>DA)wH>8uWlme|vm#y050?#z%1vVH6xXRl*{|A+a^pvH2mSny==8'
-    ';{8@z;kn}o={`}7wPfyAWOP$u3z~fq5!VCd_JDE=3V9yzh6s}TG{ztdUK*Z$eBC*x97ufac2!s@SNQSHVnG27D91a&!c7Z_MUwA;'
-    'Pjs5DGLO4>-GTIB$LD#c9*J?T_ne7Uu&HD8Pq`syO^5v4m?N_wgMy&t;Y7k>7<OxR@DXf1E7m`fSO?#mWQ96W%oD6WA05>Fy5fG1'
-    '^a&cOQgUK)_js@~0bJ4leS>CM_q-df&nvmIy)qgy)jga8H6dq3!DuDu^;W%_u$LPhv0x%teww&jXv9!Xhx~<N-T*f_Jt)Bn23lJA'
-    'p}cR774eYekDA|OjfA1B{KBYX6u~Unlf6sg=yu*aNuFYhe<%B<+tJ3ht?BX6bg^=V@{4&#%IgOl)GKM<UP3j7_ONtQ1nJ&l`~P4m'
-    'x44lmO1}Hvkk=66tt4c4Jy?KQde`~WlwirI-&q^21#%sakVQpj(81=?m{;`_0s-j8T81HaZV4+#oH!dd!6-dlDt6TA&EZO2^Vcv5'
-    'ki5$BC^f=9C1vd0o$_VHmAJs|)oP5T*qF_a;|D7!R2lcn`1Sq&3fSA&VxU>dG<!|A2x8!2gS?Dya=>g~B^!06u&RFHDtSskRd=rH'
-    '6exw)cLv(!a&hmbbD67sQ;&R0?hX(l2%ZUvi$sLZaN2w9Os|<5i<!DXHLdAS7A+9W${P=0V3`2AHmzRhI&NH-j}-85Um-aGDs+%T'
-    'kxtsCv5B}Ba^*>o_eJb*AUffoF79^^`qDynhiJTv<9JdOg}BP2w^|mL&hPG_{>UhDaq1EQEV2OP8~uQ$v_h(whCZz_h!H+ws>;PG'
-    '!@de=q-w_$t2Z<>%BuoL=u2`kZ5|B-h{_JNbu5V@f5jDe0Q%aAQ1o}X2qe6Ttz#lB)TYF*bX2d;$v$PE%k%;V+FL(8QROi5<XNbo'
-    'ZSC}jGT%L_7Q3PYup$+~T9&T<99GO48It@YZN*1Hpc>SWKurNU#y&uEXrzzay~3gjbTiZMZc1=U<os0T@#cZk&LCWwgQ^3dFb3))'
-    '^m1#ZYGZJxAtQV!PePcLmmpC7+(SNbG-2l5nc$x>-Nn#O`2;~mL~j2lYq(KlctABS%X*#??AAKZeKHfL5FNhz^v2o|wW`YDpAz55'
-    'w$t1Z@VC2RoXxR|IVxSLBjMA=`b2pXXB&cEynbkaZ`a+tR4^ivQlCD)2V3Vy55=dk#ZsA>T}={QG^jJ%#SRMK<fR0R2mZ)eXK~8T'
-    'C^2vph)%Xz7ux{0CM?0>ZZ6-KET__Mj|h=liLe&OWg6T;I#tz3$TsR<B9liT<Y*{i&_uKwWNd$5VF@7%=gv0A?f?#CM~zFVa~2Uy'
-    '<t~#YcOY7ek0+bf#bR3ZZQjvC)M)*I!>7=^iyxzZc+}}x6L^2GFq&H>%xnmRZ~qK)PEj{L**6zBcsbGanWpiACA-`K7aU`qY|QuV'
-    '&pT!45Jd*TC_A~sBLy^`&gnIg_+QDs?H&~OFeU~VV4Xyodb?elq*zHosqs3ZA-Gs77H{^3gf(;Bx&U~C4%z_N0s?J-H8FZ=GI@G6'
-    's4N6>xh9x2?nCsNNYM(PHG%t*ajhagjk{<+1*2#U^!jQ~Ue@;>FgAk>-bW)aQE`4a9fO9$V0I^^_)-4X$|8IBEYk@icvZriJ0P_d'
-    'B<*c;n0DlG=o*6Qo-#Fog~PSN^(fM!j0}781+)iD;hMUAtA;gE1N1WZY8V9i4CN%{$9=dfFq&qL2jjv2b>HH94MFIjXuk^IOWCfE'
-    '=ww@Qmblmej^=2l2P@=q0cAgj`Y4s={st9)YGhY@7i_o$>YiVZ$=%gs?@REn)9t+}aO#XzEP<<>OJtmEG!5+{AvIg?=2E8C+SE7a'
-    '-#>gg9ZZrLhC`H_J>U8OoU>1CSlIfSH3!(7IifpL>=d?&b}!gb#?Ry0D7j+J`D8n)F4v9r%RQ5RE)%jgCOnb!13*#xm~R0JCmV>#'
-    'YUa#NJAy*bnkQMKx!aV6z@^KnTZ0q@k>A5E^)m7nu>A#R%)0p^^8go=65?Hwr?ctV@UAIiX@N%PdHbk#Tj`3AL9@<lMN7PV<WtR3'
-    'J!=mg_(H;x;u1*+-bNNCz5Uf*^D4i~@rNd({@e@`Y0zE6EiS9W$&v|aX_#DRSrC5xS??`1S^PZClBH73NET%2_;PR)3=6=?qIyc<'
-    '%LMLK*1gqPdA})>@}6QTZh1H%K|#pV<UZ>xikUj@v|yt&lS)ckyc4-p%`7{wu*6qjNSlgVV=)0QZPwn@W-@#P=p(=@eTEV+6ySxL'
-    ';Z55vt8ot#@LW}qKd1zLj)kv-iyk=-*HkM!n@Gh4ene77=vgVKjY#<_g<e{b9*1HL&otM+;Nv&MRMhTsWHDy7J&+HeXAkC&mEF{4'
-    'LKU;T3P6J#jX1-q^cO$8DTa{6d%RHmPjg%ynk*TUn^CYc_gls#DdiesZ+22F8O2dk?L>+7>OF<4XqqJW@l^*&Bs@^~#|7!ZYWjjF'
-    'E1S6dtyq%EG{V0_IYT9m!dwaRe2O+>+(-_w<|{w5pV+NB<916^jZU{UqVJs`)q)F)q}po!4h^?))2mXs-{ATrS$ayy$>5_>5t|5x'
-    '6e~%jY_9p93GLG8ahQ}fjj1!Y`4W5%aPiPobz115w{Ph9WbZO5WDlB|A}_HVdIkaSJeNvMMt5}~ZJoE(J%*y#H<H{iU|i`$C<yYL'
-    ';0Y4Ab=k8aKKP(Nst#C7Sf^JGuK<mr<Abubp7DNV6O0=}BJ4qD`^E<Jqp=Jdn*&pEztGp2`wqledj5_l-cBOl3NJ;&46~A;K<4KN'
-    '>t_#XE1G)6MA7;UH|aViEHSddDDtD+&ZH`>MTF}`3Y1Nn-AK3IzSL|wKIwUAm)AN4gqfpBA2=X7RtIg37znQUvJSH6*Rj3-#?1qR'
-    '7MwFMtbQh~h3L*=cIUNlUnfajY^sjvA+l6!W0dC*oktN(p%OqMY~i5*FGvtHxo<K{2CdZAM=UVS&Qx0diGH;7$VaLVZeqtlKzv&G'
-    'F+!KcCBo^9_qk8tX$wUx>OGM6oPUmLlI0;e)e4Nz={b`lzjb-_GnT>b&-CYn%(^89>E;r4bNo6x+c=G$o-JU-eYD6bo{mU~P53V~'
-    'Zd4EDKWwCx=uV`dvOGYx27p2GHZQx(H!4I<uc7=RPr5uflcIY!8EN2%8dKn}Jtt?ivfI~g)Mo;EHr?-8A-2N5lyP?!`TS^dFx$<T'
-    '!J;UMh616JXAJAFWHef!fUR|O*wdqu5ueoPPbo4|=ywD7G$k@0!2u}4K<!#$;vM$OCl*F-Qt<G#Xcs<mBW1pi!$rf&;PoI$sR(xH'
-    'POB3N*6w_9#%MlTyK{(GlW(4F*aN3kPRUAWSuk$sNo%rhD=={0bfv($HXdGro`ZXlHuBHYhv&>~$lN>$ZxlIM2Z=CXV8W+Q-7RfX'
-    '$t2y0d?!)LmIT+C#uLa9-g$C}s+rkMUK9!SXSQZ8LQ5&bRQ=RWMzo-qX@)gxFUksii8v$>C`6X77N@V<f@Hn>d#Eif%}~0pnQ}AS'
-    '<8arMNR_4i8LE$!8NVsPRykF8;BvWmM@zSyX{;E&NtGCoq7wI?f2hb2>2|(K5o80*SdZoZ<jwG+VQZ<}G)tdl9k5^E?&o*EZe-Cp'
-    '(H>w#p_Xb0eP4MWxI;&rH8BC>Aq%10KKHFMBu{#*xS`o&=Ixu*c69K2manElI5+yLaXgA0@tLNS)2dhAq4jQ<#^}NX_u2n1q}%H)'
-    'ux*JyMRwdW5R!bv1?G}GXl2~pzK)juV`thdUUwcuf?RxAMm}_FZNg$xQ4J>}1rUd4d1hkY<O55o9sI8hA2Zl!towip+-y;7Wqnv8'
-    'T&?FiqbEtk1Ujq0<^a<?FvY}=(upO}@)4i&qqOWd*xfnqpH-wK@jWGnctieD3W4@QA8dhYh3^}@_(dQ6(It_V5lJ>`>vWK)6P6g~'
-    '>odgR^w?^JG}Wi>N2A)z*kU*rO)OdT2LufStDL-{=lwg@nY@8y3Y*j0oi8@PV5eg0W>eOIMz@lf=otSdYbbcDcez2p_qzVbmgui_'
-    '%4b#E`lm{b(sJ_I)u=8uW`SraQak<U_GQxb+Udmg>S!J<!$Q<Df1W+HvIlOr`H3KZTru4s5nu_v7gqH{-Jz*C{EqN~gV=I=EQ1RN'
-    '8rqOq$Jd*rS~H>$o(hSFcWuB4yYb#%ps^>s6Zl#BT{=r1{k*z`t`wb~+0l@Uvb=IG@(J~)IHzT$CAUN5DiM|pv{H&Fe$XME9TYPk'
-    'E0QnYhyg$K=;4S*!%jL(NHQ9I4^j?9QiIla(WGUOL2s<y_D>E6`XX95vLF1tz$B7cHTd_duK-3;ig1dmr?l%03`mHic(b9AC8jIf'
-    'dusWl46$5IeWa%n*A>bc5lQDT`~3pzZAgQE=O1se7uP*X?iQr39`^b}QcgXUiXJvTD_5!XJR|Fm|C;)D6SYrADwp(?!J)z=5Zd^H'
-    'zzsL5R<i5P&=76#S?f&w*-U02Wco%x>bWb$Qg6PA`+n!?%t+jKPrDn_PLz8ZyR*r4hl9fJO4XpqXOiw1;iEPN?N}wYx?Ve7fmUnk'
-    'HuxA;=&a$+6tU}L)|zd`4Y{3M)E2pQ2v?5Lj`bMoRBN}B|D<lHeSzAdj94G9&VG>%$QD&o-_(EUeClxX@w(+)mawC&s_z<5$GVR{'
-    '9LGNFFh+DF>UgW-Fn<h!{31*KkkF?pS2AbqLd(XA!V8cuz()gO{!b`7C!}>url=`x;u5Ty9hiB*^@y5t`JS?mSq@TDa~O;qyh^C`'
-    'kcxj-iJHzro{bBN+jm0nTAl#u({NBOar(6M8oOh1gKJxJGzxA8h-yIv8S^2~nchX;2g_&K>c&BusTI7OfhRg+A;X?*iQ8U`>uM%i'
-    '+jO4h>thN#N02g$)n!c=j*|(~`Jm^?&C;eK$7RVyakBK+Abx15P($*9O(Tu+hB8P7ak`7K!2uz<k`d#{r0v?;TYr6x;X_@)b8LrF'
-    ')2aFBPpDtrQS`<@l;EjlsbqoACiqR=C@8whmrqqs!KKx_*Nj{VD7QvT?37(Z-0DUv!5P>m91FMb@<$cb&Gd-M6z3RYr}G2Umg`I<'
-    'GmnGT%ZSiKRd=lmzv){P>s=3poVlu_AxU%f7kn($J-PoC6Vw=9;QQRm@&*`MbUk(`$~bN3oWzWvLkTrroJ(|9K~YLq`71`~@JqA6'
-    '1NqR)HMurdt(Dps`xQ+-Ob1xfBA#PWWR#dSW(rs`Eb*pIv0@eph^OlR=AXd4jBgrF%x1aP%PB5hOgSAGQwv!ICQ(vkKS7FQHz6K&'
-    '#k6)wkx?3Z-A~IRmnn5GViS-ilX~~prxfXq!<8ijGy&jF{+~NiqS0AuldE5S7|w{WPJdk%W;T*7=l-{i2{?dIv9_XFb%u_P#~~z}'
-    '2qn>=Mkd52M$a$FP3)2*q^2kY*L?RvxeY&r&&Xw7^7}f$Vv=?KoIo53V)VpHWC93j>UuyyUQVzd8Qq7B#uXexLO@*1{f9o7&6xWG'
-    'SZ&2^ECp)GjQI*-FRS%7M+>f8m<u5p5e;p5D>-7$gpL8K@eURj_5|FW2mk5+mOUir2(1hFWbW+$!c)5`*__LN^pv;lk>|;m{-RO4'
-    'g(d+2ZO?M6Nyq-Jp-dQQ24CbKEb?}udPf?pR(<mp&qGtwglZceB-QOX+Of_iS{EXL#TP>P1xn47F6}Njzr!ndz?9xuEgi4{$FmDR'
-    'G{V%59izC1kF>U6&}HPdjIBE{sH6n|R--HGzA&KUhU~A^hXpg?1t`78%q&qo{D3K^sk?cG+qMNL8hqS>?5-P(>FRTtG~zk}G3OLP'
-    '{YbcTb|grc0S1e`w}m~tP4*1*KvvD)s%GlFpk_Kl%MWz=sAG(ZOJ_MPLOLgN7+Ax=J2Rq+2f$=b{z+<kkV)53@ZA&NndGW2qKmdJ'
-    'S$Cm;VY~NHbY4FQz<8%2DM4g9ZzwG@=SJ)2s_#V?vv&-=PHSm(8Hu*KsQqcFEw5qSM-8lM0%(v6vRbac>*m|SMV7^8XJ>YN2bU%('
-    'Z^WQUAUsGE6TfIW&Eo~oLP%S8Z*m`ts?)|PF6?jD^ohyCe-XdpsmSWB<bqW6Hj+I$g30Db&<H5P)ZJ|c%*3&NL1v7%MvxpTS~h#F'
-    'lKVIaDI{iAM;+}L?Aj1$hBv{K(xZwUY}=Y@>58PayM|-}4&8fsJT;siTBv;RH!otwz5{Vs%CA62e;a=fE~1dt3m_V#$J$*&m@%L3'
-    '_}C=81bCehH8hu3QDj$S=>)jQC{er?f=SxU=}ML(x=yPz*4_~^j1Oic@PXhGuJr?UW)2fe+~?+z0K^-VzYZbE%^?daC-d{_$?8N_'
-    'vqGknH61UXEYjeR-|i%f^IL2Tm%B=e0fS?#y0{r$FxApN>KN*uiBZnLE%XIRin)@eDaR=(8HPI31y;y^W;7J$F&)>OOrz_0wx<gF'
-    '8XUzJgmH@6x@=&T;>tsV#>3TRg!J*E;O+%1JNpv+HdMh`6mY%oo;U4FKQ0yRJGZaY63{H!34Yr(-@9niS)IdZAUTR_NG7W?h)I3&'
-    'J5bdU*b_(gO%WJ1KPqYnmz9;gj_Agjjgm@?Sh$oo{v1~XW+54SDY?V63j2`2M4&a!C+s8cJ`d#MrE*L7c5(YXXVzbe1b^k6>jyNC'
-    'HqktEK->Vc0_VZ|f$MR7)Kue`Z8)prgur<Y%xcIAEh)9OX9H<fE;KBe*`#qaZ`{h+(u2PuLCYs~=}5o-#A+)t#_~KXnue(5h3ElW'
-    'k$vE1E27hJ;HTzmZq46=PeB2C9X63IRuOs{16|Z<_2CA)dDTye^k%qq%>9<Z_^<Fr-Qc+!lWv74gY*Qw4U|wZ)ZYT0$LBJyc#GW<'
-    '`HccbaENJINeYG%+_m91-1+D;BjOUkXcq{0AVi8q`6u6#Yo0Y=se$+uuZW{;<K+lDi`X<4w4l!Qz$WfWZRzI61oEnjxkhW2k2}#{'
-    '+N`m?4SruiB-Ab{1wwk^;Byk^rCjxX8%PJN_<hW}i;i*x4As;#g;%%Jh9D@_Y-xr3DAF)7XK6VVRLxz=U#HkRQB6X1-$mm_|BsnU'
-    'PX7bE{+eBk`p#;2*3E-MH0vIiTHQ~nVj)aUlb6b5x_2g4;ZFR%0Mzp#6iJGsWO{Uu>6*jOL+W+~mP`ThS?k6#>|8QH!mix4u*H66'
-    'B4f#_Ja6qdl}>i-PPB$ip$&cvq{(S~P1zEJZ+Mp$PDkp5O>*+>!Ox$-y<hFCpb%wr`2%82`x?KALSpk_6Uh}TG!t6IaoZb_Sx}7#'
-    '+zuoOUhB_*OiqW0eQMg~`HcUUWTR5ekpXR1`cn}(W5E+Ltpp=4WJlafIxjM$Xiz9ywz!f=cYyX^6)Q74<udAXHARiF;@@m!k;i0$'
-    'gj#iL)DnjX%Nzb+?q0J|`w`Y}YL9^tb5=)fHEa%7J(qiIVOi=Mv{o(Ivg{qOZ%W1a=Uy`4ZJXi>KkNZpL3HblCz?02Zb;5p?34L7'
-    'pXINHOwA5JTEJ=F;97PUt2eX;!S8>8bple;)$OQ;^>+yo61nC??!3y&j7R$?<sC#LGm&?aRqNS(pKP3xr{$S{v-0a{N7O#lBn^%e'
-    's>d!F&ciK!ny+5=Tin;~eVf-7P|-S&l2+3^mTzrxzk^jHa_(@=G@BfnJdUZF_%enchK#?qLdaWVxa6#CG88=<Siqq+a-f%tGK*|t'
-    '-<AYx2q+GbvmMSD9vp?*tEid|`@@%oxEswySVdLQ^I|d~jXP8T6k%E%glO+dq1CXxVsus{XFMDJy`CkagaXvmJ}@h#XkpEIID;@!'
-    'ccFZ1{N>9ly($psgO<h8Ih?HmvzT~0E*#bGQaOXuA&k#eCk^&!kGfn;9=sD}Ac4CoFh}NU?7=Snq5~`PNwpNVftVSyR9A1_vY$br'
-    '+iDzw2tn`3`iCMFKb#@?C&deTi}S6hud+dLlP1%-bV*Na5;#8BT}kO&`=`AzFvLBj46VHGB&@GA>TZ<-Cc{y4_hYPE)KW#s9~VoF'
-    '4TA~6Rp@niVCP{GU5%)}!(2(lP_tBt@}buLwKetaVy1Zzx9raT5bg-rSpbE4z`lb`R?nT*bvvJS9J$P<z@D`y(=d*`*x<||T~Ct&'
-    '`AmPpcPpPFA|V;ZcsK16NUEg%Cj2zQrsQVHteQ-<5y-*v>mSD)egN?L>XaiUY<nrJwJcW2q;kbQpxpjRPXxIB**u-U?C=7w?(@iA'
-    't{IOE|5}iMNh7xi!b39m7T$8P*Nf`26fc38P{9*}$CB*@1}vtbtuf{PrIK-&`;6Mo@(<tE)V*f@lI<)%ti%_yO!<o}Co;Ku3GcRa'
-    'A;VPcvd(B)_6s*xbR|d%0P@l=P#Aj*<0)|*_G1uDnGH*QSKPSX9EGYTpy7KO7(M6Vj(-<S-F7x=olvrq638e7n?FVvGA|u>QFAQ~'
-    'X)&eEg-Wz<&P_}<O{i5@hm=vDms`R;HEc%1IWNi)&zr!zZfA>L_6Sk0MUYGZ0x~9%lJC4(vCW9-0JH9-mfRK3M(dt8i|3q=ZbS?7'
-    'r_$KdD??39LW?*dTQ>gTn$ZSJ03cD=PolV$Ha<`!Ygq+e9r)TdThniC*Zvz!aN61v=Q5v&0OraO7^T-TGP}a1AStn$SY&fcfSC{&'
-    'pQ<!ngg@BF1hTgssftTToX+H3f?l;~q<e*!Xf=5@)arHdYI*MusKq>NkT8QlCgVc5sbivxEh&hExNI@EsYOCCRGf%a>8|x}0#liR'
-    'LTQ|#X!PD7i8^d9XE2%S;nsZ9ujqO!w5(`PFSs<h>E{i@yk$bu?pG1w&FvNNnt|}Zq{QF0V{5U6L>#E-zbiRV$w9^jK1k$;HIG8C'
-    '%BU%ofy@*@YA%K(4DPS`MAyEe43Qw;Z!wa1n+wAVuhM{EL~Ky;{>ZX2p{S4`TK7x!3rpkT7ne``z0?>jOB68VuCj6W`v`As(Je?|'
-    'Ja@F3Om*&RFN{RjKW98?yl<(|XSa~$+DH(=1rTO>+Rb#%o=wW8gUQ&GT(f#cdO0oF-`7%Fzd$P}|Hyq+NvF4y{JH2$F*(p<rzKKf'
-    'Z_Rsc)%&I6KqO*Kt}T8SV-At~n&jeObFVW*XzI7|2w-Skzwp1Yt!Ya<1r{FIEU0>21lGP+zx*N<S%^#}Jh>kezY0bnsKu|mO9M;1'
-    'W^Kmn4L-2@r0TDw<hFz`JwXlsbb00hhJZSq&u3oZx9w$3T|A%<J$9zAl$L^7$TtQ$uUn8FkiI#me?ZHv`1RPRERuK76(tNF7@AQZ'
-    '3R@t94_^H_CTi%dqc9GwFDr)IG)tzn=3Mrq(G%h!{1dbGxO-oQt5rcW=@hYp>^OmGsrZrxF?RFpuK;|lWm{;%xT7_Rc&b&&%!I2S'
-    'zJLoNxf&`}N|9B)jPk7kaI?qLd#XXUB``R&G)R#QNr(TVMlsg({B0M74Lb+$+<TZMN+y{kMy%>OslA}gLCz^3&4Uk64hJyo6^y}G'
-    '26edpM4Q3hR9d8So~zY-T%kD8L@hDm2_Bv^x0gI3LE;@!{nlLIMy=*FjBI{Tbq}qaT85YU<Hxz^8a1Qv2a~&d2y|c1<C}tHf)Gaf'
-    'Y7CzYk@B$XCQ9eyh-JT1L3w}@jlf<C&fg7ADZBy4Uu(G{dsLCubGufZlnN5_M~y=Rv#CH2Zf;Rg$nT&jZI#vCa#&GK$%yzga$ZR|'
-    'NQe{rM1Ec}JK>rw6u`UkG>ExX)IFvP`JN1ZT%IHhKt)wdEL3bG7VM<3Na{0pg(DOW@e4(`$*d^uvKKM`%ZAcjLr6o+BNw&Sd)x<w'
-    'A+hEjB|iurU;r20kY8XpWLcfywK=3oBxCSYhTpNVz7WLXiNVG0Vhq1p#dA$5+cZz4N+S_$u{6lzln;I9)wV;O^~2M#Twi*wiTj_9'
-    'n;7Lc6B$2&l8XS>X|CAUd9Z@GK8f}4-dGP8$L~#`f+pyu+OJEDiA5NkYB)}IQ~)Cca?GE*@R-4O#~}bd@sv9Q$$O!QQ(T#hOc5+D'
-    'l+?J?5hq@?u@e6bSfZ5@Tz|NV&Zd9gyk;5``};>H5y8sCiL3aXOkzId^RyH$@_Q{6m)7MOy0ec=HgY=vUf=X8tYONTM1AbZKRsMV'
-    'j<-zYue>1*ZeF2P<bFO58_Enn&58$Hdg9NgI~K4AiI*0xp)(w4Um$KfU$rV)Bb^)ixuFPOmiQeS{hx6M=HL9=@)=uBJt+@f4&9-*'
-    'C`_HyB%As^7mEfEDH%EhvlyBNrjNbnqyKYtyj82XwZ-EeISjghmPvO+uwbdJY2e#x?S&3|kqb+JQn$Jlq8_bmF7~#=DNig7KC$wa'
-    'c;MFKAQ!?DJmx@vzya~K+_rsl7K{8{Mw%ZIpg3W<3}$awJ4qZ6n+6^nm40Rqmkk~zj!|_ChBt%C*&TWnI=UFoCPPw5CE|eQ7s$U0'
-    'y6`fS6VJq1hprC~SzFi7|K21xWegWdURFWdW0;e0h;t0ZbWVa}UgF(gp}70%mrb&B$D8M$c(jND8zWf8ddexh?5d#3<BlWwS|M7N'
-    'l|-R`1Oe6Qqcd@V$r!Wn5ptqW<szy<xrtHWw?wT&Yzb&cz<j^U3Zba;HH(+uIQowSC{Fp=gv?gL*9x!FHVHc-C2nhuElHceb9HA`'
-    'u=%fcEfuoZJRE2oI!>A}ce$qNK@--%Q-Qtdh$5=49ASI;jRCO*A9yjHu<nB7ht7s8wQ)a;>!xGV>&$zt0;MbCY&OUxnljzLwmJ&x'
-    '5f&$)_Qq`EL>Y(LPT3(<$6NOe!B43#N=$zb#wf_X`f6mCuuD&ln^-PZ7_mTFVkRb6_E0-b%qWj~-uC-|h5bR-TD%lezJDjFES(&W'
-    '4R1aVe)s29UZ1%Tr%%##i9BA0Y=J!|d!{fsuad!T&QK!OEM0yZLAe-buNmS+l$w>u`i2oX0Ne>qTYlENw3rNUI|%xmV}harPhCPb'
-    '?-OE3N6ypK@+Lde=?ky2&Dj5mtpj$_8^$rbf?<|#cSM`Xqi-UPsDu44KdFL+ORM?1u#fWUFsQ`2Snci2<Ku?MYIR~LGfrA>HkZ!1'
-    '+cDna+8m&|<NZsbrUMRS<S#yfg>0Gb<K)}#oe=dszOpx4cWy16izQR1p||OKdQgr>P-)$c4|0*l<Ve46BjoDGPnu+;y@@qvj99lR'
-    'WPWa#{kXxt`NaBg5Cw(^@BLRW!~p}w>XCEyiy|P-v6OG+W;(9(gxpTy>Xx|J4N{<Ztow2O?r}Et(r5(BPPS-^Eh=v_03Kv@y4@-I'
-    'EpEpQJEsB(b?ODh5fP9#iHSz^7f_##2ucDPV`Xes@#r7i=(l>S{-erHkhM7&<4TH~tkMd&gR?xkoc^~rwurjjvlqTp85@0VTo0;C'
-    'S*OKHqsV!;u{Wn*LfYsdPI!iQEFCrN`&0ud=Zp{P{+`8Y)!Ih#i8)GZBXAqjV3pH^Q)9K86i9RSAsXuyZ{il5r3Y9n^^HWGhVO0F'
-    'yw$M%pWk<;MH_o4LOx5sJdMWa=m}|D)lwI|f(kaU6B(=kx(L}N65MYQNA---eNZVl1w~y<cW%TN!m!U2*vu2xE-S310ST7qgASUe'
-    'mrnT_O9N$I%T<`cN+ZlQRfhL>$+8=2sG$!9+xUdK_qh7c6_pThh`(Yz$V_NgAA^)VB$Xa5YIp;lG*W&zfz79=zzd*5lWdP<R*m9k'
-    'XjD*VXS-6RLs2m~F5Gm`SieNPlW7gZMxH`XZay|S`}i8G8dSSc;ee(?$Bga$lr5bVM<crFw^-5^(|RZ<6Exr8Upl>nZ?<PUz)exg'
-    'P%sH7_M^P5x0yez3=SCv2YyR?sL-r;%xB2kTMYab_jKP|dZ=D5l`P~J$|h33*>KwNCk*nZpw>zK#Z>?ptnhRU6GWfvASD#g9PyDv'
-    '+rcH9*CEg~=<u>6cAuUmF3p$Vpb}6?xQ!dlhG&`|t2?HPeDS*PffVVqy($1=XN-=xtjZ>f>bQ>t4^!?nJzcVO0lw~a3t~<bz^G91'
-    'TF%XT0qs3NywIxa;)iJnmMX9n9EHpGuXO4?+G;5Sn5ybC!|vu{<vj_20r(8BLmxGjH*Rwo#t#BlgJe!{T^Z>oL;Oayd{b|0XE|-W'
-    '1;lOWMv-hn7_{m9%rv}<>dg_x+QAo6!44+4jR7)X45YwqXpCqAx>=#M9sz(Jqe%S)ffBi8n+5y`_VX%R$Iv}aH*iZ!vS24#qgQVF'
-    '<X^6+F-Nj~qRW$cZ_+j{1C=7tm`^`fP56VNPZuTVDT~al+r%M7^GDeWU~O!s=Xl=V5MK8qSU|^MDfzMSK~cFYU>UA3vpaYP5r!6-'
-    'UKkdYri<<2KaWtP4!orl%ZXXcNbNppr>MPsX)Y_KBZB(;vA{8|Air&rZD||I4N7S#j}2vSklaAIU#fcpCdzg+RJ7({tcqba$l{-}'
-    '>o7qBYXC}2!hB~Sh_53Y_ST(WJ8GR*<~k?}U$^<dI@P+8>@2P2yhWKvC9L=ag*KWt=^dkteMAwFVpJy-?k0={D6+z+JDZr$BbepR'
-    'DXs6Df}o{0mxnFXupctdE<4<OFQ|_S@a~r@Gp{FbsXoVpm8EcbjlJbG3m$#fWG1;WBjofVRq+`glWV>#=l&45H{zqxGa2^h?|ziF'
-    'bY1@_cK-g6{)9MmFPJEC&N(c?H)*Y^G6U(8MvI{pA=(h}e#{??c!Lot?Y8~amk^KlEVD>1lOw|TMe6J=6|eWAWJQ4*5ye}Hc$<VU'
-    'A40kRh@v##-QhyikGH{1SE3CVtZgC3XHq|Eb*U;oB0(>IzSR7If`Qf*l9e<s&1GF3npKXPbbf(={wdhMfZ^ci{`fxDnT`@cgW^)#'
-    'cqp@8HALKNc($<G1<k^nB>aaT6{8^jC4^lsS(+ujL8@uI=;-Qfse^GOvJr(K0At3gXbQ!iL96ZR>1)usf;+QwhucnLwd8!#Y!fhm'
-    '$qErR@r=Oq`RjU}P<di)pmKNu1WKE^;v^FPOFcTPYv%d5k+C28$$y@D84vPnjIL-@g?y*D-w&Nv{Gcl*6hr|5=vQNz6N4v~X%gmh'
-    'skgDX47&rmLx^JLR=|giBS@&X7#^DSUV`Qk&gA~AFJMAISK893C790}t+cvRW$8cNp+%g=1PkJHxOIOQK`}<v--C}<=@0Wl;Yt)N'
-    '!fEp}UfVg0hDs`(-as)kh@r0o<nXXHNujsKQ$v6E?-5-93ZEJf4Nsc6G(-D|$?e3`tlMnFYZpWB$0=i3yE*dWLZc|-|Ev;ZSZ^mz'
-    'bsrycv4e$2frcDWItKbEL`s02{C*|m?dKs}77uxs!?1umsn5*pk0Z}61SGlCTUP%wKhq`5WkPp;&Ez0zD_md}s<Vom-QnMGCGw7s'
-    'phYNhok(UWf7tAP6Xa^bw~NWTo6A+KBvUnYc*Aa^LTMLodAK<Qva65@vH#jy>#yAYxi;ddC*%l7NRAAf(TFPN8G*~9vDY6o1LVJi'
-    '<bp(giu8w3N9Nv4i5vxI5=@*~b`pfh%Ey6B>Ywpy(##8UV-fb9b7{Ymp8(gkGBzp1&uG1K>2hBzx5*`izudETI5_^PM1~V|9+RtE'
-    '2nA=F(BY(_WHZ%Z%Vx=Q!kM}iIk&wDGCq>tQ$24%-*><t6#Eku-7p)9Wz0ZAI$)h<rmK*SPnBHJ6^lwCSr1Dk=W;--VupV>8wNNe'
-    '8=@7j<%(1bX0{Ez?=Ov0TYnCpv5pOhh+ar}tokE^x`v3c-9c@b{B;r0MG<$#UjD+wiBYBcrz_P5Rv8(G6y1Yp#F!!gaJ{lp@?&D1'
-    'ZePlBvZKqaSJ8-&tFg9R-l{#Wfex9Dmzqk?p_vTa!?3lhC;lp^x;5iL_01!!$UoOXj-(YBzM9&;OoI6p)TQDDT!%NBBG(z(J@-3P'
-    '3i2H7s|F|Y(WScb(@KrWp1Bv{r!D@lET#P(NDOKau!pS=12FE!B{Vkb>?v3Cr&bYH^T&bS%>Wz6cu12R2kP@x7;_3II`~Z+=VPh6'
-    'PvB81GBAOkZ)XnTiuu}jmij%6u2`QV>hAXC-5vC%#cq{n=q|q{{(L$?C3e4JUZ*J2Bnm$WZ#F)ob;^0OE1toRv<OVL;HC#d&>Y%s'
-    'QX#ev%wT%&V+7%?j*$-DUBRXJZk?>(0WU?x4)dU#n1Q#?RoiDekq`4ssU~2J+B}_f;s(IgnLy(i%nL(yWh^P<!k+&QmeHCsh?J#y'
-    '^tLd`tjY8J7QqB0g8><iV=V7dI|Bc<dVLw&*z70>gC*Ey&W}ru&f77gjm`U+*am~7pFAlBxftkw{&`KDMLc)YgMXDjJ9k5SoLOs@'
-    'mJQY!HEK<w!`q_2*TXh^-)5Zq?=FS#+Z<TUjZvT5WH%fLO!^fs<{R2<!djt3joSk87Ar1;68i+E*EmASny19xgfX5S0!Z(7_+LlE'
-    'pL^xELCz9;U~C=UvyoZ1kf9!&F6A93{MX~X8Rz}six1-_kt(fNIQkRxg?#I3ts5yJrvImSAe6xO7GhJjTqw-hS=m<tkH2K$cGI0`'
-    'n(%0hEHDL}m`Ec67MnvoBO=Bqi(EpSHNY6mXMF9a!YONMNw{BcF}?=K?PENuyh3CIdrsl%dDv8^%!`F0>@kghkc|aFiEsSguj&<L'
-    'E{^-Mj?w-rLNwPvTTnPiePpaH$SrvLLc}Ml>g`#+FMx4Ft7b&Qk+EDfh3B|LTSNab?Q|TvW`4UU5%+x(hw~rLRAsa378hz{{uNw@'
-    ')w@*>;ax`dHEau@F!$)J;EP9TYx%8ADCKS`MB(iw4=85u>vz%t4e~9Y0cw>dNXX-obBnfB^DKEM8!1;N*({3o(c~6{77}L$1bO_y'
-    'fAcgoXDlW{O~@t1h!jS{Z)g|%?Gl@6Ox(|_a4S;c{02;;cP4YgYs|IQed4l_G#xYGv#-i1j1lX>l^epmpK`~oBV`Cnc^c1fh_l>L'
-    'r+#5QSWSK}ua;;E7gKg;@ZV;yk0;UUUl6{@VX3t%{ca3%Q*f$$0v~1EV!YDY<R=j<9FT?bWKA*tY;@acaQTK14p`jEjwll=8dB>2'
-    '$?qAhM1F?39aUsBgbb;{><2}OD%i;_uOIep+c|W{OQMH$)h(8J^(5`b3KN+(vFy?`r7LPQedhZ?|6>3-TIhm$RvZSI%7M#Gua#1S'
-    '4#An&HsOoebyaC>i}LpTUSYAp2M#*a$5L1tZLRUjo@rRFpC$g_>#0EYTK|qQwXg!tAgcdzJ;s32WGQoI^s#&Mu1zkPGu{KQ04P%V'
-    'nq#{|K8uRwNa_tY{mi{2<kVW}0+n~vSxXX?wJ2WSgcKr}_c}++dT;|T=6$=irMTZ7N6k*f;Z{k>8hB!x|Bf(|p>av>(<`=L5E3IQ'
-    '66S8^(wP7s`|UiSX&;Lz=0M*GGLQzkg4UBdMIOKUSVp~0clhGN*l8Vll+ifW(IU~lzR><VyRi{hv}~3yb1mNnXdUNu0pPqMj;(*`'
-    'TG?ZJ26`(ytNRBQ<fc;L6RGfGHMlMyBAFvKcTzU8%hedL^Kr~wyt<}%!b9eE-{xQ1rYsz9VRfhyHav6G(m=p-hcUw$;{mxY2tYu#'
-    'IS1a|Kj)w)b3H(0<m$uXlt&ELZ|vdt=1>Z$xc)G?xYz*EOY+-rU!G{FqYb_Dq~=Fub-o3ag`|jh+&kuU>gLU-nFTybAqcs5y{^Ab'
-    'J%yRsq5`Unn~cz+`Rpp|;O2(hOLQ3ACj<Wki%MYbz#b^tI0yVir-DWOY2QGUYKFB#U{(eJ!MCA<M6DKy#i{<KNW?0pz)&kCP)NJj'
-    '$81n*8!?*7gJ&4HrgW)GPoghk>N6K2wOUvr_+Hlef+Yy)K{Z-vxei3Y$t-$Fq5v5Iw1H`!1=qZ29ci^Gn!eV{K?!m-yPc$iB{xoN'
-    'kZY#Udv9Fpw%4XRAJl#xeQnE04*BX!@UNXCIJhd^;(?^~3UeU|rs>$O$vzGTTO=exCeJGN?F^?C1ltBJC5g+;70WeTvvN2Z@FLpW'
-    '69w<E{zXQZk(2=xCc!&fuWWC>NmYr7sr-~^Oit!vWF-rj@8LFLK9B^{UxjBRsAFi+Y08y-5={24MU!kzem6T?qvl*xy=`VvL@_=?'
-    '$rsQQb~32y-;f5;qmqv}64vIs2nFgDUeuF+h}V%L)1o+vAc>dBN5eQXMyVb7&1l)a0B8rDq5e6Dx)hN#hW0XVQ9I-7Lf)eSncESg'
-    'WP5YS28TXtO%$LF_b)!~g*3M`<rHe}&LKf(rCr(c`M^$6=9Fn|S^3^0bQN^jK8TMUZ>(pKSj7#)RZ?OxF8uQx8UE-#=wt35C}ppl'
-    'cnj!Pc5=@+!50%=_AHMnZF!fD46YY2E!j_u8Wy=-G&(Y9N`%SsY$qK%;b_N%&U8GNJY6c+L%@@y^&R|yPXuVy(3Rjf2xh3=(|=~2'
-    'iv@%yxuY5{n>98iie7=0@U1T^w(CEz_oC0lKMN7OQaX)t(k|e1!9<#OsZ&VF48dx90B0^Tex^$cpOl_|P{iCybMQR4^eCeM!TKx8'
-    'K<_yHv6GiYnf};1Z6S_I<QmL!gLY@IwU1Nexp&06dyWzc-R*yLr}#)CM2f<b-7&)UHVYTov#3gYFySyS`aba=u`In&mmL&zDhJ<)'
-    'Xyd5Lfe<oDuUw4GQB;G;JTawwZ13XKUWC+PMMInnos^uZ18hL2$1Enae+WX3TLr{~Dgl;n&P5t1Xvgei=pl=#Y@dAUb_9Jwi9GIe'
-    ';MkE1Q&ttewenmR%bW7t4_uP1Qh@tdk|?_(SQXQgQ&zC1x%4bejNO`|6pNJQ2cVNcFQ0@Dox&)~YwXs2rHQLE+Q#xBtEocaXj07*'
-    'q+(wjz%Pi4Ni3&}=q~P!oopkTejTR^ZwLh)GU)J~!xVlYs?M*Vjs{;zxh6#&c4C!;`bO9@xw%|#--LNqwy;HxMpnIru$4H4kX+gg'
-    'jEGQ#|BT4;bT^_K6^BDHk@p-`yBs=W(dT_qI2x9$!t5ASVo=ksUZl#iM6g#Mk`|^tiUgzN2+B%s=gUqx$*aVhb_Vj6A6VHkybZ4n'
-    '#6#QJx?hoVoYi={$m~HwYc|mD4Hy;)_GF(^PZR3B9$>pNAbeFor$g|e9~q+)Qd?gRdV#VbnSFQxdla#yK9Gb>#yb9p7H2kw<&^_?'
-    'PZlk>)}EFnJ1JZo+VerzgnDN5txm|zKWyXI<?73wJZPVmo8dxYbF-DsD}&x_<TxWtNzn+q%4-K|I{^+bW}0j*)Wxngd|Z!MBc_#3'
-    '7}+F*u)Xe;Q|fic&y89kRG>s>8iN+M#n-L*T#!xzqeX$aE}KZED#`se@o5}HpxjUo&Wm3*5JxAr&&~|oy_NKM!f088eaM#Jx_~eV'
-    ')=2X89<KDQEg6hQr1KhM&=U9X3~11%UY?2f;6f)9iQXqzL-aO3cok)OgO(u1t^U4swhP~`Veo2|K=l917mS7ez<*;;_K+tawT`uN'
-    '%by}W=2z#m&C?VOr6cBi83)d+ihhZwv&e!~|4rB*TBmy0AoWrm0Z4DQz(b0)EzevHdmqnq2L;XnM2wla8Il~ouw1V?C`=*Ms(N1G'
-    'FNE@EiR^=SOyQKH(@xiUGBZbz-fip~nSGQDU-~mCvB+7JZhm>XR1?!w(WbOT0ki$fZ`zD*F>Ma}LGhPh@GCh=-yhx*K<x4?WUoza'
-    'sbg$_icI*akqfu-&n`$vvDpI0cY}Itt~)9r{xTL#1Sv@<?QU?4i9;<+LHQe!61_0Y?H-LF`(d(dXKIZexUd2xJlGQ~cnI-jZh4fE'
-    'Wz+ve)bWN>GeAG01lmu;!_V|UY~9FZ<-wGXnKr{ZoGq{|*Lb)4N^>n3&8K8U?IkR-8Eg^;xu}bfKJ~kKJT_EKscT{B|6<J?gpo8I'
-    'Nn?T#p{^l}(a5w86UMZn;10up$UXxZS^l6hnA(^f6OdfS(nZ07nzSxwR6wAm!^S>;^{Fpa0T82Lje1Q;=jsk9$DH7JlAt%YNh7+#'
-    'YQY#@g$U=K5*aYl@>P5!DmRT)d~!0v-4#;JP+H=Mq*4kYhmELAdL<~KOMG-hIhZ=8Zj7p)0uX&b>uCuUR3_OyW{EF?P&YKezuyIW'
-    '6U+uY)47Ns&zzuaQ$Y?a^^}`6XF@?tt6#VIM1k^TWsZxG=oaQ*<~;s}CCGc2$(zDij~XP1ZFZ^_-(M9jHyFv#{SJmhc1$yW1+>v}'
-    'cz;EWK0$diV<fn3^OqN~j<8OXCC#z_`iIg&AuwvwDzltZL+)rUfVQEgegy5e{D>OcQtw7EFMlOSrJKG;vlD#8Ha1VRf&<S#BJ+#7'
-    '@7SPxwHQ8x)WMA{nUiWg%d@zGm2Crz(wc8}I}LrpPz6Ub;Ly<snhyKN74_aSq{PYvZMDa<(8-}jyzIRkuPLkT$D9=T>{x;ad!eDm'
-    'wts1jQ<%d^<TEZCYOAT(c9H%C&ln{7g+W5t3!>D(@0QYs@t76A>$K;)o9yd97vF@(E9%;nBrM1{y)<NLo4|FY1+>u&S)co<@)^E8'
-    '5Y|Oub@})JLK0;jeDFRP=L6Rs1k^a4OVDfrCYAwilk^rHwmHOgM!uiIpqkjruwEjh9EM6s5e{EvMTrQ!d~^9F7AAH2+m{K`z>Y}T'
-    ';l5~f-3o+MbI<Trey}6X@q4mzs$uVzLUJ7IYdSd!Swb{~5~d&Q&~|WUXAI3RzZaJ5a0X40oS0|4MmKr8(rMGQwqB^){!Nz~LP`tB'
-    'ZS7DK9mx%yD$%xCEE3O-2oXL;G8+icJ9A&$66V9CJhdA5%my5SCuBlj@5yHRY^e^ig4KY9eSbkl;VC^3bm~;9i-E@{fc!DZqednL'
-    '^Jj6MMa~rj55Fy8bGg3M$1+3~t=lrR*F`g!8RQ+&2s#aVzD;0Wq;Gf~Cnl^-b(p@atV)p<{vvedcI#7Ac!BN=#}9A@TT;#2@k81J'
-    '@#`pBs!u7M4<^Ej>NJn4Y&f;by6zCO^4D@>zeRDRltBOZ90Ft1*mXv6eo1s2M^u}$v6hWXh-PC^8Xh=Fqv%LJB_vyWQx4ek`XGMk'
-    'Smx-eZTkg9kPn@Rj=e0T@;%$GY?3ZOC1L)2NXn_Zl9;*mf?0QoJzcFUhheax;E0HPE5E|d$(!zg)hYbrK?%Pk`<bQ--{P6+Z8jAf'
-    'l0)b~rn9~2F*LC4PlJQNT$TsNHTec0@64mWxV@j?6p38#*Gm8bMSy~!agh9h@v<Zxbd!OE2t<LpVIo%J!E~c#TigalO&ffT<+M)f'
-    '++gj$VTVIh2aA_JY@Wi;b6!a52t{bL6r1@8<lE=J*d{mUt*a3Z&z5_v)02R#%rv&SE=1$b`I<}9*-|xClnXkA9PIQKzO`a!K=*yY'
-    'gNT8=Td1WY%Wc=C6qL8n(l{Av<oRTZg)oW?%-Hd!ONUj1gOB#WW6gg82S?j+?}US!v}p1mS~(iQ-_Nki^FfwkB-P77w$f-~dpzUF'
-    'qdL5OC?29ze~7A^9}foi-<VU$b6!DQiY)qwMbkes!7GoRcrggS!7c1ZgAb7}gFCE67(oqW7h!u!mrtl##_%4sGf+wXhCw#kCLzSM'
-    'H3K%i8nFCWXhY%?)gA}I-}aTp`><`cX3fLz8FL?)(HlV@thIrmwc<o(I26pI-0k4^KG00p0Wbq^o@E7wYAhyd)l0=1nOvq!0>tS*'
-    'aZI8WfUbv=tQzn@w2-zcK)|K5FdS1GA&>pn4i|ysF7-)vV-V6Qu-}~Vd0=Yv4!yTx$yxAoGp9E;ojZcRO^mzi!<lHiUZ^f`6OUWw'
-    'q_I5~r!_9Xy)nW0QJn+V29nLU;f-`UM#JRZd2DOqZy^h<Y1C)y`?Y0$q2Bq!2(OBq@oZ%O=qgJTG6cS|IEH#j+!qKy31~ia<NHTc'
-    '8G0`*K1~`jy9x#p(u}OUp4de2;5=$^`?u~PzW6u_Vlly9PcA{svGfwOMO=a<G)Fc|4YG)6hl2XehBt|};u|GQu7mCEk&uu`bT42l'
-    'EUAW)|6S$Uo=YjI>cx6}meAzW?J@`^V0jBnB7im15eoqR`;88`pGO^)<nNIu+FB1sBcLn`NjZcDyvUljf~s8zsaRZegy6qep~d(6'
-    'YR<!+$gKKrtaxXfW&e?y%rI%Mez@ObdpQig0J(brZYpQ?HpG>2-lTsc+$gjU8S8>GIuEg-Nn{oAHuNHY@!vBf`kM<3*ER<u`KFX5'
-    'Ee^fwyWO*2yn%?G`<3Ll$rn?D{1#EECe9km1d+6q$39wU_*P~*o0G2Fd1c^T{B54pdUX#T0%n6}g0uq?;{-6H7S(+O$xSXaP*(B)'
-    '8>M%-^||>p%GDRJD+LT-L6@anXqg16?7559UH|IXk!JfE*eWR#W3N1h=;+7X*QRcA0a#iVkPp0=&PDF$!Q$#10|oRdQyI38s)PwU'
-    '48p0f5ufgx-r6bL_a_xUD{Peor-CZ`-iT|g4m2lW-9-DZwXl5%rZ`XPBjNzoGnjLNhWYB&r}eh#Q6d8Xj@WaEeDY(+h4pJlnO*iF'
-    'qdPQFNf$WZuKwetSQ3+jlYOHOt^d^aF+Wh$4J1*Xo3@JPe>f{X*e7iK-DHh^zM(QU)ijA!Dg+!XVJesS0>i^k4@T16r(5k>Wj#vh'
-    'i?7;9Z&}vzsAvc_#w1Q>3Vj_k4+F^hFKO8C-Gxw&@q0Ncb%K=?aKdv~bXGZH?|R6^IZHP2dIo*rcT9FT4~A0boVqKNC$Llcjjo4O'
-    '+W`%K+j^f_6gvB3_$kh&)|%v84w(b1(8et%p0M+o8@qTDX97%5jF;4Ap+m0sc@?Itq}0`saQP!QL81o&cyX<?yi{MMZqL$|&lcK7'
-    'n75af2o@)GZwI%ijJJ0joubz==A3RttL_8R><>j{Y9X674=Le(14n?2ui)<jcC2C^M@;F|F|dIlZ|=2_el{38Bw6cp-{wAq0+EEZ'
-    '8Nvx!>J|pcDdhR>^7vmv4Di6Jem_9^%F+?yznIXf5YRA*T$W*;X4WHbS~Do8Zn{eySGsm>9HIfvOdACPB@B!36I}ci(s8IX9=0#_'
-    ')Ek8RgsRv#!M|Lqp+6W+<=EeD`kuD^@>XD^bJP4yFDRt!#=`^sZ`B}pV^?Sg0>*|^k593;n1!^)QZ%%>s3twTY?Np8q64*8qA?Wq'
-    'q7-TZ0s4TO%d53NGoXAIhS`qXsbXvY3FSzB?B$1I#BFZj!`hNz1ch-@%dx|xtJcwCFnNx=P20!!1V-E|VFy$Sjtw;K?mejyKQ=WB'
-    '^j`HDm+Y~rp`N;hSW^qdt1lI5F~+56pN4w~^o4CILAATrf}R^dg4na?|FpmhGt0gQD!_Sv-hTmYc*s+BFTYUYxBu#O1DF38borD*'
-    'xLD;NgRDq<zG};|l`PU%D}1}Om-%eS$oHNm##bm<OI`zd!)Xshu?8L{-;MzUAG|<WnzYWOT>Cw%;C0)t80YHA;OA!mF<c1N%1F53'
-    'R#g_+eXtZ(4IcS>DhH*e^S6-QPu@7S*7%c+gsgjur_igqa1qo_b?3B)&?qc9cnEcy*BGtD-a+XE_tvVbZh7WaJyfsJ!KEY4=lJ?-'
-    'F)R?wV9uo3zh3)Gcn={X-Vn_GzckfQ;W`Wrf!8$gz6i}8?evrdy^+{#IW6+;Hxt07>jyfCDV@t|pripErY?8+bNxW>qbU#GFUD17'
-    'oo!3CgV5;@0He~5caEgHj%7$yJGcCSDy$lqHE=^+h$Oqu)oLcM(!kA0Sr6idxIGhs2MKj3kU&CKyx*;B5pK#d=WW8yWYl{e@9b~S'
-    'FA{vzWaZspM<aot?NMop+M9{f#cDhf0>0_Ye3jIN0%2yzw4gQeTnr0>;CGV$L209mOo;kFLd<8tS>vv(XX3p9^+~l_(D?@$r_U2s'
-    'CN8pZ%RxCMP_|xw$xdhH-bt^D$6nxM%UE5R4mN0@O57217;p|q0=u615biAytKiJDcLAp;;}*fUuXeO3eTDVFe4H{$N#NaN$p(lL'
-    'G;K^HfuGa|nfDcG*gHC|X&-sr*d~GNh^N%Ru7)<2pn=Kt-&=qAl1*KbXBrgr&zn)+_~mE^f)yAebk+<ovI50_WGy8PRzf|{|EyNH'
-    'Uqi|4?;+2!<1{aQlw>btRk8)@#h*HsdLmOu0?ar{Jj?oNIIK}KrQ$SrF88OYKh@!A_+Bx*L8W4aw&Z;l*B0a%0oX^xCqrcL@FoP('
-    'y>@6>oLjQ#B4NbfhFNNhNzlFc7Y8MRks#^+SQ>NU`2OW%o&b~<&d;K$<Xj8gc~f56LUFv$(~PO*7%bsKn`MN&lwEW>gb8WtO^Ae%'
-    'aV`({3~P^m?q|?Tt>&OO{u?CHFI~e$)2Dq=9YO<cD&RPVi0;h~p1Q?>>g2<=0?_>mn_mGqfguS3Ww1RD+`kF6C9Ayz`|W0c-7!Tf'
-    'a3$!RU4ev=U^r66Ujop{27CZ63sP0q+<CFDBSrtWeYa?UzwahoTjP#|PgJcUiEO8Or&LyH0#gtVMI=j$)tDufH3ik^_2})?s>_(U'
-    'pSf}Ja(9@9_2yxCyBZ@bI`IOBR=Dir^fPHSO_{JX8jThkSDyxz`{38~M^$O^P>`BYS4E%K@wl!{;r^>%#P|>6cyy6}=K2Sm0PFFe'
-    'm9L+|2cdipP(?f^sw+!ESQ)4XCkw%*bC=b;)o-r~!GoB`;W0`;tHJakds0TJeP4=gYp0#E8qmfBu(dc(IlNRCGl=}z)qRQLrjMCn'
-    '(+(1w%m56XXnv9E=W~|<$q@WupBy^w7ZHg=Kq*$DbowA3mCF8tb?rN#>GDA((4x-C(JWeXixnT1Zn3?H_uTP2%9EJprJ5(m)W<bH'
-    'pHg;$PH6{9sEkKYc0VclNU@=Z*xj&X6`I)JyX29xUr_#cP1O&u3mbCv#A!FPhta3Xryz9L74JMAZ3Fpaf*aevxZOZR8<_YcHgg#z'
-    'JWX06oubjk##{7MRFKl0R9&j&uV-#+3|A^&bW9w(V5QSl8u2Idxj4X8H}G)ww{hUaiZ8|;J00S;Vs2=(v+^0@GJ#=G6cr%Zo!17O'
-    'qLPknK@pxmX0e;@Fuz{Hlhl2!iPhENqY+w^){d=_1E+7M1!z=b<61}Wvdr&xk07uwDfe5OiLlhYSxKl;>??l>7gtz7w%41h^q}ze'
-    'X{q@g^VKaaO^QYoR$<1#cXtOqRF54QpDisVS{$J=<DV(+o1=Pd(1N_BZsBNacL66f%x=6huj*N;?wpBF|IOKl<&_SJWRs9AP7!lm'
-    ')xKD|7&R^)enhecPb8yXz5Q|`RX!k|N?8M+$m;)@TM4f4I?;F~L?01;Sedhf5GZp15Dx(Z$*3oU#wR-mHEbE&&KSG$*wx6a^$Ig?'
-    'LFCFB+6l}Sc+?tU`a6&q99v9P44iF<g-*&drJI*;>(Z>ztL1aZzV6=u&Yrh@LL@)W3LA|EYl2sht&CQl?Txp@*5JJhjui&O&@sv+'
-    '?nj+K0JC~Q%IXP|H{#yDjEdD_OTQy%PW`SW>1Qb(^-=#NzqEM#u)~0?+Ct1l*5V2FdPum!p1`@lAG+7#{~kX;zupd8`6SUmQJGIu'
-    'TvGglaZc>E<vop;c@ae~1ep<PU_b1v0xRUTjNof3q9=A6k=gnx__b+ek)eA+3XaBNaR?s;&u<gOicmYAl&AFfn8CfxzIs306hs%)'
-    '>EV>MOwqBC=PaE#4y~KGF0l6-xyZY2qyl|4H3$X$#L0?8hIKSo0XM+&H^NvAHCH|61jPert6L`bScpN-7mR<YsY!2iFEEZQ8oO%@'
-    'AmgSNI3l?eY>&W2a&GDV*<QFXM#q(QocGKV{PV~=;lw1UX@aT;MKgG6GD$3?syFaIf`7TrNL{(9F%Wt`tQQo@?4*6L1r7^kYbO$f'
-    'PmHCf1kE!Bls5@sL#Mn*(oF7SvXNBgL92j`f~qC(asnBbbTn{qMA}?%{+^{q@i5RCBW4==95|}!0rGTGZrSUGixOoMF(2&DqX#Pi'
-    'xhlwHw#~&k=j^-25j5J`P{jYX)XSu<C$Qu=lVnB!)y0wf?^|^Fa<59kbhllQ#c0ZMX>>CPQyOH+6??L@58nb>k)i9YJy5wKI|#lS'
-    'zxNZ<JqMmo2YPq#kA2|#!5zq4_}^go#?Q&3-Ir*5ILMxyBTQ8Xz8<wm0Z5m!W5ylM(Z%zGMQ^_5O<x$VWME2xZSKq|?BMc+K&w1u'
-    '_VFYt$oWOdYau!%ifqN_Hkf9`9|Z~RjSjZJ1GA!D9Z)eDSy|Y58ddswujnPwil-7udW&7cJpR&2efTh8;)|esHIF&myHfr9{j<Fh'
-    '8>avmxdOqTpF|p2nSkmtc|}0Nk46Uh52l+smE7chTSUvKcM4!O^?W_*y$SkGKrSiT9kjVrooHgS9o=dnZ7?YdMC}~Qo~%IrqUs9>'
-    'r9BL2qF!+McN*WLKrM#o1YDjUc;+FPLhPFHpe|D`SLF{M(w4L7M5chrY=pY5AvOBxdG2qxwRqHjy5bu<o63dEyyXLyZIm?MKg4GW'
-    '%<CMSN;9vJ*Py-86CH4@Y-ca;qvh?F5n3JF@yxwUv+wLUOTM%60vt~UIS^CeE6v<k?Gf9e=OM)OzT0-Vl!^kPOh$xv&n~i4a}rY{'
-    'Wm<6;5VmmN^P49w+E*2VZclJIRH!=I#25&>@Hgh5xYrxBUmLfKA;6$F#5ivS<DNIk(KqW7#q_D@#w@NBELN94qfGdd;H`JbGol%Q'
-    'JHS2CqIcqN%sb=a$<nQ0nARB$-39t=Rx?(MZvxL8k^tgi;hP>v0DX9`5L~m7(W6fPN!Xc@<sA3{94@nm!FV0}W~Bp)3Q2tf8goJ<'
-    'VV>@-sj<3q#-9yH6Ai3xB6LY|SJ&PEj8D%f<imE*)xS)1>iT~g9t+0&tQKz3Kkc3ip({!+;n}cDRORSRP=^Wv6fg++%Sh4Im5J?@'
-    '(wjA<4ww&Qvlyo^x;@~S4ac~JpGw>kCwZ$f%Tw8<#=IGB#3g-Cjn8J)eb}THlI?H-7z2KIM9k}Q7@_h~&)$r*bgYBUQLu)C?_o@s'
-    '?@hLOg??iWcUG+Enkwaks4{FmS85-=(}FivKOTqt_ZUTOE}P~7*84uI-)rY4W}^=#`$eaaK8|G=pqf%gJ8Wd*u*vdo4hXn^f6Ww_'
-    'l2oM&OO!(iChuI!fKH+br*Je>aO^t^O_FQwz^A5<jiR-1W?f=Yu-Knjh7%mvZghQMX5Y(#+Jgrj8d%U-CbTae#>lKXAv#SE9HRnB'
-    'M^ckrWl8*Z-hO)tP4tA&jP%`81PDws$WXkaoUnj%Lw;CL{l?`=%5cz2gLXJsF{nZq4U7efkFc|doQ7NY<X+2)9l9J2C^j?Xq}Goi'
-    '{gaB~<`Y(=Y%LSN#YFtd12ikPTUynJLZ~d!{k{CWOwBFLyqz{$5{nXP{>ZHYy85!{;dwayE|3p~cRb0xEtubuNsukY_b%P6|Nd#Q'
-    '06IwEki9HP@B?(AzT4z&UDjs&o{12$+AfB$6bQtzhC<F-Dg2~L$W8<f4(CM6$IG^NL1H%fiFTPXRml9BHQh3e>Utt<HCnJ8P);})'
-    '-62iJZDxHJkx<Jd1f_TpGP0y?r|C>BGb&PuBz3t5Fov*%$HxdZ!pu`+>%KM+B!s;`2GRB8Odd`+12JNKPT1wsnHJAB%>uD>QkHQ5'
-    'm%wk;abUhChCRa|>?*Jih_y7nbAHXu`bYSwbudSWd_(prR7Of}AX)h<!RBEey_f8yb?U=z)pogKZD=J~nPeDblT+tNWawVMk^lez'
-    '_lN0;xhM^(00FCl1dxCQVU;jKvBYQl0ssI200dcD'
-)
 
 class SM3:
-    def __init__(self, data=b""):
+    def __init__(self, data=b''):
         if isinstance(data, str):
             data = data.encode("utf-8")
         self._data = bytearray(data)
-
     def update(self, data):
         self._data.extend(data)
-
     def digest(self):
-        # Chaquopy/FongMi 环境未必带 cryptography；保留纯 Python SM3 回退。
-        if hashes is not None and hasattr(hashes, "SM3"):
-            digest = hashes.Hash(hashes.SM3())
-            digest.update(bytes(self._data))
-            return digest.finalize()
-        data = bytes(self._data)
-        bit_len = len(data) * 8
-        data += b"\x80"
-        data += b"\x00" * ((56 - len(data) % 64) % 64)
-        data += bit_len.to_bytes(8, "big")
-        iv = [0x7380166F, 0x4914B2B9, 0x172442D7, 0xDA8A0600,
-              0xA96F30BC, 0x163138AA, 0xE38DEE4D, 0xB0FB0E4E]
-        def rol32(v, n):
-            return ((v << n) | (v >> (32 - n))) & 0xFFFFFFFF
-        for off in range(0, len(data), 64):
-            block = data[off:off + 64]
-            w = [int.from_bytes(block[i:i + 4], "big") for i in range(0, 64, 4)]
-            for j in range(16, 68):
-                x = w[j - 16] ^ w[j - 9] ^ rol32(w[j - 3], 15)
-                w.append((x ^ rol32(x, 15) ^ rol32(x, 23) ^ rol32(w[j - 13], 7) ^ w[j - 6]) & 0xFFFFFFFF)
-            w1 = [w[j] ^ w[j + 4] for j in range(64)]
-            a, b, c, d, e, f, g, h = iv
-            for j in range(64):
-                tj = 0x79CC4519 if j < 16 else 0x7A879D8A
-                ss1 = rol32((rol32(a, 12) + e + rol32(tj, j % 32)) & 0xFFFFFFFF, 7)
-                ss2 = ss1 ^ rol32(a, 12)
-                ff = a ^ b ^ c if j < 16 else (a & b) | (a & c) | (b & c)
-                gg = e ^ f ^ g if j < 16 else (e & f) | ((~e) & g)
-                tt1 = (ff + d + ss2 + w1[j]) & 0xFFFFFFFF
-                tt2 = (gg + h + ss1 + w[j]) & 0xFFFFFFFF
-                d, c, b, a = c, rol32(b, 9), a, tt1
-                h, g, f, e = g, rol32(f, 19), e, (tt2 ^ rol32(tt2, 9) ^ rol32(tt2, 17)) & 0xFFFFFFFF
-            iv = [(x ^ y) & 0xFFFFFFFF for x, y in zip(iv, (a, b, c, d, e, f, g, h))]
-        return b"".join(x.to_bytes(4, "big") for x in iv)
+        h = _sm3_hash([b for b in self._data])
+        return bytes.fromhex(h)
+
+
+def _enc_varint(value):
+    buf = bytearray()
+    while value > 0x7F:
+        buf.append((value & 0x7F) | 0x80)
+        value >>= 7
+    buf.append(value & 0x7F)
+    return bytes(buf)
+
+def _zigzag32(n):
+    return ((n << 1) ^ (n >> 31)) & 0xFFFFFFFF
+
+def _zigzag64(n):
+    return ((n << 1) ^ (n >> 63)) & 0xFFFFFFFFFFFFFFFF
+
+def _enc_sint32(field, value):
+    if value == 0:
+        return b''
+    return _enc_varint(field << 3) + _enc_varint(_zigzag32(value))
+
+def _enc_sint64(field, value):
+    if value == 0:
+        return b''
+    return _enc_varint(field << 3) + _enc_varint(_zigzag64(value))
+
+def _enc_string(field, value):
+    if not value:
+        return b''
+    data = value.encode('utf-8')
+    return _enc_varint((field << 3) | 2) + _enc_varint(len(data)) + data
+
+def _enc_bytes(field, value):
+    if not value:
+        return b''
+    data = bytes(value)
+    return _enc_varint((field << 3) | 2) + _enc_varint(len(data)) + data
+
+def _enc_float(field, value):
+    if value == 0.0:
+        return b''
+    return _enc_varint((field << 3) | 5) + struct.pack('<f', value)
+
+def _enc_msg(field, data):
+    if not data:
+        return b''
+    return _enc_varint((field << 3) | 2) + _enc_varint(len(data)) + data
+
+class MedushaAlgorithmCount:
+    def __init__(self, sign_count=0, report_count=0, setting_count=0, unknown4=0, unknown5=0):
+        self.sign_count = sign_count
+        self.report_count = report_count
+        self.setting_count = setting_count
+        self.unknown4 = unknown4
+        self.unknown5 = unknown5
+    def __bytes__(self):
+        return b''.join([
+            _enc_sint32(1, self.sign_count),
+            _enc_sint32(2, self.report_count),
+            _enc_sint32(3, self.setting_count),
+            _enc_sint32(4, self.unknown4),
+            _enc_sint32(5, self.unknown5),
+        ])
+
+class Report:
+    def __init__(self, time=0, state=0, code=0, times=0, unknown6=0):
+        self.time = time
+        self.state = state
+        self.code = code
+        self.times = times
+        self.unknown6 = unknown6
+    def __bytes__(self):
+        return b''.join([
+            _enc_sint64(1, self.time),
+            _enc_sint32(2, self.state),
+            _enc_sint32(4, self.code),
+            _enc_sint32(5, self.times),
+            _enc_sint32(6, self.unknown6),
+        ])
+
+class Device:
+    def __init__(self, **kw):
+        self.__dict__.update({
+            'd1': 0, 'collect_stat': 0, 'aid': '', 'device_id': '',
+            'sec_device_token': '', 'app_version': '', 'battery': 0,
+            'battery2': 0, 'battery_health': 0, 'battery_changed': 0,
+            'network': '', 'tz': '', 'lan': '', 'cpu': 0, 'resolution': '',
+            'sdcard': 0.0, 'sdcard_used': 0.0, 'memory': 0.0, 'memory2': 0.0,
+            'data': 0.0, 'data_used': 0.0, 'os_version': '', 'brightness': 0,
+            'volume': 0, 'ts': 0, 'ts2': 0, 'ts3': 0, 'ts4': 0, 'usb': 0,
+            'hw_version': '', 'brand': '', 'board': '', 'product_name': '',
+            'product_device': '', 'product_manufacturer': '', 'hardware': '',
+            'unknown38': 0, 'unknown40': 0,
+        })
+        self.__dict__.update(kw)
+    def __bytes__(self):
+        return b''.join([
+            _enc_sint32(1, self.d1), _enc_sint32(2, self.collect_stat),
+            _enc_string(3, self.aid), _enc_string(4, self.device_id),
+            _enc_string(5, self.sec_device_token), _enc_string(6, self.app_version),
+            _enc_sint32(7, self.battery), _enc_sint32(8, self.battery2),
+            _enc_sint32(9, self.battery_health), _enc_sint32(10, self.battery_changed),
+            _enc_string(11, self.network), _enc_string(12, self.tz),
+            _enc_string(13, self.lan), _enc_sint32(14, self.cpu),
+            _enc_string(15, self.resolution),
+            _enc_float(16, self.sdcard), _enc_float(17, self.sdcard_used),
+            _enc_float(18, self.memory), _enc_float(19, self.memory2),
+            _enc_float(20, self.data), _enc_float(21, self.data_used),
+            _enc_string(22, self.os_version),
+            _enc_sint32(23, self.brightness), _enc_sint32(24, self.volume),
+            _enc_sint64(25, self.ts), _enc_sint64(26, self.ts2),
+            _enc_sint64(27, self.ts3), _enc_sint64(28, self.ts4),
+            _enc_sint32(29, self.usb), _enc_string(30, self.hw_version),
+            _enc_string(31, self.brand), _enc_string(32, self.board),
+            _enc_string(33, self.product_name), _enc_string(34, self.product_device),
+            _enc_string(35, self.product_manufacturer), _enc_string(36, self.hardware),
+            _enc_sint32(38, self.unknown38), _enc_sint32(40, self.unknown40),
+        ])
+
+class Env:
+    def __init__(self, **kw):
+        self.launch_time = kw.get('launch_time', 0)
+        self.unknown2 = kw.get('unknown2', 0)
+        self.unknown3 = kw.get('unknown3', 0)
+        self.unknown5 = kw.get('unknown5', 0)
+        self.version = kw.get('version', '')
+        self.pid = kw.get('pid', 0)
+        self.device = kw.get('device', None)
+        self.report = kw.get('report', None)
+        self.app_version = kw.get('app_version', '')
+        self.unknown15 = kw.get('unknown15', 0)
+        self.unknown16 = kw.get('unknown16', 0)
+        self.unknown18 = kw.get('unknown18', 0)
+        self.unknown19 = kw.get('unknown19', 0)
+        self.unknown20 = kw.get('unknown20', 0)
+        self.unknown21 = kw.get('unknown21', 0)
+    def __bytes__(self):
+        parts = [
+            _enc_sint32(1, self.launch_time),
+            _enc_sint32(2, self.unknown2),
+            _enc_sint32(3, self.unknown3),
+            _enc_sint32(5, self.unknown5),
+            _enc_string(6, self.version),
+            _enc_sint32(7, self.pid),
+        ]
+        if self.device is not None:
+            parts.append(_enc_msg(12, bytes(self.device)))
+        if self.report is not None:
+            parts.append(_enc_msg(13, bytes(self.report)))
+        parts.append(_enc_string(14, self.app_version))
+        parts.extend([
+            _enc_sint32(15, self.unknown15), _enc_sint32(16, self.unknown16),
+            _enc_sint32(18, self.unknown18), _enc_sint32(19, self.unknown19),
+            _enc_sint32(20, self.unknown20), _enc_sint32(21, self.unknown21),
+        ])
+        return b''.join(parts)
+
+class Medusa:
+    def __init__(self, **kw):
+        self.magic = kw.get('magic', b'')
+        self.version = kw.get('version', 0)
+        self.rand = kw.get('rand', 0)
+        self.ms_app_id = kw.get('ms_app_id', '')
+        self.device_id = kw.get('device_id', '')
+        self.license_id = kw.get('license_id', '')
+        self.app_version = kw.get('app_version', '')
+        self.sdk_version_str = kw.get('sdk_version_str', '')
+        self.sdk_version = kw.get('sdk_version', 0)
+        self.xg_seed_bytes = kw.get('xg_seed_bytes', b'')
+        self.time = kw.get('time', 0)
+        self.query_body_ts_hash = kw.get('query_body_ts_hash', b'')
+        self.query_sm3 = kw.get('query_sm3', b'')
+        self.request = kw.get('request', None)
+        self.sec_device_token = kw.get('sec_device_token', '')
+        self.time2 = kw.get('time2', 0)
+        self.lanusk_hash = kw.get('lanusk_hash', b'')
+        self.query_body_hash_sm3 = kw.get('query_body_hash_sm3', b'')
+        self.psk_version = kw.get('psk_version', '')
+        self.call_type = kw.get('call_type', 0)
+        self.env = kw.get('env', None)
+        self.unknown24 = kw.get('unknown24', '')
+        self.original = kw.get('original', '')
+    def __bytes__(self):
+        parts = [
+            _enc_bytes(1, self.magic),
+            _enc_sint32(2, self.version),
+            _enc_sint32(3, self.rand),
+            _enc_string(4, self.ms_app_id),
+            _enc_string(5, self.device_id),
+            _enc_string(6, self.license_id),
+            _enc_string(7, self.app_version),
+            _enc_string(8, self.sdk_version_str),
+            _enc_sint32(9, self.sdk_version),
+            _enc_bytes(10, self.xg_seed_bytes),
+            _enc_sint32(12, self.time),
+            _enc_bytes(13, self.query_body_ts_hash),
+            _enc_bytes(14, self.query_sm3),
+        ]
+        if self.request is not None:
+            parts.append(_enc_msg(15, bytes(self.request)))
+        parts.extend([
+            _enc_string(16, self.sec_device_token),
+            _enc_sint32(17, self.time2),
+            _enc_bytes(18, self.lanusk_hash),
+            _enc_bytes(19, self.query_body_hash_sm3),
+            _enc_string(20, self.psk_version),
+            _enc_sint32(21, self.call_type),
+        ])
+        if self.env is not None:
+            parts.append(_enc_msg(23, bytes(self.env)))
+        parts.append(_enc_string(24, self.unknown24))
+        parts.append(_enc_string(26, self.original))
+        return b''.join(parts)
+
+class EecryptParams:
+    def __init__(self):
+        self.khronos = ''
+        self.argus = ''
+        self.medusa = ''
+        self.gorgon = ''
+        self.ladon = ''
+        self.helios = ''
+
+_BRANCH_ONE_B64 = (
+        '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'
+        'DfozaEg6sMIrVto1fQki/5PgVwSRS45gD4EVeorz0O7SCvz60tbyCIx76i/lWDeBcWIwgQ2JkBNMZgfs8ojTetL+CmVwMuEwX4cpCtTSjvvy6HqSxBuYWl/eCijtapgMuD4JCJi8bjjpKg1aH8BblpwK2txansILGliXCWjoui6dDDgPmloe2MKTXD25nuwKaAgo4xhB'
+        'dfFVSmZP+W2tlvNbBQlH3AbF8XV49kUdUeJwYUtIVnIZYUP15YljZy8R9pjNZXNRQk0e4fDOKfFgn2WPE7RAXxGN1c3k1RrwYlfbRXp0/4XrmthDDoxdQde1EOXMyNQVRedcibXelIWaQv+Jn+UU1V3JRLeIn576gYqX3URToHOMqwyUA/G87Vn1w3uEg1nF63m89fSr'
+        'dKQLVIgDk5ALjKMDc6xUgOftVVhYDnIEiwt0lKNTqHBQWO4N4oVf5T59Y9D5Ww0EI6jDcHx3VC2doalkNiIs1Xk7/eNmCF1e/WM4DX3T4YJhLHQ80ZWZCWX4e1s95daZctQtlGGEOQCI9b9uJNkQOFGJ4zFI8ZNLvkhW5bkC2uyVw0ftS2L02CC5jhXwbwSpisQIOJX4'
+        'm2VMQpXzxO/rYcqoTWwjNnP/arsD0vuozBBqo1DARDvY1XRMiKLRBX9aKjP83tyGvar8AGrLv9P7NrqWVFf7wAyiZHDLSl3YhJdsfrn4bUM2RXqgWDa61stRB60qrUOBlsgQrtJbIFKQIvjM8Qf87qnXxIsKzM+Tk9puQBZsSTt1g90v78yGQ7G+VdOuyKiNLBLMFN1c'
+        'h4kGYtIqRaiP9xPi5vsedSuhzyvhdqMfzfrmLN52wopd/UKOY6r3RxAq0c0Eil4XEdyEziod+aLnd+MlyMAkjv7Vgl3qbjDdIN7hgJO/nAn1ba/3gQttn628kJGvbAu9gJ/1gP0lwtTKjCbJgNWOwiQk/q/0nb1skwuBPhgr3dPF3bbHPdDd3rcqGZaW6OWpQJFWQJWq'
+        'kOZV6pWVVJKq6JXmQbTG3SvdGtM9Gbfe0ik93MdWQuXpkZaolLdNysrVDh9fDrfVHstdy057Wf1OFXgrOXl7FShNOf9ak7Xh1QBfa19dD8vJHk/Wtk9eH9fKtskNOXtP/SpZFXjNa5eBZisTFivPZxOCFpVpZbgms9Gz4L6yZNDjsr0lu7i+4dInZ7CxFymDlhFqZ89r'
+        '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'
+    )
+
+def _get_branch_one_table():
+    raw = zlib.decompress(base64.b64decode(_BRANCH_ONE_B64))
+    return [list(raw[i:i+24]) for i in range(0, len(raw), 24)]
+
+
+import hashlib
+import json
+import random
+import time
+from urllib.parse import urlencode, unquote
+
+
+def extract_url_params(url) -> dict:
+    params = {}
+    parsed_url_list = url.split("?")[1].split("&") if "?" in url else url.split("&")
+    for param in parsed_url_list:
+        splited_param = param.split("=")
+        params[splited_param[0]] = unquote(splited_param[1] if len(splited_param) == 2 else "")
+    return params
+
+def url_encode(data):
+    param = urlencode(data)
+    param = param.replace("+", "%20")
+    param = param.replace("%2A", "*")
+    return param
+
+
+def get_params_encrypturl(url, params:dict=None, devices={}, common=None, rticket_override=None, ts_override=None):
+    x_common = {}
+    if params:
+        x_params = params.copy()
+        if common:
+            x_params.update(extract_url_params(common))
+            x_common = extract_url_params(common)
+        if devices:
+            for k, v in devices.items():
+                if k in x_params:
+                    x_params[k] = v
+                if k in x_common:
+                    x_common[k] = v
+                elif "did" in x_params and k == "device_id":
+                    x_params["did"] = v
+    else:
+        x_params: dict = extract_url_params(url) if ("?" in url and len(url.split("?")) == 2 and url.split("?")[1]) else params
+        if common:
+            x_common = extract_url_params(common)
+            x_params.update(x_common)
+        if devices:
+            for k, v in devices.items():
+                if k in x_params:
+                    x_params[k] = v
+                if k in x_common:
+                    x_common[k] = v
+                elif "did" in x_params and k == "device_id":
+                    x_params["did"] = v
+
+    x_params["ts"] = ts_override if ts_override is not None else int(time.time())
+    x_params["_rticket"] = rticket_override if rticket_override is not None else int(time.time() * 1e3)
+    if x_common:
+        x_common["ts"] = int(time.time())
+        x_common["_rticket"] = int(time.time() * 1e3)
+    eurl = url.split("?")[0] + "?" + url_encode(x_params) if "?" in url else url + "?" + url_encode(x_params)
+    url_params: dict = x_params
+
+    return eurl, url_params, url_encode(x_common)
+
+def xssstub_hash_md5_hex(data, dataType:str=None):
+    if not data:
+        return str()
+    if dataType == "md5":
+        return data
+    md5 = hashlib.md5()
+    if isinstance(data, str):
+        md5.update(data.encode('utf-8'))
+    elif isinstance(data, bytes):
+        md5.update(data)
+    else:
+        if dataType == "application/json; charset=UTF-8":
+            md5.update(json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8'))
+        else:
+            md5.update(urlencode(data).encode('utf-8'))
+    xt = md5.hexdigest()
+    return xt.upper()
+
+import binascii
+
 
 xtime = lambda a: (((a << 1) ^ 0x1B) & 0xFF) if (a & 0x80) else (a << 1)
 
+
 def rol(num, shift):
     shift %= 32
-    # Perform the left rotation
     return ((num << shift) | (num >> (32 - shift))) & 0xFFFFFFFF
+
 
 def rl8(x: int, k: int) -> int:
     n = 8
     s = k & (n - 1)
     return ((x << s) | (x >> (n - s))) & 0xff
+
 
 def ror32(value, count):
     count %= 32
@@ -1652,6 +939,7 @@ def ror32(value, count):
     value &= 0xFFFFFFFF
     return value
 
+
 def ror(value, count):
     count %= 64
     low = value << (64 - count)
@@ -1659,6 +947,7 @@ def ror(value, count):
     value |= low
     value &= 0xFFFFFFFFFFFFFFFF
     return value
+
 
 def get_key_hash(key, rand):
     to_hash = bytearray(68)
@@ -1673,31 +962,35 @@ def get_key_hash(key, rand):
 
     return SM3(to_hash).digest(), d2.to_bytes(4, "little")
 
+
 def split_blocks(message, block_size=16, require_padding=True):
     assert len(message) % block_size == 0 or not require_padding
     return [message[i:i + 16] for i in range(0, len(message), block_size)]
+
 
 def add_round_key(s, k):
     for i in range(4):
         for j in range(4):
             s[i][j] ^= k[i][j]
 
+
 def add_round_key_con(s, k, con):
     for i in range(4):
         for j in range(4):
             s[i][j] ^= k[i][con[j]]
 
+
 def bytes2matrix(text):
-    """ Converts a 16-byte array into a 4x4 matrix.  """
     return [list(text[i:i + 4]) for i in range(0, len(text), 4)]
 
+
 def xor_bytes(a, b):
-    """ Returns a new byte array with the elements xor'ed. """
     return bytearray(i ^ j for i, j in zip(a, b))
 
+
 def matrix2bytes(matrix):
-    """ Converts a 4x4 matrix into a 16-byte array.  """
     return bytearray(sum(matrix, []))
+
 
 def mix_single_column(a, i):
     t = a[0][i] ^ a[1][i] ^ a[2][i] ^ a[3][i]
@@ -1707,13 +1000,16 @@ def mix_single_column(a, i):
     a[2][i] ^= t ^ xtime(a[2][i] ^ a[3][i])
     a[3][i] ^= t ^ xtime(a[3][i] ^ u)
 
+
 def mix_columns(s):
     for i in range(4):
         mix_single_column(s, i)
 
+
 def inv_mix_columns(s):
     for i in range(0, 4):
         inv_mix_single_column(s, i)
+
 
 def inv_mix_single_column(a, i):
     u = xtime(xtime(a[0][i] ^ a[2][i]))
@@ -1724,6 +1020,7 @@ def inv_mix_single_column(a, i):
     a[3][i] ^= v
 
     mix_single_column(a, i)
+
 
 s_box = b''.join([
     b'\xFA\x7D\x08\x6B\x9C\x59\xB3\x4B\x04\x5F\x39\xD0\x38\x4A\x91\x99',
@@ -1793,6 +1090,12 @@ s_box = b''.join([
 
 inv_s_box = bytearray(1024)
 
+for i in range(4):
+    idx = i * 256
+    for j in range(256):
+        inv_s_box[idx + s_box[idx + j]] = j
+
+
 class AES_V3():
     r_con = [[1, 0, 2, 3], [1, 3, 0, 2], [0, 1, 3, 2], [1, 0, 2, 3]]
     r_con2 = [[1, 0, 2, 3], [2, 0, 3, 1], [0, 1, 3, 2], [1, 0, 2, 3]]
@@ -1802,7 +1105,7 @@ class AES_V3():
                 [0, 9, 14, 11, 4, 13, 2, 7, 8, 1, 6, 15, 12, 5, 10, 3]]
 
     def __init__(self, aes_key, khronos):
-        self.word_size = khronos & 3  # khronos - (khronos & -4)
+        self.word_size = khronos & 3
         self.aes_key = aes_key
 
         self.s_box = s_box[self.word_size << 8:]
@@ -1869,7 +1172,6 @@ class AES_V3():
         for i in range(31):
             kk = key[i]
             idx = i * 8
-            # print(k, data[idx + 1], (data[idx + 1] & -65) | (k & 64))
             data[idx + 0] = (data[idx + 0] & -33) | ((kk << 4) & 0xff & 32)
             data[idx + 1] = (data[idx + 1] & -65) | (kk & 64)
             data[idx + 2] = (data[idx + 2] & -5) | ((kk * 4) & 4)
@@ -1892,23 +1194,17 @@ class AES_V3():
             previous = block
 
         key = b''.join(blocks)
-        # key = bytes.fromhex('a22c23b05bb4a831d31bbdbd1327c5f84991bca3e7d8df24e52f58b7ac61f2e0')
-        # print("sign_key", key.hex())
         data = self.mix_columns(data, key)
         return key[-1:] + data
 
     def encrypt_block(self, plaintext):
-        # print("b000", plaintext.hex())
         plain_state = bytes2matrix(plaintext)
 
         add_round_key_con(plain_state, self._key_matrices[0:4], self.con2)
-        # print("b001", matrix2bytes(plain_state).hex())
 
         for i in range(1, 3):
             self.sub_bytes(plain_state)
-            # print("b003", matrix2bytes(plain_state).hex())
             self.shift_rows(plain_state)
-            # print("b004", matrix2bytes(plain_state).hex())
             if i == 1:
                 self.shift_rows_con(plain_state, self.con2)
                 mix_columns(plain_state)
@@ -1927,12 +1223,10 @@ class AES_V3():
 
         for ciphertext_block in split_blocks(ciphertext):
             dc = xor_bytes(previous, self.decrypt_block(ciphertext_block))
-            # dc = matrix2bytes(dcm)
             blocks.append(dc)
             previous = ciphertext_block
 
         key = b''.join(blocks)
-        # print("sign_key", key.hex())
         data = self.mix_columns(data, key)
         return data
 
@@ -1940,22 +1234,17 @@ class AES_V3():
         assert len(ciphertext) == 16
         cipher_state = bytes2matrix(ciphertext)
 
-        # print("b000", matrix2bytes(cipher_state).hex())
         add_round_key(cipher_state, self._key_matrices[4:])
-        #         print("b001", matrix2bytes(cipher_state).hex())
 
         for i in range(2, 0, -1):
             add_round_key_con(cipher_state, self._key_matrices[i * 4:], self.con2)
-            #             print("b002", i, matrix2bytes(cipher_state).hex())
 
             if i == 1:
                 inv_mix_columns(cipher_state)
                 self.shift_rows_con(cipher_state, self.con)
 
             self.inv_shift_rows(cipher_state)
-            #             print("b004", i, matrix2bytes(cipher_state).hex())
             self.inv_sub_bytes(cipher_state)
-        #             print("b005", i, matrix2bytes(cipher_state).hex())
 
         add_round_key_con(cipher_state, self._key_matrices[0:4], self.con2)
 
@@ -1963,7 +1252,6 @@ class AES_V3():
 
     def shift_rows_con(self, s, c):
         for i in range(4):
-            # c = self.con
             s[i][0], s[i][1], s[i][2], s[i][3] = s[i][c[0]], s[i][c[1]], s[i][c[2]], s[i][c[3]]
 
     def shift_rows(self, s):
@@ -1995,12 +1283,24 @@ class AES_V3():
                 s[i][j] = self.inv_s_box[s[i][j]]
         s[0], s[1], s[2], s[3] = s[self.con[0]], s[self.con[1]], s[self.con[2]], s[self.con[3]]
 
+
+SV = [0xa7aefe20, 0x7149f1d6, 0x47e4ca07, 0xe9b58f67, 0x93b924de, 0xc614d0f5, 0x38afe0ef, 0xb2bbad73,
+      0xe24444c3, 0x9d3aec9b, 0xdf7b37e4, 0xd8b16d40, 0xf8ac31b8, 0x76b9a90b, 0x31d833ee, 0x953fce64,
+      0x6a6b2b48, 0x8c138276, 0x6d24a010, 0x18da124b, 0xbbeb82ee, 0x39f7ea56, 0x149f4fe1, 0x229946bc,
+      0x327f309, 0xf4f50e66, 0x62d569aa, 0x78419f92, 0x4db088a7, 0x7430a018, 0xf31d88f4, 0x2f4ed651,
+      0x9b13fe59, 0x45c5910d, 0x374bf0ec, 0xd5a5b69e, 0xefaceb16, 0x714f4811, 0x4c98233b, 0xc9e6e7b1,
+      0xd0623b3f, 0xdf5e4f6f, 0xccb31244, 0xaddab856, 0x6faf9c9e, 0x62804e10, 0x6fa7e29d, 0x7e429d51,
+      0xcdb31e01, 0xb339e419, 0xe497a8a3, 0xebeca6bc, 0x1746cd57, 0xfbf4f54a, 0xd5ea2a8b, 0xb4f02ed2,
+      0x512b192, 0xefad4d29, 0xd59bec05, 0x2a1436e2, 0xfaea73c1, 0x1ebdbae8, 0x8ff257bd, 0x2d59351d]
+
+
 def leftCircularShift(k, bits):
     bits = bits % 32
     k = k % (2 ** 32)
     upper = (k << bits) % (2 ** 32)
     result = upper | (k >> (32 - (bits)))
     return (result)
+
 
 def blockDivide(block, chunks):
     result = []
@@ -2009,34 +1309,134 @@ def blockDivide(block, chunks):
         result.append(int.from_bytes(block[i * size:(i + 1) * size], byteorder="little"))
     return (result)
 
+
 def F(X, Y, Z):
     return ((X & Y) | ((~X) & Z))
+
 
 def G(X, Y, Z):
     return ((X & Z) | (Y & (~Z)))
 
+
 def H(X, Y, Z):
     return (X ^ Y ^ Z)
 
+
 def I(X, Y, Z):
     return (Y ^ (X | (~Z))) & 0xffffffff
+
 
 def FF(a, b, c, d, M, s, t):
     result = b + leftCircularShift((a + F(b, c, d) + M + t), s)
 
     return (result)
 
+
 def GG(a, b, c, d, M, s, t):
     result = b + leftCircularShift((a + G(b, c, d) + M + t), s)
     return (result)
+
 
 def HH(a, b, c, d, M, s, t):
     result = b + leftCircularShift((a + H(b, c, d) + M + t), s)
     return (result)
 
+
 def II(a, b, c, d, M, s, t):
     result = b + leftCircularShift((a + I(b, c, d) + M + t), s)
     return (result)
+
+
+def md5sum(msg, n=0):
+    A = 0x79e0f2fb
+    B = 0xc8b52570
+    C = 0xebc2f8cd
+    D = 0x7c104d93
+
+    a = A
+    b = B
+    c = C
+    d = D
+    block = msg[:64]
+    M = blockDivide(block, 16)
+    a = FF(a, b, c, d, M[0], 7, SV[0])
+    d = FF(d, a, b, c, M[13], 12, SV[1])
+    c = FF(c, d, a, b, M[14], 17, SV[2])
+    b = FF(b, c, d, a, M[12], 22, SV[3])
+    a = FF(a, b, c, d, M[11], 7, SV[4])
+    d = FF(d, a, b, c, M[10], 12, SV[5])
+    c = FF(c, d, a, b, M[9], 17, SV[6])
+    b = FF(b, c, d, a, M[7], 22, SV[7])
+    a = FF(a, b, c, d, M[8], 7, SV[8])
+    d = FF(d, a, b, c, M[6], 12, SV[9])
+    c = FF(c, d, a, b, M[5], 17, SV[10])
+    b = FF(b, c, d, a, M[4], 22, SV[11])
+    a = FF(a, b, c, d, M[3], 7, SV[12])
+    d = FF(d, a, b, c, M[2], 12, SV[13])
+    c = FF(c, d, a, b, M[1], 17, SV[14])
+    b = FF(b, c, d, a, M[15], 22, SV[15])
+
+    a = GG(a, b, c, d, M[0], 5, SV[16])
+    d = GG(d, a, b, c, M[5], 9, SV[17])
+    c = GG(c, d, a, b, M[10], 14, SV[18])
+    b = GG(b, c, d, a, M[1], 20, SV[19])
+    a = GG(a, b, c, d, M[12], 5, SV[20])
+    d = GG(d, a, b, c, M[11], 9, SV[21])
+    c = GG(c, d, a, b, M[15], 14, SV[22])
+    b = GG(b, c, d, a, M[2], 20, SV[23])
+    a = GG(a, b, c, d, M[9], 5, SV[24])
+    d = GG(d, a, b, c, M[13], 9, SV[25])
+    c = GG(c, d, a, b, M[3], 14, SV[26])
+    b = GG(b, c, d, a, M[8], 20, SV[27])
+    a = GG(a, b, c, d, M[6], 5, SV[28])
+    d = GG(d, a, b, c, M[7], 9, SV[29])
+    c = GG(c, d, a, b, M[4], 14, SV[30])
+    b = GG(b, c, d, a, M[14], 20, SV[31])
+
+    a = HH(a, b, c, d, M[8], 4, SV[32])
+    d = HH(d, a, b, c, M[5], 11, SV[33])
+    c = HH(c, d, a, b, M[12], 16, SV[34])
+    b = HH(b, c, d, a, M[13], 23, SV[35])
+    a = HH(a, b, c, d, M[1], 4, SV[36])
+    d = HH(d, a, b, c, M[12], 11, SV[37])
+    c = HH(c, d, a, b, M[7], 16, SV[38])
+    b = HH(b, c, d, a, M[14], 23, SV[39])
+    a = HH(a, b, c, d, M[10], 4, SV[40])
+    d = HH(d, a, b, c, M[0], 11, SV[41])
+    c = HH(c, d, a, b, M[2], 16, SV[42])
+    b = HH(b, c, d, a, M[6], 23, SV[43])
+    a = HH(a, b, c, d, M[4], 4, SV[44])
+    d = HH(d, a, b, c, M[11], 11, SV[45])
+    c = HH(c, d, a, b, M[15], 16, SV[46])
+    b = HH(b, c, d, a, M[3], 23, SV[47])
+
+    a = II(a, b, c, d, M[8], 6, SV[48])
+    d = II(d, a, b, c, M[6], 10, SV[49])
+    c = II(c, d, a, b, M[15], 15, SV[50])
+    b = II(b, c, d, a, M[5], 21, SV[51])
+    a = II(a, b, c, d, M[14], 6, SV[52])
+    d = II(d, a, b, c, M[9], 10, SV[53])
+    c = II(c, d, a, b, M[10], 15, SV[54])
+    b = II(b, c, d, a, M[2], 21, SV[55])
+    a = II(a, b, c, d, M[2], 6, SV[56])
+    d = II(d, a, b, c, M[13], 10, SV[57])
+    c = II(c, d, a, b, M[7], 15, SV[58])
+    b = II(b, c, d, a, M[12], 21, SV[59])
+    a = II(a, b, c, d, M[4], 6, SV[60])
+    d = II(d, a, b, c, M[1], 10, SV[61])
+    c = II(c, d, a, b, M[11], 15, SV[62])
+    b = II(b, c, d, a, M[3], 21, SV[63])
+    A = (A + a) % (2 ** 32) ^ 0x19be4866
+    B = (B + b) % (2 ** 32) ^ 0xe85986b4
+    C = (C + c) % (2 ** 32) ^ 0xe19b326e
+    D = (D + d) % (2 ** 32) ^ 0x71d1d7d4
+
+    result = bytearray(
+        A.to_bytes(4, "little") + B.to_bytes(4, "little") + C.to_bytes(4, "little") + D.to_bytes(4, "little"))
+
+    result += sum_md5(result).to_bytes(4, "little")
+    return result
+
 
 def sum_md5(data):
     check_sum = 0x20220420
@@ -2056,6 +1456,7 @@ def sum_md5(data):
     check_sum ^= 0x1000000
     return check_sum
 
+
 SV2 = [0xa7aefe20, 0x7149f1d6, 0x47e4ca07, 0xe9b58f67, 0x93b924de, 0xc614d0f5, 0x38afe0ef, 0xb2bbad73,
        0xe24444c3, 0x9d3aec9b, 0xdf7b37e4, 0xd8b16d40, 0xf8ac31b8, 0x76b9a90b, 0x31d833ee, 0x953fce64,
        0x353595a4, 0x4609c13b, 0x36925008, 0x8c6d0925, 0x5df5c177, 0x1cfbf52b, 0x8a4fa7f0, 0x114ca35e,
@@ -2064,6 +1465,7 @@ SV2 = [0xa7aefe20, 0x7149f1d6, 0x47e4ca07, 0xe9b58f67, 0x93b924de, 0xc614d0f5, 0
        0xf4188ecf, 0xf7d793db, 0x332cc491, 0xab76ae15, 0x9bebe727, 0x18a01384, 0x5be9f8a7, 0x5f90a754,
        0x39b663c0, 0x36673c83, 0x7c92f514, 0x9d7d94d7, 0xe2e8d9aa, 0x5f7e9ea9, 0x7abd4551, 0x569e05da,
        0x40a25632, 0x3df5a9a5, 0xbab37d80, 0x454286dc, 0x3f5d4e78, 0x3d7b75d, 0xb1fe4af7, 0xa5ab26a3]
+
 
 def md5sum_v3(msg, count_v2, orders, count_v1, n=0):
     count = count_v2 & 0xff
@@ -2086,10 +1488,10 @@ def md5sum_v3(msg, count_v2, orders, count_v1, n=0):
         ror32(0xe19b326e, count),
         ror32(0x71d1d7d4, count)
     ]
-    A = start[0]  # 0x79e0f2fb
-    B = start[1]  # 0xc8b52570
-    C = start[2]  # 0xebc2f8cd
-    D = start[3]  # 0x7c104d93
+    A = start[0]
+    B = start[1]
+    C = start[2]
+    D = start[3]
 
     a = A
     b = B
@@ -2102,10 +1504,9 @@ def md5sum_v3(msg, count_v2, orders, count_v1, n=0):
     order2 = orders[16:32]
     order3 = orders[32:48]
     order4 = orders[48:]
-    # Rounds
     a = FF(a, b, c, d, M[order1[0]], 7, sv[0])
-    d = FF(d, a, b, c, M[order1[1]], 12, sv[1])  # 0xb6bc6ddb
-    c = FF(c, d, a, b, M[order1[2]], 17, sv[2])  # 0xf80b15d4
+    d = FF(d, a, b, c, M[order1[1]], 12, sv[1])
+    c = FF(c, d, a, b, M[order1[2]], 17, sv[2])
     b = FF(b, c, d, a, M[order1[3]], 22, sv[3])
     a = FF(a, b, c, d, M[order1[4]], 7, sv[4])
     d = FF(d, a, b, c, M[order1[5]], 12, sv[5])
@@ -2182,11 +1583,13 @@ def md5sum_v3(msg, count_v2, orders, count_v1, n=0):
     result += sum_md5(result).to_bytes(4, "little")
     return result
 
+
 def bxor(b1, b2):
     b3 = bytearray(len(b1))
     for i in range(len(b1)):
         b3[i] = b1[i] ^ b2[i]
     return b3
+
 
 def get_iv(iv, data):
     for i in range(len(data)):
@@ -2196,6 +1599,7 @@ def get_iv(iv, data):
             iv = ~((iv >> 7) ^ iv ^ (data[i] | iv << 12))
         iv = iv & 0xffffffff
     return iv
+
 
 def hash_f13(query_sm3, body_md5_bytes, ts_bytes, khronos):
     iv = get_iv(0x20230928, query_sm3)
@@ -2212,6 +1616,7 @@ def hash_f13(query_sm3, body_md5_bytes, ts_bytes, khronos):
         return branch_2(iv, khronos, query_sm3, body_md5_bytes, ts_bytes)
     else:
         raise Exception("no branch: " + str(branch))
+
 
 def branch_0(iv_v0, khronos, query_sm3, body_md5_bytes, ts_bytes):
     tt01 = [0xc4a78580, 0xb3c0fd39, 0xc58c5686, 0xc9aa3ba7, 0xf5a7adf2, 0x963c2ed1]
@@ -2286,6 +1691,7 @@ def branch_0(iv_v0, khronos, query_sm3, body_md5_bytes, ts_bytes):
     ret += sum.to_bytes(4, "little")
     return ret
 
+
 def swap_v0(src, src_xor, tt2, table_f, order1, typ=None):
     da0 = [0] * 8
     ha0 = src_xor[:]
@@ -2306,8 +1712,8 @@ def swap_v0(src, src_xor, tt2, table_f, order1, typ=None):
         d0, d1, d2, d3, d4, d5, d6, d7 = da0[0], da0[1], da0[2], da0[3], da0[4], da0[5], da0[6], da0[7]
 
         da0[0] = r00(d0, d1, d2, d3, d4, d5, d6, d7, rr_0, table_f)
-        da0[1] = r00(d1, d2, d3, d4, d5, d6, d7, d0, rr_1, table_f)  # 0xd0a489b35ba678e8
-        da0[2] = r00(d2, d3, d4, d5, d6, d7, d0, d1, rr_2, table_f)  # 0x3be5b7f9cfd44654
+        da0[1] = r00(d1, d2, d3, d4, d5, d6, d7, d0, rr_1, table_f)
+        da0[2] = r00(d2, d3, d4, d5, d6, d7, d0, d1, rr_2, table_f)
         da0[3] = r00(d3, d4, d5, d6, d7, d0, d1, d2, rr_3, table_f)
         da0[4] = r00(d4, d5, d6, d7, d0, d1, d2, d3, rr_4, table_f)
         da0[5] = r00(d5, d6, d7, d0, d1, d2, d3, d4, rr_5, table_f)
@@ -2335,6 +1741,7 @@ def swap_v0(src, src_xor, tt2, table_f, order1, typ=None):
         src[6] = da0[1] ^ typ[7] ^ src[7]
         src[7] = da0[0] ^ typ[0]
     return src
+
 
 def branch_1(iv_v0, khronos, query_sm3, body_md5_bytes, ts_bytes):
     tt1 = [0x808a9c79, 0xf079807e, 0xbadf79c5, 0xa785d3ff, 0x82d8438c]
@@ -2388,6 +1795,7 @@ def branch_1(iv_v0, khronos, query_sm3, body_md5_bytes, ts_bytes):
     ret += sum.to_bytes(4, "little")
     return ret
 
+
 def r00(r0, r1, r2, r3, r4, r5, r6, r7, tt, table_f, v=0):
     x = table_f(8 * (r0 >> 56))
     r1 = (r1 >> 45) & 2040
@@ -2416,6 +1824,7 @@ def r00(r0, r1, r2, r3, r4, r5, r6, r7, tt, table_f, v=0):
 
     return x
 
+
 branch_2_orders = bytes.fromhex('''
     0f 07 04 00 09 08 03 0a 06 0b 05 0d 0e 01 0c 02 0f 05 08 0c 00 09 02 01 03 07 0e 06 0b 0a 0d 04 06 05 00 07 0c 00 0a 04 08 0f 01 0b 0d 09 02 0e 06 0b 02 05 04 03 08 01 01 07 0a 00 0d 0c 09 0e
     0d 07 0e 0f 0b 02 08 03 0c 05 09 01 00 04 06 0a 0d 09 02 06 0f 0b 0a 04 08 07 00 0c 05 03 01 0e 0c 09 0f 07 06 0f 03 0e 02 0d 04 05 01 0b 0a 00 0c 05 0a 09 0e 08 02 04 04 07 03 0f 01 06 0b 00
@@ -2423,6 +1832,7 @@ branch_2_orders = bytes.fromhex('''
     01 00 0d 0f 09 0a 0b 0e 04 02 08 07 03 06 0c 05 01 08 0a 0c 0f 09 05 06 0b 00 03 04 02 0e 07 0d 04 08 0f 00 0c 0f 0e 0d 0a 01 06 02 07 09 05 03 04 02 05 08 0d 0b 0a 06 06 00 0e 0f 07 0c 09 03
     0a 08 04 0f 00 0b 01 06 0d 0c 07 09 03 0e 05 02 0a 07 0b 05 0f 00 02 0e 01 08 03 0d 0c 06 09 04 0d 07 0f 08 05 0f 06 04 0b 0a 0e 0c 09 00 02 03 0d 0c 02 07 04 01 0b 0e 0e 08 06 0f 09 05 00 03
     ''')
+
 
 def branch_2(iv, khronos, query_sm3, body_md5_bytes, ts_bytes):
     n0 = (iv & 15 - 2) * 86
@@ -2450,6 +1860,7 @@ def branch_2(iv, khronos, query_sm3, body_md5_bytes, ts_bytes):
 
     return ret
 
+
 def branch0_xor(data, base, di, tt03, round, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10):
     d = data[:]
 
@@ -2475,398 +1886,1217 @@ def branch0_xor(data, base, di, tt03, round, x1, x2, x3, x4, x5, x6, x7, x8, x9,
         d[x8] = (o + n4) & 0xffffffff
     return d
 
-branch_1_table = None
+
+_BR1_RAW = None
+
 
 def get_branch_1_table_f(iv_v0):
-    global branch_1_table
-    if branch_1_table is None:
-        branch_1_table = _branch_one_bytes()
+    global _BR1_RAW
+    if _BR1_RAW is None:
+        _BR1_RAW = bytes([item for sublist in _get_branch_one_table() for item in sublist])
 
-    table = branch_1_table[iv_v0 << 14:]
+    table = _BR1_RAW[iv_v0 << 14:]
     def table_f(x):
         return int.from_bytes(table[x:x + 8], 'little')
     return table_f
 
-def _varint(value: int) -> bytes:
-    value = int(value)
-    if value < 0:
-        value &= (1 << 64) - 1
-    result = bytearray()
-    while value > 0x7F:
-        result.append((value & 0x7F) | 0x80)
-        value >>= 7
-    result.append(value)
-    return bytes(result)
 
-def _sint(value: int, bits: int) -> int:
-    # 正式 protobuf 编码规则：正数不先截断到有符号范围；
-    # 这对 Medusa.rand 等可能大于 2**31 的 sint32 字段很重要。
-    value = int(value)
-    return (value << 1) if value >= 0 else (value << 1) ^ (~0)
+import hashlib
 
-def _proto_field(field: int, value: Any, kind: str) -> bytes:
-    if value in (None, "", b"", 0, 0.0, False):
-        return b""
-    if kind == "sint32":
-        return _varint((field << 3) | 0) + _varint(_sint(int(value), 32))
-    if kind == "sint64":
-        return _varint((field << 3) | 0) + _varint(_sint(int(value), 64))
-    if kind == "float":
-        return _varint((field << 3) | 5) + struct.pack("<f", float(value))
-    if kind == "bytes":
-        raw = bytes(value)
-    elif kind == "string":
-        raw = str(value).encode("utf-8")
-    elif kind == "message":
-        raw = bytes(value)
-    else:
-        raise ValueError(f"unknown protobuf field kind: {kind}")
-    return _varint((field << 3) | 2) + _varint(len(raw)) + raw
 
-def _proto(fields: list[tuple[int, Any, str]]) -> bytes:
-    return b"".join(_proto_field(field, value, kind) for field, value, kind in fields)
-
-def _encode_request() -> bytes:
-    return _proto([
-        (1, 111, "sint32"),
-        (2, 10, "sint32"),
-        (3, 694367, "sint32"),
-        (5, 586952199, "sint32"),
-    ])
-
-def _encode_device(device: Mapping[str, Any]) -> bytes:
-    fields = [
-        (1, device.get("d1"), "sint32"), (2, device.get("collect_stat"), "sint32"),
-        (3, device.get("aid"), "string"), (4, device.get("device_id"), "string"),
-        (5, device.get("sec_device_token"), "string"), (6, device.get("app_version"), "string"),
-        (7, device.get("battery"), "sint32"), (8, device.get("battery2"), "sint32"),
-        (9, device.get("battery_health"), "sint32"), (10, device.get("battery_changed"), "sint32"),
-        (11, device.get("network"), "string"), (12, device.get("tz"), "string"),
-        (13, device.get("lan"), "string"), (14, device.get("cpu"), "sint32"),
-        (15, device.get("resolution"), "string"), (16, device.get("sdcard"), "float"),
-        (17, device.get("sdcard_used"), "float"), (18, device.get("memory"), "float"),
-        (19, device.get("memory2"), "float"), (20, device.get("data"), "float"),
-        (21, device.get("data_used"), "float"), (22, device.get("os_version"), "string"),
-        (23, device.get("brightness"), "sint32"), (24, device.get("volume"), "sint32"),
-        (25, device.get("ts"), "sint64"), (26, device.get("ts2"), "sint64"),
-        (27, device.get("ts3"), "sint64"), (28, device.get("ts4"), "sint64"),
-        (29, device.get("usb"), "sint32"), (30, device.get("hw_version"), "string"),
-        (31, device.get("brand"), "string"), (32, device.get("board"), "string"),
-        (33, device.get("product_name"), "string"), (34, device.get("product_device"), "string"),
-        (35, device.get("product_manufacturer"), "string"), (36, device.get("hardware"), "string"),
-        (38, device.get("unknown38"), "sint32"), (40, device.get("unknown40"), "sint32"),
-    ]
-    return _proto(fields)
-
-def _encode_env(env: Mapping[str, Any]) -> bytes:
-    fields = [
-        (1, env.get("launch_time"), "sint32"), (2, env.get("unknown2"), "sint32"),
-        (3, env.get("unknown3"), "sint32"), (5, env.get("unknown5"), "sint32"),
-        (6, env.get("version"), "string"), (7, env.get("pid"), "sint32"),
-        (12, _encode_device(env.get("device") or {}), "message"),
-        (13, _proto([
-            (1, (env.get("report") or {}).get("time"), "sint64"),
-            (2, (env.get("report") or {}).get("state"), "sint32"),
-            (4, (env.get("report") or {}).get("code"), "sint32"),
-            (5, (env.get("report") or {}).get("times"), "sint32"),
-            (6, (env.get("report") or {}).get("unknown6"), "sint32"),
-        ]), "message"),
-        (14, env.get("app_version"), "string"),
-        (15, env.get("unknown15"), "sint32"), (16, env.get("unknown16"), "sint32"),
-        (18, env.get("unknown18"), "sint32"), (19, env.get("unknown19"), "sint32"),
-        (20, env.get("unknown20"), "sint32"), (21, env.get("unknown21"), "sint32"),
-    ]
-    return _proto(fields)
-
-def _encode_medusa(values: Mapping[str, Any]) -> bytes:
-    return _proto([
-        (1, values.get("magic"), "bytes"), (2, values.get("version"), "sint32"),
-        (3, values.get("rand"), "sint32"), (4, values.get("ms_app_id"), "string"),
-        (5, values.get("device_id"), "string"), (6, values.get("license_id"), "string"),
-        (7, values.get("app_version"), "string"), (8, values.get("sdk_version_str"), "string"),
-        (9, values.get("sdk_version"), "sint32"), (10, values.get("xg_seed_bytes"), "bytes"),
-        (12, values.get("time"), "sint32"), (13, values.get("query_body_ts_hash"), "bytes"),
-        (14, values.get("query_sm3"), "bytes"), (15, _encode_request(), "message"),
-        (16, values.get("sec_device_token"), "string"), (17, values.get("time2"), "sint32"),
-        (18, values.get("lanusk_hash"), "bytes"), (19, values.get("query_body_hash_sm3"), "bytes"),
-        (20, values.get("psk_version"), "string"), (21, values.get("call_type"), "sint32"),
-        (23, _encode_env(values.get("env") or {}), "message"),
-        (24, values.get("unknown24"), "string"), (26, values.get("original"), "string"),
-    ])
-
-def _json_body_md5(data: Any, data_type: str | None = None) -> str:
-    if not data:
-        return ""
-    if isinstance(data, str):
-        raw = data.encode("utf-8")
-    elif isinstance(data, bytes):
-        raw = data
-    elif data_type == "application/json; charset=UTF-8":
-        raw = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    else:
-        raw = urlencode(data).encode("utf-8")
-    return hashlib.md5(raw).hexdigest().upper()
-
-def _url_encode(value: Mapping[str, Any]) -> str:
-    return urlencode(value).replace("+", "%20").replace("%2A", "*")
-
-def _get_params_encrypturl(url: str, params: Mapping[str, Any], devices: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
-    result = dict(params)
-    for key, value in devices.items():
-        if key in result:
-            result[key] = value
-        elif key == "device_id" and "did" in result:
-            result["did"] = value
-    result["ts"] = int(time.time())
-    result["_rticket"] = int(time.time() * 1000)
-    return url.split("?", 1)[0] + "?" + _url_encode(result), result
-
-def _xg_rc4(data: bytes, key: bytes) -> bytearray:
-    table = list(range(256))
+def rc4_xg(data, key):
+    S = list(range(256))
     j = 0
     for i in range(256):
-        j = (j + table[i] + key[i % len(key)]) % 256
-        table[i] = table[j]
+        j = (j + S[i] + key[i % len(key)]) % 256
+        S[i] = S[j]
     i = j = 0
+
     result = bytearray(len(data))
-    for index, value in enumerate(data):
-        i = (i + 1) & 0xFF
-        x = table[i]
-        j = (j + x) & 0xFF
-        y = table[j]
-        # 保持正式基线的 RC4 变体：这里只覆盖 S[i]，不交换 S[j]。
-        table[i] = y
-        result[index] = value ^ table[(y + y) & 0xFF]
+    for k, v in enumerate(data):
+        i += 1
+        x = S[i]
+        j += x
+        y = S[j & 0xff]
+        S[i] = y
+        result[k] = v ^ S[(y + y) & 0xff]
+
     return result
 
-def _reverse_bits(value: int) -> int:
-    return int(f"{value:08b}"[::-1], 2)
 
-def _encrypt_gorgon(body: Any, query: str, khronos: int, xg_rand: int, data_type: str) -> str:
-    body_md5 = _json_body_md5(body, data_type).lower() if body else ""
-    data = bytearray(hashlib.md5(query.encode()).digest()[:4])
-    data += bytes.fromhex(body_md5)[:4] if body_md5 else b"\0\0\0\0"
-    data += b"\0\0\0\0" + (67503104).to_bytes(4, "little") + khronos.to_bytes(4, "big")
-    key = bytes((0x4A, 320 & 0xFF, 0x16, (xg_rand >> 8) & 0xFF, 0x47, 0x6C, 1, xg_rand & 0xFF))
-    result = _xg_rc4(data, key)
-    for index, value in enumerate(result):
-        value = ((value >> 4) | (value << 4)) & 0xFF
-        following = result[index + 1] if index + 1 < len(result) else result[0]
-        result[index] = (~(_reverse_bits(following ^ value) ^ 20)) & 0xFF
-    return (b"\x84\x04" + xg_rand.to_bytes(2, "little") + (320).to_bytes(2, "little") + result).hex()
+def reverse_bits(num):
+    bin_num = bin(num)[2:].zfill(8)
+    rev_bin_num = bin_num[::-1]
+    rev_num = int(rev_bin_num, 2)
 
-def _ror64(value: int, count: int) -> int:
+    return rev_num
+
+
+gorgon_84 = bytes([0x4a, 0x16, 0x47, 0x6c, 0x84, 0x04])
+
+def encrypt_gorgon(body, query, khronos, xg_rand, dataType):
+    xg_seed = 320
+    body_md5 = xssstub_hash_md5_hex(data=body, dataType=dataType).lower() if body else ""
+
+    data = hashlib.md5(query.encode()).digest()[:4]
+
+    if len(body_md5) > 0:
+        body_md5 = bytes.fromhex(body_md5)
+        data += body_md5[:4]
+    else:
+        data += bytearray([0, 0, 0, 0])
+    data += bytearray([0, 0, 0, 0])
+    mssdkVersionInt = 67503104
+    data += mssdkVersionInt.to_bytes(4, "little")
+    data += khronos.to_bytes(4, "big")
+    key = bytes([
+        gorgon_84[0],
+        320 & 0xff,
+        gorgon_84[1],
+        (xg_rand >> 8) & 0xff,
+        gorgon_84[2],
+        gorgon_84[3],
+        (320 >> 8) & 0xff,
+        xg_rand & 0xff,
+    ])
+
+    out = rc4_xg(data, key)
+    for i in range(len(out)):
+        a = out[i]
+        out[i] = (a >> 4 | (a << 4)) & 0xFF
+        a = out[0]
+        if i + 1 < len(out):
+            a = out[i + 1]
+        a ^= out[i]
+        a = reverse_bits(a)
+        out[i] = (~(a ^ 20)) & 0xFF
+
+    ret = gorgon_84[-2:]
+    ret += xg_rand.to_bytes(2, "little")
+    ret += xg_seed.to_bytes(2, "little")
+    ret += out
+
+    return ret.hex()
+
+
+import base64
+import hashlib
+import random
+
+
+def ror(value, count):
     count %= 64
-    return ((value >> count) | (value << (64 - count))) & 0xFFFFFFFFFFFFFFFF
-
-def _encrypt_helios(khronos: int, rand_value: int = 0) -> str:
-    value = rand_value or random.randint(0, 0xFFFFFFFF)
-    seed = value.to_bytes(4, "little") + b"8662"
-    digest = hashlib.md5(seed).digest()
-    keys = b"".join(f"{item:02x}".encode() for item in digest)
-    table = [int.from_bytes(keys[:8], "little")]
-    words = [int.from_bytes(keys[i:i + 8], "little") for i in range(0, 32, 8)]
-    first, second = words[0], words[1]
-    words = words[2:]
-    for index in range(0x22):
-        value2 = _ror64(second, 8)
-        value2 = (value2 + first) & 0xFFFFFFFFFFFFFFFF
-        value2 = (value2 ^ index) & 0xFFFFFFFFFFFFFFFF
-        words.append(value2)
-        value2 ^= _ror64(first, 61)
-        value2 &= 0xFFFFFFFFFFFFFFFF
-        table.append(value2)
-        first, second = value2, words.pop(0)
-    raw = (f"{khronos}-1588093228-8662").encode()
-    pad = 16 - len(raw) % 16
-    raw += bytes([pad]) * pad
-    output = bytearray()
-    for offset in range(0, len(raw), 16):
-        left = int.from_bytes(raw[offset:offset + 8], "little")
-        right = int.from_bytes(raw[offset + 8:offset + 16], "little")
-        for index in range(0x22):
-            right = (table[index] ^ (left + _ror64(right, 8))) & 0xFFFFFFFFFFFFFFFF
-            left = (right ^ _ror64(left, 61)) & 0xFFFFFFFFFFFFFFFF
-        output += left.to_bytes(8, "little") + right.to_bytes(8, "little")
-    return base64.b64encode(value.to_bytes(4, "little") + output).decode()
-
-def _gen_medusa_proto(url: str, url_params: Mapping[str, Any], devices: Mapping[str, Any], data: Any, khronos: int, data_type: str) -> tuple[bytes, bytes, bytes]:
-    body_md5 = _json_body_md5(data, data_type).lower() if data else ""
-    body_md5_bytes = bytes.fromhex(body_md5) if body_md5 else bytes(16)
-    ts_bytes = khronos.to_bytes(4, "little")
-    query = url.split("?", 1)[1] if "?" in url else ""
-    query_sm3 = SM3(query).digest()
-    query_body_hash = SM3(query.encode() + body_md5_bytes + b"none").digest()
-    device_id = str(devices.get("device_id", url_params.get("device_id", url_params.get("did", ""))))
-    version_name = str(devices.get("version_name", url_params.get("version_name", "7.1.3.32")))
-    device_model = str(devices.get("device_model", url_params.get("device_type", "")))
-    brand = str(devices.get("device_brand", url_params.get("device_brand", "")))
-    sec_device_token = str(devices.get("sec_device_token") or "")
-    device_sec_device_token = str(devices.get("device_sec_device_token") or "")
-    proto_rand = random.randint(0, 0xFFFFFFFF)
-    launch_time = random.randint(100, 120)
-    process_id = random.randint(10001, 12000)
-    # 这些字段是正式签名实现中的固定环境采样值，不是用户设备标识。
-    report_ts = 1728388016635
-    report_time = int(time.time())
-    device = {
-        "d1": 1, "collect_stat": 2, "aid": "8662", "device_id": device_id,
-        "sec_device_token": device_sec_device_token,
-        "app_version": "!noperm!", "battery": -888888, "battery2": -888888,
-        "battery_health": 3, "battery_changed": -888888, "network": "!notset!",
-        "tz": "Asia/Shanghai,8", "lan": "zh_CN", "cpu": 4,
-        "sdcard": 255.24993896484375, "sdcard_used": 35.58599090576172,
-        "memory": 3.467449188232422, "memory2": 3.467449188232422,
-        "data": 255.1754913330078, "data_used": 42.17544174194336,
-        "os_version": str(devices.get("os_version", url_params.get("os_version", ""))),
-        "brightness": 41, "volume": 36, "ts": report_ts, "ts2": report_ts,
-        "ts3": report_ts, "ts4": report_ts + 2, "usb": -1, "hw_version": device_model,
-        "brand": brand, "board": device_model, "product_name": device_model,
-        "product_device": str(devices.get("device_manufacturer", brand)),
-        "product_manufacturer": brand, "hardware": brand, "unknown38": 31,
-    }
-    env = {
-        "launch_time": launch_time, "unknown2": 146331399,
-        "unknown3": 146331396, "unknown5": 7, "version": "v04.06.04.03-bugfix",
-        "pid": process_id, "device": device,
-        "report": {"time": report_time, "state": -2, "code": 200, "times": 0, "unknown6": 0},
-        "app_version": version_name,
-    }
-    values = {
-        "magic": b"\xf7\xe8_\xfa\xd7\xd7\xdc;\xd6*\xc8pW\xcfa\x18",
-        "version": 3, "rand": proto_rand, "ms_app_id": "8662",
-        "device_id": device_id, "license_id": "1588093228", "app_version": version_name,
-        "sdk_version_str": "v04.06.04-ml-android", "sdk_version": 67503104,
-        "xg_seed_bytes": (320).to_bytes(8, "little"), "time": khronos,
-        "query_body_ts_hash": hash_f13(query_sm3, body_md5_bytes, ts_bytes, khronos),
-        "query_sm3": query_sm3[:6], "sec_device_token": sec_device_token, "time2": khronos,
-        "lanusk_hash": b"", "query_body_hash_sm3": query_body_hash, "psk_version": "none",
-        "call_type": 312, "env": env,
-        "unknown24": '{"cmr":16777216,"cmr2":16777216,"un_h":1879194040,"vpn":0,"kd":0,"fkd":3672518972,"pd":-1872573247,"dyn":"","do":0,"tk":true}',
-    }
-    return _encode_medusa(values), query_sm3, hash_f13(query_sm3, body_md5_bytes, ts_bytes, khronos)
-
-def _xmxor_two(data: bytes, key: bytes) -> bytearray:
-    encoded = bytearray(len(data))
-    for index, value in enumerate(data):
-        position = (index * 4) & 28
-        d0, d1 = key[position], key[position + 1]
-        d2 = (rl8(value, 4) + d0) ^ d1
-        d2 = rl8((~d2) & 0xFF, 3)
-        d2 = ((d2 + d1) & 0xFF) ^ d0
-        encoded[-index - 1] = (~d2) & 0xFF
-    return encoded
-
-def _xmxor(data: bytes, key: bytes) -> bytearray:
-    value = _xmxor_two(data, key)
-    last_flag = value[-1] ^ value[-2]
-    data0 = value[0]
-    value[0] = (~last_flag + value[0]) & 0xFF
-    value[1] = ((value[0] ^ value[-1] ^ 254) + value[1]) & 0xFF
-    value[2] = (value[2] + ((last_flag - data0) ^ rl8(value[1], 3) ^ 2)) & 0xFF
-    for index in range(len(value) - 4):
-        temp = rl8(value[index + 2], 3) ^ value[index + 1] ^ (index + 3)
-        value[index + 3] = (~temp + value[index + 3]) & 0xFF
-    value[-1] ^= value[-2]
-    value[0] = ((value[0] ^ value[1]) + sum(value[1:])) & 0xFF
+    low = value << (64 - count)
+    value >>= count
+    value |= low
+    value &= 0xFFFFFFFFFFFFFFFF
     return value
 
-def _gen_medusa(url: str, url_params: Mapping[str, Any], devices: Mapping[str, Any], data: Any, khronos: int, data_type: str) -> str:
-    config_key = b"\xf1Y3vvn\xa9\x8d4\xf3\x1b\x05z\x9d[\xe4"
-    config_iv = b"\x1f\xe1\t\xa4\x12R\x83\xf4\x18\xde\x9e\x05\x1a\x96\x9e\x12"
-    sign_key = b"\x8e\xbd\xfa8\x06\xec\xc5\xce\xe7\x94#\xe6\x02\x9e\xd8%@\xbc\"\x18\xbb~\xae\xf7\x1c\xb6\x91\xf7\xaa\x8a\xa2\xf5"
-    proto, query_sm3, body_sm3 = _gen_medusa_proto(url, url_params, devices, data, khronos, data_type)
-    hash_rand = random.randint(0, 0xFFFFFFFF)
-    xm_rand = random.randint(0, 0xFFFFFFFF)
-    key, seed = get_key_hash(sign_key, hash_rand)
-    mixed = _xmxor(proto, key)
-    mixed = (320).to_bytes(8, "little") + mixed
-    mixed = bytearray(mixed[::-1])
-    for index in range(len(mixed)):
-        mixed[index] ^= seed[~index & 3]
-    hash_bytes = hash_rand.to_bytes(4, "little")
-    check_bit = ((query_sm3[0] & 63) << 14) | 0x18000001 | ((body_sm3[0] & 63) << 8)
-    mixed = b"\x35" + xm_rand.to_bytes(4, "little") + check_bit.to_bytes(4, "little") + mixed + hash_bytes[2:]
-    mixed = AES_V3(config_key, khronos).encrypt(mixed, config_iv)
-    version = bytes.fromhex("03 00 00 00 f7 e8 5f fa d7 d7 dc 3b d6 2a c8 70 57 cf 61 18")
-    version_or = b"".join((int.from_bytes(version[i:i + 4], "little") ^ khronos).to_bytes(4, "little") for i in range(0, 20, 4))
-    return base64.b64encode(version_or + hash_bytes[:2] + (256).to_bytes(2, "little") + mixed).decode()
 
-def _core_sixgod(url: str, params: Mapping[str, Any], devices: Mapping[str, Any], data: Any, header: Mapping[str, Any]) -> tuple[dict[str, str], str]:
-    data_type = str(header.get("content-type", header.get("Content-Type", "")))
-    xg_rand = random.randint(0, 0xFFFF)
-    encrypted_url, url_params = _get_params_encrypturl(url, params, devices)
-    khronos = int(time.time())
-    encoded_query = _url_encode(url_params)
-    values = {
-        "khronos": str(khronos),
-        "ladon": base64.b64encode(khronos.to_bytes(4, "big")).decode(),
-        "argus": base64.b64encode(khronos.to_bytes(4, "little")).decode(),
-        "gorgon": _encrypt_gorgon(data, encoded_query, khronos, xg_rand, data_type),
-        "helios": _encrypt_helios(khronos, 0),
-        "medusa": _gen_medusa(encrypted_url, url_params, devices, data, khronos, data_type),
+HexTable = b"0123456789abcdef"
+
+
+def _helios_bytes2matrix(text):
+    return [int.from_bytes(list(text[i:i + 8]), 'little') for i in range(0, len(text), 8)]
+
+
+def encrypt_helios_input(hash_table, in_data):
+    data0 = int.from_bytes(in_data[:8], 'little')
+    data1 = int.from_bytes(in_data[8:], 'little')
+    for i in range(0, 0x22):
+        hash1 = hash_table[i]
+        data1 = hash1 ^ (data0 + ror(data1, 8))
+        data1 &= 0xFFFFFFFFFFFFFFFF
+        data0 = data1 ^ ror(data0, 61)
+        data0 &= 0xFFFFFFFFFFFFFFFF
+
+    return data0.to_bytes(8, 'little') + data1.to_bytes(8, 'little')
+
+
+def encrypt_helios(khronos, rand=0):
+    rand = rand or int(random.randint(0, 0xFFFFFFFF))
+    data = rand.to_bytes(4, "little")
+    data += str(8662).encode()
+    key_sum = hashlib.md5(data).digest()
+
+    keys = bytearray(32)
+    for i in range(16):
+        v1 = key_sum[i]
+        keys[2 * i] = HexTable[v1 >> 4]
+        keys[2 * i + 1] = HexTable[v1 & 15]
+
+    hash_table = []
+    hash_table.append(int.from_bytes(keys[:8], "little"))
+
+    keys = _helios_bytes2matrix(keys)
+    buffer_b0 = keys[0]
+    buffer_b8 = keys[1]
+    keys.pop(0)
+    keys.pop(0)
+
+    for i in range(0, 0x22):
+        x9 = buffer_b0
+        x8 = buffer_b8
+
+        x8 = ror(x8, 8)
+        x8 = x8 + x9
+        x8 = (x8 ^ i) & 0xFFFFFFFFFFFFFFFF
+        keys.append(x8)
+
+        x8 = x8 ^ ror(x9, 61)
+        x8 &= 0xFFFFFFFFFFFFFFFF
+
+        hash_table.append(x8)
+        buffer_b0 = x8
+        buffer_b8 = keys[0]
+        keys.pop(0)
+
+    in_data = _pkcs7_pad(bytes(f"{khronos}-1588093228-8662", 'utf-8'), 16)
+    out = bytearray()
+    for i in range(len(in_data) // 16):
+        out += encrypt_helios_input(hash_table, in_data[i * 16:i * 16 + 16])
+
+    out = data[:4] + out
+    return base64.b64encode(out).decode()
+
+import base64
+import random
+import time
+
+
+def xmxor(data, key):
+    data = xmxor_two(data, key)
+
+    last_flag = data[-1] ^ data[-2]
+    data0 = data[0]
+    data[0] = (~last_flag + data[0]) & 0xff
+    data[1] = ((data[0] ^ data[-1] ^ 254) + data[1]) & 0xff
+    data[2] = (data[2] + ((last_flag - data0) ^ rl8(data[1], 3) ^ 2)) & 0xff
+
+    for i in range(len(data) - 4):
+        temp = (rl8(data[i + 2], 3)) ^ data[i + 1] ^ (i + 3)
+        data[i + 3] = (~temp + data[i + 3]) & 0xff
+
+    data[-1] ^= data[-2]
+
+    sum = 0
+    for i in range(len(data) - 1):
+        sum += int(data[i + 1])
+
+    data[0] = ((data[0] ^ data[1]) + sum) & 0xff
+    return data
+
+
+def xmxor_two(data, key):
+    enc_data = bytearray(len(data))
+    for i in range(len(data)):
+        index = (i * 4) & 28
+        d0 = key[index]
+        d1 = key[index + 1]
+
+        d2 = (rl8(data[i], 4) + d0) ^ d1
+        d2 = ~d2
+        d2 = (rl8(d2 & 0xff, 3)) & 0xff
+        d2 += d1
+        d2 = (d2 & 0xff) ^ d0
+        enc_data[-i - 1] = ~d2 & 0xff
+    return enc_data
+
+def gen_medusa(url, url_params, devices, data:dict, khronos:int=None, lanusk=None, hash_rand=0, xm_rand=0, dataType=None):
+    config = {
+        'fix': bytes([0x35]),
+        'aes_key': b'\xf1Y3vvn\xa9\x8d4\xf3\x1b\x05z\x9d[\xe4',
+        'aes_iv': b'\x1f\xe1\t\xa4\x12R\x83\xf4\x18\xde\x9e\x05\x1a\x96\x9e\x12',
+        'signKey': b'\x8e\xbd\xfa8\x06\xec\xc5\xce\xe7\x94#\xe6\x02\x9e\xd8%@\xbc"\x18\xbb~\xae\xf7\x1c\xb6\x91\xf7\xaa\x8a\xa2\xf5',
     }
-    signs = {
-        "x-ladon": values["ladon"], "x-khronos": values["khronos"],
-        "x-argus": values["argus"], "x-gorgon": values["gorgon"],
-        "x-helios": values["helios"], "x-medusa": values["medusa"],
+    data, query_sm3, body_sm3 = gen_medusa_proto(url, url_params, devices, data, khronos, lanusk, dataType)
+
+    hash_rand = hash_rand or int(random.randint(0, 0xFFFFFFFF))
+    xm_rand = xm_rand or int(random.randint(0, 0xFFFFFFFF))
+    key, seed = get_key_hash(config['signKey'], hash_rand)
+    data = xmxor(data, key)
+    xg_seed = 320
+    data = xg_seed.to_bytes(8, "little") + data
+    data = bytearray(data[::-1])
+    for i in range(0, len(data)):
+        data[i] = data[i] ^ seed[~i & 3]
+
+    hash_rand_bytes = hash_rand.to_bytes(4, "little")
+    check_bit = (query_sm3[0] & 63) << 14
+    check_bit |= 0x18000001
+    check_bit |= (body_sm3[0] & 63) << 8
+    data = config['fix'] + xm_rand.to_bytes(4, 'little') + check_bit.to_bytes(4, 'little') + data + hash_rand_bytes[2:]
+    data = AES_V3(config['aes_key'], khronos).encrypt(data, config['aes_iv'])
+    version_or = bytes()
+    version = bytes.fromhex("03 00 00 00 f7 e8 5f fa d7 d7 dc 3b d6 2a c8 70 57 cf 61 18 ")
+    for i in range(0, 20, 4):
+        d = int.from_bytes(version[i:i + 4], "little")
+        d ^= khronos
+        version_or += d.to_bytes(4, "little")
+
+    data = version_or + hash_rand_bytes[:2] + int(256).to_bytes(2, "little") + data
+
+    return base64.b64encode(data).decode()
+
+def gen_medusa_proto(url, url_params, devices, data:dict, khronos:int=None, lanusk=None, dataType=None):
+    xg_seed = 320
+    body_md5 = xssstub_hash_md5_hex(data=data, dataType=dataType).lower() if data else ""
+    if body_md5 != '':
+        body_md5_bytes = bytes.fromhex(body_md5)
+    else:
+        body_md5_bytes = bytes(16)
+    ts_bytes = khronos.to_bytes(4, "little")
+    query_sm3 = SM3(url.split('?')[1]).digest()
+    if len(lanusk) > 0:
+        lanusk_sm3 = SM3(bytes.fromhex(lanusk) + ts_bytes).digest()
+        lanusk_hash = md5sum(
+            lanusk_sm3 + body_md5_bytes + bytes.fromhex("84 96 77 9d db 6d bc b6 d4 15 0b f8 80 01 00 00"))
+
+        lanusk_hash = lanusk_hash
+        psk_version = "1"
+        query_body_hash_sm3 = SM3(url.split('?')[1].encode() + body_md5_bytes + b"1").digest()
+    else:
+        lanusk_hash = b''
+        psk_version = 'none'
+        query_body_hash_sm3 = SM3(url.split('?')[1].encode() + body_md5_bytes + b"none").digest()
+
+    proto_data = Medusa(
+        magic=bytearray(b'\xf7\xe8_\xfa\xd7\xd7\xdc;\xd6*\xc8pW\xcfa\x18'),
+        version=3,
+        rand=int(random.randint(0, 0xFFFFFFFF)),
+        ms_app_id='8662',
+        device_id=str(devices.get("device_id", url_params.get("device_id", url_params.get("did", "")))),
+        license_id='1588093228',
+        app_version=devices.get("version_name", url_params.get("version_name")),
+        sdk_version_str='v04.06.04-ml-android',
+        sdk_version=67503104,
+        xg_seed_bytes=xg_seed.to_bytes(8, "little"),
+        time=khronos,
+        query_body_ts_hash=hash_f13(query_sm3, body_md5_bytes, ts_bytes, khronos),
+        query_sm3=bytearray(query_sm3[:6]),
+        request=MedushaAlgorithmCount(sign_count=111, report_count=10, setting_count=694367, unknown4=0, unknown5=586952199),
+        sec_device_token='AXYQOS6n2m60x1fVZHIrH3iol',
+        time2=khronos,
+        lanusk_hash=lanusk_hash,
+        query_body_hash_sm3=query_body_hash_sm3,
+        psk_version=psk_version,
+        call_type=312,
+        env=Env(
+            launch_time=random.randint(100, 120),
+            unknown2=146331399,
+            unknown3=146331396,
+            unknown5=7,
+            version='v04.06.04.03-bugfix',
+            pid=random.randint(10001, 12000),
+            device=Device(
+                d1=1,
+                collect_stat=2,
+                aid='8662',
+                device_id=str(devices.get("device_id", url_params.get("device_id", url_params.get("did", "")))),
+                sec_device_token='Ai6svO3PyrwDOUSmO6ZcResxu',
+                app_version='!noperm!',
+                battery=-888888,
+                battery2=-888888,
+                battery_health=3,
+                battery_changed=-888888,
+                network='!notset!',
+                tz='Asia/Shanghai,8',
+                lan='zh_CN',
+                cpu=4,
+                sdcard=255.24993896484375,
+                sdcard_used=35.58599090576172,
+                memory=3.467449188232422,
+                memory2=3.467449188232422,
+                data=255.1754913330078,
+                data_used=42.17544174194336,
+                os_version=devices.get("os_version", url_params.get("os_version")),
+                brightness=41,
+                volume=36,
+                ts=1728388016635,
+                ts2=1728388016635,
+                ts3=1728388016635,
+                ts4=1728388016637,
+                usb=-1,
+                hw_version=devices.get("device_model", url_params.get("device_type")),
+                brand=devices.get("device_brand", url_params.get("device_brand")),
+                board=devices.get("device_model", url_params.get("device_type")),
+                product_name=devices.get("device_model", url_params.get("device_type")),
+                product_device=devices.get("device_manufacturer", devices.get("device_brand", url_params.get("device_brand"))),
+                product_manufacturer=devices.get("device_brand", url_params.get("device_brand")),
+                hardware=devices.get("device_brand", url_params.get("device_brand")),
+                unknown38=31
+            ),
+            report=Report(
+                time=devices.get("report_time", int(time.time())),
+                state=-2,
+                code=200,
+                times=0,
+                unknown6=0
+            ),
+            app_version=devices.get("version_name", url_params.get("version_name"))
+        ),
+        unknown24='{"cmr":16777216,"cmr2":16777216,"un_h":1879194040,"vpn":0,"kd":0,"fkd":3672518972,"pd":-1872573247,"dyn":"","do":0,"tk":true}'
+    )
+
+    return bytes(proto_data), query_sm3, proto_data.query_body_ts_hash
+
+
+import base64
+import json
+import random
+import time
+
+
+def lowerHeader(header: dict):
+    new_header = {}
+    for key, value in header.items():
+        new_header[str(key).lower()] = value
+    header.clear()
+    header.update(new_header)
+    return new_header
+
+
+def core_sixgod(surl, params, devices, data:dict={},  common=None, header=None, lanusk="", log=False, rticket_override=None, ts_override=None, khronos_override=None):
+    if devices:
+        for k, v in devices.items():
+            if k in data:
+                data[k] = v
+    dataType = header.get("content-type", header.get("Content-Type"))
+    xg_rand = int(random.randint(0, 0xFFFF))
+    url, url_params, x_common = get_params_encrypturl(surl, params=params, devices=devices, common=common, rticket_override=rticket_override, ts_override=ts_override)
+
+    khronos = khronos_override if khronos_override is not None else int(time.time())
+    params = EecryptParams()
+    params.khronos = str(khronos)
+    params.ladon = base64.b64encode(khronos.to_bytes(4, 'big')).decode()
+    params.argus = base64.b64encode(khronos.to_bytes(4, 'little')).decode()
+    params.gorgon = encrypt_gorgon(data, url_encode(url_params), khronos, xg_rand, dataType)
+    params.helios = encrypt_helios(khronos, rand=0)
+    params.medusa = gen_medusa(
+        url,
+        url_params,
+        devices,
+        data,
+        khronos,
+        lanusk,
+        dataType=dataType
+    )
+    six = result(params, data, url,  common=x_common, dataType=dataType, log=log)
+
+    headers = header.copy()
+    lowerHeader(header=headers)
+    headers.update(six.get("sign_header"))
+    if devices:
+        headers["x-tt-dt"] = devices.get("x_tt_dt", "")
+        headers["user-agent"] = devices.get("ua", "")
+    return headers, six.get("sign_url")
+
+
+def result(params: EecryptParams, data, eurl,  common=None, sell=False, dataType=None, log=False):
+
+    six = {
+        'x-ladon': params.ladon,
+        'x-khronos': params.khronos,
+        'x-argus': params.argus,
+        'x-gorgon': params.gorgon,
+        'x-helios': params.helios,
+        'x-medusa': params.medusa
     }
     if data:
-        signs["x-ss-stub"] = _json_body_md5(data, data_type)
-    result_headers = {str(key).lower(): str(value) for key, value in header.items()}
-    result_headers.update(signs)
-    if devices.get("ua"):
-        result_headers["user-agent"] = str(devices["ua"])
-    result_headers["x-tt-dt"] = str(devices.get("x_tt_dt", ""))
-    return result_headers, encrypted_url
+        six["x-ss-stub"] = xssstub_hash_md5_hex(data=data, dataType=dataType)
+    if sell:
+        datas: dict = dict()
+        datas["api"] = eurl
+        datas["sign"] = six
+        if common:
+            datas["sign"]["x-common-params-v2"] = common
+        return datas
+    datas: dict = dict()
+    datas["sign_url"] = eurl
+    datas["sign_header"] = six
+    if common:
+        datas["sign_header"]["x-common-params-v2"] = common
+    if log:
+        print(json.dumps(datas, indent=4, ensure_ascii=False))
+    return datas
 
-def _device_config(config: Mapping[str, Any]) -> dict[str, str]:
-    device_id = _text(config.get("device_id"))
-    install_id = _text(config.get("install_id"))
+
+USER_AGENT = (
+    "com.phoenix.read/71332 (Linux; U; Android 16; zh_CN; 25053RT47C; "
+    "Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 "
+    "QuicVersion:c67e9834 2025-09-08)"
+)
+
+VIDEO_MODEL_URL_TEMPLATE = (
+    "https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/"
+    "?iid={install_id}&device_id={device_id}&ac=wifi&channel=update_64&aid=8662"
+    "&app_name=novelread&version_code=71332&version_name=7.1.3.32"
+    "&device_platform=android&os=android&ssmix=a&device_type=25053RT47C"
+    "&device_brand=Redmi&language=zh&os_api=36&os_version=16"
+    "&manifest_version_code=71332&resolution=1280*2772&dpi=520"
+    "&update_version_code=71332&host_abi=arm64-v8a&dragon_device_type=phone"
+    "&pv_player=71332&compliance_status=0&need_personal_recommend=1"
+    "&player_so_load=1&is_android_pad_screen=0"
+)
+
+
+def load_local_config() -> Dict[str, Any]:
+    return {"device_id": CONFIG_DEVICE_ID, "install_id": CONFIG_INSTALL_ID, "platform": CONFIG_PLATFORM, "cache_seconds": CONFIG_CACHE_SECONDS}
+
+
+def get_device_keys() -> Dict[str, str]:
+    config = load_local_config()
+
+    device_id = str(config.get("device_id") or "").strip()
+    install_id = str(config.get("install_id") or "").strip()
+    platform = str(config.get("platform") or "android").strip() or "android"
+
     if not device_id or not install_id:
-        raise HongguoPluginError("缺少红果 device_id/install_id 配置")
+        raise RuntimeError(
+            "Missing device configuration. Set DUANJU_DEVICE_ID / "
+            "DUANJU_INSTALL_ID, or open the web UI and save local config."
+        )
+
     return {
-        "device_id": device_id, "iid": install_id, "install_id": install_id,
-        "device_brand": "Redmi", "device_model": "25053RT47C", "device_type": "25053RT47C",
-        "device_manufacturer": "Xiaomi", "os_version": "16", "version_name": "7.1.3.32",
-        "x_tt_dt": _text(config.get("x_tt_dt")),
-        "sec_device_token": _text(config.get("sec_device_token")),
-        "device_sec_device_token": _text(config.get("device_sec_device_token")),
-        "ua": APP_UA,
+        "device_id": device_id,
+        "install_id": install_id,
+        "platform": platform,
     }
 
-def _video_model(video_id: str, config: Mapping[str, Any]) -> dict[str, Any]:
-    devices = _device_config(config)
-    params = {
-        "iid": devices["install_id"],
-        "device_id": devices["device_id"],
-        "ac": "wifi",
-        "channel": "update_64",
-        "aid": "8662",
-        "app_name": "novelread",
-        "version_code": "71332",
-        "version_name": "7.1.3.32",
-        "device_platform": "android",
-        "os": "android",
-        "ssmix": "a",
-        "device_type": "25053RT47C",
+def build_liushen_device(device_keys: Dict[str, str]) -> Dict[str, str]:
+    return {
+        "device_id": device_keys.get("device_id", ""),
+        "iid": device_keys.get("install_id", ""),
+        "install_id": device_keys.get("install_id", ""),
         "device_brand": "Redmi",
-        "language": "zh",
-        "os_api": "36",
+        "device_model": "25053RT47C",
+        "device_type": "25053RT47C",
+        "device_manufacturer": "Xiaomi",
         "os_version": "16",
-        "manifest_version_code": "71332",
-        "resolution": "1280*2772",
-        "dpi": "520",
-        "update_version_code": "71332",
-        "host_abi": "arm64-v8a",
-        "dragon_device_type": "phone",
-        "pv_player": "71332",
-        "compliance_status": "0",
-        "need_personal_recommend": "1",
-        "player_so_load": "1",
-        "is_android_pad_screen": "0",
+        "version_name": "7.1.3.32",
+        "ua": USER_AGENT,
     }
-    payload = {
+
+
+def _compute_branch(query_string, body_bytes, khronos):
+    query_sm3 = SM3(query_string).digest()
+    body_md5 = hashlib.md5(body_bytes).digest() if body_bytes else bytes(16)
+    ts_bytes = khronos.to_bytes(4, "little")
+    iv = get_iv(0x20230928, query_sm3)
+    iv = get_iv(iv, body_md5)
+    iv = get_iv(iv, ts_bytes)
+    low = iv & 15
+    iv_v0 = (low * 171) >> 9
+    return low - (iv_v0 * 3)
+
+
+def sign_json_request_with_liushen(
+    url: str,
+    body_obj: Dict[str, Any],
+    device_keys: Dict[str, str],
+) -> Tuple[str, Dict[str, str], bytes]:
+    body_text = json.dumps(body_obj, ensure_ascii=False, separators=(",", ":"))
+    body_data = json.loads(body_text)
+    body_bytes = body_text.encode("utf-8")
+
+    ts = str(int(time.time() * 1000))
+    base_headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json; charset=utf-8,application/x-protobuf",
+        "Content-Type": "application/json; charset=UTF-8",
+        "x-xs-from-web": "0",
+        "x-ss-req-ticket": ts,
+        "x-tt-request-tag": "t=0;n=0",
+        "sdk-version": "2",
+        "passport-sdk-version": "50561",
+        "x-vc-bdturing-sdk-version": "3.7.2.cn",
+    }
+
+    url_parts = urlsplit(url)
+    base_url = f"{url_parts.scheme}://{url_parts.netloc}{url_parts.path}"
+    params = dict(parse_qsl(url_parts.query, keep_blank_values=True))
+    devices = build_liushen_device(device_keys)
+
+    khronos = int(time.time())
+    base_rticket = int(time.time() * 1000)
+    safe_rticket = base_rticket
+    safe_khronos = khronos
+
+    for offset in range(32):
+        rticket = base_rticket + offset
+        eurl, _, _ = get_params_encrypturl(
+            base_url, params=params, devices=devices,
+            rticket_override=rticket, ts_override=khronos,
+        )
+        query_string = eurl.split("?", 1)[1] if "?" in eurl else ""
+        branch = _compute_branch(query_string, body_bytes, khronos)
+        if branch != 1:
+            safe_rticket = rticket
+            safe_khronos = khronos
+            break
+
+    sign_headers, sign_url = core_sixgod(
+        surl=base_url,
+        params=params,
+        data=body_data,
+        devices=devices,
+        header=base_headers,
+        log=False,
+        rticket_override=safe_rticket,
+        ts_override=safe_khronos,
+        khronos_override=safe_khronos,
+    )
+    return sign_url, sign_headers, body_bytes
+
+
+def _quality_number(value: str) -> int:
+    text = str(value or "")
+    m = re.match(r".*?(2160|1440|1080|720|576|540|480|360)", text)
+    if m:
+        return int(m.group(1))
+    mapping = {"1920": 1080, "1280": 720, "1024": 576, "854": 480, "640": 360}
+    if text in mapping:
+        return mapping[text]
+    if re.match(r"^\d{3,4}$", text):
+        return int(text)
+    return 0
+
+
+def _quality_label(value: str) -> str:
+    n = _quality_number(value)
+    if n:
+        return "%dP" % n
+    labels = {
+        "low": "\u6d41\u7545",
+        "smooth": "\u6d41\u7545",
+        "medium": "\u6807\u6e05",
+        "normal": "\u9ad8\u6e05",
+        "high": "\u8d85\u6e05",
+        "original": "\u539f\u753b",
+        "uhd": "\u539f\u753b",
+        "super_high": "\u539f\u753b",
+    }
+    return labels.get(str(value or "").lower(), str(value or "\u81ea\u52a8"))
+
+
+def _quality_rows(video_list: Any) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    if not video_list:
+        return rows
+    if not isinstance(video_list, dict):
+        video_list = _normalize_video_list(video_list)
+    for key, value in video_list.items():
+        item = value if isinstance(value, dict) else {}
+        if not _item_has_url(item):
+            continue
+        quality = str(
+            item.get("quality_desc")
+            or item.get("height")
+            or item.get("vheight")
+            or item.get("quality")
+            or key
+        )
+        if not any(r["key"] == key for r in rows):
+            rows.append({"key": key, "quality": quality, "item": item})
+    rows.sort(
+        key=lambda r: _quality_number(r["quality"] or r["key"]),
+        reverse=True,
+    )
+    return rows
+
+
+def fetch_quality_rows(vid: str) -> List[Dict[str, Any]]:
+    cache_key = str(vid)
+    cached = _quality_cache.get(cache_key)
+    if cached and time.time() - cached[0] < 300:
+        return cached[1]
+
+    rows: List[Dict[str, Any]] = []
+    try:
+        device_keys = get_device_keys()
+        target_url = build_video_model_url(
+            device_keys["device_id"], device_keys["install_id"]
+        )
+        post_payload = {
+            "biz_param": {
+                "detail_page_version": 0,
+                "device_level": 3,
+                "disable_digg_stat": False,
+                "need_all_video_definition": True,
+                "need_mp4_align": False,
+                "use_os_player": False,
+                "use_server_dns": False,
+                "video_platform": 1024,
+            },
+            "mixed_video_id_map": {"1004": [str(vid)]},
+        }
+        signed_url, headers, post_body = sign_json_request_with_liushen(
+            target_url, post_payload, device_keys
+        )
+        resp = curl_request(signed_url, headers, post_body, 20)
+        data = json.loads(resp)
+        fallback_api, video_model = extract_fallback_api(data, str(vid))
+
+        resp2 = curl_request(fallback_api, {"User-Agent": USER_AGENT}, None, 20)
+        outer = json.loads(resp2)
+        video_data = outer.get("video_info", {}).get("data", {})
+        if not isinstance(video_data, dict):
+            video_data = {}
+        video_list = video_data.get("video_list", {})
+        rows = _quality_rows(video_list)
+        if not rows:
+            print("[quality] video_list parsed but no usable row")
+    except Exception as exc:
+        print("[quality] quality rows fetch failed: %s" % exc)
+
+    _quality_cache[cache_key] = (time.time(), rows)
+    return rows
+
+
+_quality_cache: Dict[str, Tuple[float, List]] = {}
+
+
+def replace_failed_device(device_id: str, platform: str) -> None:
+    pass
+
+
+def get_current_domain(request=None) -> str:
+    return _CURRENT_DOMAIN
+
+
+_RUNTIME_BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__))) if "__file__" in dir() else Path.cwd()
+
+def get_runtime_base_dir() -> Path:
+    return _RUNTIME_BASE_DIR
+
+
+DEFAULT_TIMEOUT = 30
+VIDEO_WORKER_POOL = ThreadPoolExecutor(max_workers=4)
+FFMPEG_BIN = "ffmpeg"
+VIDEO_TTL_SECONDS = 300
+
+
+def schedule_video_cleanup(filepath: Path, delay_seconds: int = VIDEO_TTL_SECONDS) -> None:
+
+    def _delete_file() -> None:
+        try:
+            filepath.unlink(missing_ok=True)
+            print(f"[cleanup] deleted_expired_video={filepath.name}")
+        except Exception as exc:
+            print(f"[cleanup] delete_failed file={filepath.name} error={exc}")
+
+    timer = threading.Timer(delay_seconds, _delete_file)
+    timer.daemon = True
+    timer.start()
+
+
+def curl_request(
+    url: str,
+    headers: Dict[str, str],
+    post_body: Optional[bytes] = None,
+    timeout: int = DEFAULT_TIMEOUT,
+) -> bytes:
+    session = requests.Session()
+    session.trust_env = False
+    if post_body is not None:
+        resp = session.post(url, headers=headers, data=post_body, timeout=timeout)
+    else:
+        resp = session.get(url, headers=headers, timeout=timeout)
+    resp.raise_for_status()
+    return resp.content
+
+
+_WEB_SPIDER = None
+_WEB_SPIDER_LOCK = threading.Lock()
+
+
+def get_web_spider():
+    """给本地 HTTP 服务用的 Spider 单例：现抓播放页、现取直链。"""
+    global _WEB_SPIDER
+    if _WEB_SPIDER is None:
+        with _WEB_SPIDER_LOCK:
+            if _WEB_SPIDER is None:
+                _WEB_SPIDER = Spider()
+    return _WEB_SPIDER
+
+
+def resolve_web_direct(sid, vid='', refresh=False):
+    """服务器侧解析网页明文直链，带短缓存；refresh 用于过期后强制重取。"""
+    spider = get_web_spider()
+    try:
+        return spider._web_direct_url(sid, vid, refresh=refresh)
+    except TypeError:
+        return spider._web_direct_url(sid, vid)
+
+
+SERVICE_TAG = 'hongguo-embedded'
+
+
+def _probe_own_server(port, timeout=1.5):
+    """确认该端口上跑的是本插件自己的服务。
+
+    只判断端口能否连通是不够的：插件热更新/多实例时，旧代码的服务可能
+    还占着端口（没有新路由），或其它插件恰好同端口。拿 /health 的身份
+    标记做校验，避免把一个"能连但不是自己"的服务当成可用。
+    """
+    if not port:
+        return False
+    try:
+        resp = requests.get('http://127.0.0.1:%d/health' % port,
+                            timeout=timeout)
+        if resp.status_code != 200:
+            return False
+        try:
+            return resp.json().get('service') == SERVICE_TAG
+        except ValueError:
+            return False
+    except Exception:
+        return False
+
+
+def _parse_range(range_header: str, total_size: int):
+    """解析 Range。返回 (start, end, is_partial)；越界返回 None（应回 416）。"""
+    start = 0
+    # 拿不到总长度时不设上界，交给上游 EOF 收尾，避免只回 1 字节
+    end = total_size - 1 if total_size > 0 else (1 << 62)
+    is_partial = False
+    if range_header and total_size > 0:
+        m = re.match(r'bytes=(\d+)-(\d*)', range_header)
+        if m:
+            start = int(m.group(1))
+            if m.group(2):
+                end = int(m.group(2))
+            is_partial = True
+            end = min(end, total_size - 1)
+            if start >= total_size or start > end:
+                return None
+    return start, end, is_partial
+
+
+def handle_video_request(
+    video_id: str,
+    request=None,
+    max_retries: int = 3,
+    stream_mode: bool = False,
+    quality_key: Optional[str] = None,
+) -> Dict[str, Any]:
+    return resolve_video_url(
+        video_id, request, max_retries,
+        stream_mode=stream_mode, quality_key=quality_key,
+    )
+
+
+def resolve_video_url(
+    video_id: str,
+    request=None,
+    max_retries: int = 3,
+    stream_mode: bool = False,
+    quality_key: Optional[str] = None,
+) -> Dict[str, Any]:
+    last_err: Optional[Exception] = None
+
+    for attempt in range(max_retries):
+        device_keys = get_device_keys()
+        target_url = build_video_model_url(
+            device_keys["device_id"], device_keys["install_id"]
+        )
+
+        post_payload = {
+            "biz_param": {
+                "detail_page_version": 0,
+                "device_level": 3,
+                "disable_digg_stat": False,
+                "need_all_video_definition": True,
+                "need_mp4_align": False,
+                "use_os_player": False,
+                "use_server_dns": False,
+                "video_platform": 1024,
+            },
+            "mixed_video_id_map": {
+                "1004": [video_id],
+            },
+        }
+        signed_url, headers, post_body = sign_json_request_with_liushen(
+            target_url, post_payload, device_keys
+        )
+
+        try:
+            resp = curl_request(signed_url, headers, post_body, 30)
+        except Exception as exc:
+            last_err = Exception(f"video_model request failed: {exc}")
+            time.sleep(0.1)
+            continue
+
+        try:
+            data = json.loads(resp)
+        except Exception as exc:
+            last_err = Exception(f"video_model JSON parse failed: {exc}")
+            continue
+
+        if not isinstance(data, dict) or "data" not in data:
+            print("video_model raw response:")
+            print(json.dumps(data, ensure_ascii=False, indent=2))
+
+        try:
+            fallback_api, video_model = extract_fallback_api(data, video_id)
+        except Exception as exc:
+            last_err = exc
+            continue
+
+        try:
+            result = download_and_decrypt_video(
+                request,
+                fallback_api,
+                video_model,
+                device_keys,
+                video_id,
+                max_retries=3,
+                stream_mode=stream_mode,
+                quality_key=quality_key,
+            )
+            return result
+        except Exception as exc:
+            last_err = exc
+            time.sleep(0.1)
+            continue
+
+    raise Exception(f"Video request failed, retried {max_retries} times: {last_err}")
+
+
+def build_video_model_url(device_id: str, install_id: str) -> str:
+    from urllib.parse import quote
+
+    return VIDEO_MODEL_URL_TEMPLATE.format(
+        install_id=quote(install_id, safe=""),
+        device_id=quote(device_id, safe=""),
+    )
+
+
+def extract_fallback_api(
+    data: Dict[str, Any], video_id: str
+) -> Tuple[str, Dict[str, Any]]:
+    data_map = data.get("data")
+    if not isinstance(data_map, dict):
+        raise ValueError("Response missing data field")
+
+    video_entry: Optional[Dict[str, Any]] = None
+
+    if video_id in data_map and isinstance(data_map[video_id], dict):
+        video_entry = data_map[video_id]
+
+    if video_entry is None:
+        for v in data_map.values():
+            if isinstance(v, dict):
+                video_entry = v
+                break
+            if isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
+                video_entry = v[0]
+                break
+
+    if video_entry is None:
+        keys = list(data_map.keys())
+        raise ValueError(
+            f"video entry not found (looked for {video_id}, available keys: {keys})"
+        )
+
+    video_model: Optional[Dict[str, Any]] = None
+    vm = video_entry.get("video_model")
+    if isinstance(vm, str):
+        video_model = json.loads(vm)
+    elif isinstance(vm, dict):
+        video_model = vm
+    else:
+        raise ValueError("video_model is empty or unknown format")
+
+    fallback_raw = video_model.get("fallback_api")
+    fallback_str = parse_fallback_api(fallback_raw)
+    if not fallback_str:
+        raise ValueError(f"fallback_api cannot be parsed: {type(fallback_raw)} => {fallback_raw}")
+
+    return fallback_str, video_model
+
+
+def parse_fallback_api(raw: Any) -> str:
+    if isinstance(raw, str):
+        if raw.startswith("{"):
+            try:
+                decoded = json.loads(raw)
+                if isinstance(decoded, dict) and "fallback_api" in decoded:
+                    return str(decoded["fallback_api"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if len(raw) > 10:
+            return raw
+    elif isinstance(raw, list) and len(raw) > 0:
+        if isinstance(raw[0], str):
+            return raw[0]
+    elif isinstance(raw, dict):
+        if "fallback_api" in raw:
+            return str(raw["fallback_api"])
+    return ""
+
+
+def download_and_decrypt_video(
+    request,
+    fallback_api: str,
+    video_model: Dict[str, Any],
+    device_keys: Dict[str, str],
+    video_id: str,
+    max_retries: int = 3,
+    stream_mode: bool = False,
+    quality_key: Optional[str] = None,
+) -> Dict[str, Any]:
+    current_url = fallback_api
+    current_device_keys = device_keys
+    last_err: Optional[Exception] = None
+
+    for attempt in range(max_retries):
+        headers = {"User-Agent": USER_AGENT}
+
+        try:
+            resp = curl_request(current_url, headers, None, 30)
+        except Exception as exc:
+            last_err = Exception(f"fallback_api request failed: {exc}")
+        else:
+            try:
+                data = json.loads(resp)
+            except Exception as exc:
+                last_err = Exception(f"fallback_api JSON parse failed: {exc}")
+            else:
+                video_info = data.get("video_info", {})
+                if not isinstance(video_info, dict):
+                    video_info = {}
+                video_data = video_info.get("data", {})
+                if not isinstance(video_data, dict):
+                    video_data = {}
+
+                if not video_data:
+                    last_err = Exception("fallback_api response structure abnormal")
+                else:
+                    key_seed_b64 = video_data.get("key_seed", "")
+                    key_seed_raw = b64_decode_padded(key_seed_b64)
+
+                    video_list = video_data.get("video_list", {})
+                    best_key = ""
+                    best_item: Dict[str, Any] = {}
+                    if isinstance(video_list, dict) and video_list:
+                        best_key, best_item = select_best_quality(video_list, preferred_key=quality_key)
+                    elif video_list:
+                        normalized = _normalize_video_list(video_list)
+                        if normalized:
+                            video_data["video_list"] = normalized
+                            best_key, best_item = select_best_quality(
+                                normalized, preferred_key=quality_key)
+                    if not (best_key and best_item):
+                        raise Exception(
+                            "video_list has no playable quality (keys=%s)"
+                            % (list(video_list)[:8] if hasattr(video_list, "__iter__") else type(video_list))
+                        )
+                    if best_key and best_item:
+                            spade_a = best_item.get("spade_a", "")
+                            content_key = None
+                            if spade_a:
+                                try:
+                                    content_key = derive_content_key(spade_a)
+                                except Exception:
+                                    pass
+
+                            raw_main_url = best_item.get("main_url", "")
+                            if raw_main_url:
+                                real_main_url = raw_main_url
+                                if key_seed_raw and len(raw_main_url) > 10:
+                                    try:
+                                        dec = decrypt_spade_url(raw_main_url, key_seed_raw)
+                                        if dec:
+                                            real_main_url = dec
+                                    except Exception as exc:
+                                        print(f"[debug] spade_url_decrypt_failed={exc}")
+
+                                backup_urls = []
+                                for bk_key in ("backup_url_1", "backup_url_2", "url", "play_addr"):
+                                    bk_raw = best_item.get(bk_key, "")
+                                    if not bk_raw or not isinstance(bk_raw, str):
+                                        continue
+                                    bk_real = bk_raw
+                                    if key_seed_raw and len(bk_raw) > 10:
+                                        try:
+                                            bk_dec = decrypt_spade_url(bk_raw, key_seed_raw)
+                                            if bk_dec:
+                                                bk_real = bk_dec
+                                        except Exception:
+                                            pass
+                                    if bk_real and bk_real != real_main_url:
+                                        backup_urls.append(bk_real)
+
+                                if stream_mode:
+                                    stream_url = build_stream_url(
+                                        request, real_main_url, content_key, backup_urls)
+                                    if stream_url:
+                                        best_item["main_url"] = stream_url
+                                else:
+                                    local_url = download_decrypt_and_serve(
+                                        request, real_main_url, content_key, backup_urls)
+                                    if local_url:
+                                        best_item["main_url"] = local_url
+
+                            video_data["video_list"] = {best_key: best_item}
+
+                    video_info["data"] = video_data
+                    data["video_info"] = video_info
+                    return build_response_payload(video_id, video_model, video_data, best_item)
+
+        if attempt < max_retries - 1 and video_id:
+            if current_device_keys:
+                replace_failed_device(
+                    current_device_keys.get("device_id", ""),
+                    current_device_keys.get("platform", ""),
+                )
+            try:
+                new_url, new_keys = refresh_fallback_url(video_id)
+                if new_url:
+                    current_url = new_url
+                    current_device_keys = new_keys
+            except Exception:
+                pass
+
+    raise Exception(
+        f"fallback_api request failed, retried {max_retries} times: {last_err}"
+    )
+
+
+def download_decrypt_and_serve(
+    request,
+    video_url: str,
+    content_key: Optional[bytes],
+    backup_urls=None,
+) -> Optional[str]:
+    pipeline_start = time.perf_counter()
+    encrypted_data = download_video_bytes(video_url, backup_urls)
+    decrypted_data = decrypt_video_bytes(encrypted_data, content_key)
+    local_url = save_video_bytes(request, decrypted_data)
+    pipeline_seconds = time.perf_counter() - pipeline_start
+    print(f"[timing] video_pipeline_seconds={pipeline_seconds:.3f}")
+    return local_url
+
+
+def download_video_bytes(video_url: str, backup_urls=None) -> bytes:
+    download_start = time.perf_counter()
+    session = requests.Session()
+    session.trust_env = False
+    dl_headers = {
+        "User-Agent": "com.phoenix.read/71332",
+        "Referer": "https://novel.snssdk.com/",
+    }
+    candidate_urls = [video_url] + (backup_urls or [])
+    last_exc = None
+    for url in candidate_urls:
+        try:
+            resp = session.get(url, headers=dl_headers, timeout=(8, 120))
+            resp.raise_for_status()
+            download_seconds = time.perf_counter() - download_start
+            print(f"[timing] download_seconds={download_seconds:.3f}")
+            return resp.content
+        except Exception as exc:
+            print(f"[download] cdn_failed url={url[:80]} error={exc}")
+            last_exc = exc
+            continue
+    raise Exception(f"Failed to download video: all CDN nodes failed: {last_exc}")
+
+
+def decrypt_video_bytes(encrypted_data: bytes, content_key: Optional[bytes]) -> bytes:
+    if content_key is None:
+        print("[timing] decrypt_seconds=0.000 content_key_missing=true")
+        return encrypted_data
+
+    decrypt_start = time.perf_counter()
+    try:
+        decrypted_data = decrypt_mp4_cenc(encrypted_data, content_key)
+        decrypt_seconds = time.perf_counter() - decrypt_start
+        print(f"[timing] decrypt_seconds={decrypt_seconds:.3f}")
+        return decrypted_data
+    except Exception as exc:
+        raise Exception(f"Failed to decrypt video: {exc}")
+
+
+def save_video_bytes(request, decrypted_data: bytes) -> str:
+    save_start = time.perf_counter()
+    src_dir = get_runtime_base_dir() / "src"
+    src_dir.mkdir(parents=True, exist_ok=True)
+
+    filename = f"video_{time.time_ns()}.mp4"
+    filepath = src_dir / filename
+    filepath.write_bytes(decrypted_data)
+    schedule_video_cleanup(filepath)
+
+    current_domain = get_current_domain(request)
+    save_seconds = time.perf_counter() - save_start
+    print(f"[timing] save_seconds={save_seconds:.3f}")
+    return f"{current_domain}/src/{filename}"
+
+
+def build_stream_url(request, encrypted_url: str, content_key: Optional[bytes],
+                     backup_urls=None) -> str:
+    current_domain = get_current_domain(request)
+    key_b64 = base64.b64encode(content_key).decode('ascii') if content_key else ''
+    params_list = [('url', encrypted_url), ('key', key_b64)]
+    for bk in (backup_urls or []):
+        params_list.append(('bk', bk))
+    params = urlencode(params_list)
+    return f"{current_domain}/stream?{params}"
+
+
+def stream_cenc_decrypt_chunk(chunk: bytearray, chunk_start: int,
+                              decrypt_map: Dict[int, Tuple[int, bytes]],
+                              content_key: bytes,
+                              sorted_offsets: Optional[List[int]] = None) -> bytes:
+    if not decrypt_map:
+        return bytes(chunk)
+    if sorted_offsets is None:
+        sorted_offsets = sorted(decrypt_map)
+    chunk_end = chunk_start + len(chunk)
+
+    # 从第一个可能与本块相交的 sample 开始，避免每块全量扫表
+    index = max(bisect.bisect_right(sorted_offsets, chunk_start) - 1, 0)
+    while index < len(sorted_offsets):
+        sample_off = sorted_offsets[index]
+        index += 1
+        if sample_off >= chunk_end:
+            break
+        sample_sz, iv = decrypt_map[sample_off]
+        sample_end = sample_off + sample_sz
+
+        if sample_end <= chunk_start:
+            continue
+
+        overlap_start = max(sample_off, chunk_start)
+        overlap_end = min(sample_end, chunk_end)
+        overlap_size = overlap_end - overlap_start
+        offset_in_sample = overlap_start - sample_off
+
+        start_block = offset_in_sample // 16
+        ctr_int = int.from_bytes(bytes(iv) + b'\x00' * 8, 'big') + start_block
+        ctr_bytes = ctr_int.to_bytes(16, 'big')
+
+        cipher = AES.new(content_key, AES.MODE_CTR, nonce=b"", initial_value=ctr_bytes)
+
+        block_offset = offset_in_sample % 16
+        if block_offset > 0:
+            cipher.decrypt(b'\x00' * block_offset)
+
+        start_in_chunk = overlap_start - chunk_start
+        decrypted = cipher.decrypt(bytes(chunk[start_in_chunk:start_in_chunk + overlap_size]))
+        chunk[start_in_chunk:start_in_chunk + overlap_size] = decrypted
+
+    return bytes(chunk)
+
+
+def refresh_fallback_url(video_id: str) -> Tuple[str, Dict[str, str]]:
+    device_keys = get_device_keys()
+    target_url = build_video_model_url(
+        device_keys["device_id"], device_keys["install_id"]
+    )
+
+    post_payload = {
         "biz_param": {
             "detail_page_version": 0,
             "device_level": 3,
@@ -2879,395 +3109,2311 @@ def _video_model(video_id: str, config: Mapping[str, Any]) -> dict[str, Any]:
         },
         "mixed_video_id_map": {"1004": [video_id]},
     }
-    request_headers = {
-        "User-Agent": APP_UA,
-        "Accept": "application/json; charset=utf-8,application/x-protobuf",
-        "Content-Type": "application/json; charset=UTF-8",
-        "x-xs-from-web": "0",
-        "x-ss-req-ticket": str(int(time.time() * 1000)),
-        "x-tt-request-tag": "t=0;n=0",
-        "sdk-version": "2",
-        "passport-sdk-version": "50561",
-        "x-vc-bdturing-sdk-version": "3.7.2.cn",
-    }
-    if devices.get("cookie"):
-        request_headers["Cookie"] = devices["cookie"]
-    signed_headers, signed_url = _core_sixgod(
-        VIDEO_URL,
-        params,
-        devices,
-        payload,
-        request_headers,
+    signed_url, headers, post_body = sign_json_request_with_liushen(
+        target_url, post_payload, device_keys
     )
-    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    response = requests.post(
-        signed_url,
-        headers=signed_headers,
-        data=body,
-        timeout=30,
-    )
-    response_data = _json_response(response)
-    data = response_data.get("data") or {}
-    if not isinstance(data, Mapping):
-        raise HongguoPluginError("video_model 数据为空")
-    entry: Any = data.get(video_id)
-    if entry is None:
-        for value in data.values():
-            if isinstance(value, Mapping):
-                entry = value
-                break
-            if isinstance(value, list) and value and isinstance(value[0], Mapping):
-                entry = value[0]
-                break
-    if not isinstance(entry, Mapping):
-        entry = data
-    raw_model = entry.get("video_model") if isinstance(entry, Mapping) else None
-    if raw_model is None:
-        raw_model = data.get("video_model")
-    if isinstance(raw_model, str):
-        try:
-            raw_model = json.loads(raw_model)
-        except ValueError as exc:
-            raise HongguoPluginError("video_model JSON 无效") from exc
-    if not isinstance(raw_model, Mapping):
-        raise HongguoPluginError("video_model 为空")
-    return dict(raw_model)
 
-def _video_list_from_model(model: Mapping[str, Any]) -> Any:
-    for key in ("video_list", "dynamic_video_list"):
-        if model.get(key) is not None:
-            return model[key]
-    dynamic = model.get("dynamic_video")
-    if isinstance(dynamic, Mapping):
-        for key in ("dynamic_video_list", "video_list", "list"):
-            if dynamic.get(key) is not None:
-                return dynamic[key]
-    video_info = model.get("video_info")
-    if isinstance(video_info, Mapping):
-        data = video_info.get("data")
-        if isinstance(data, Mapping):
-            return _video_list_from_model(data)
-    data = model.get("data")
-    if isinstance(data, Mapping):
-        return _video_list_from_model(data)
+    resp = curl_request(signed_url, headers, post_body, 30)
+    data = json.loads(resp)
+
+    fallback_api, _ = extract_fallback_api(data, video_id)
+    return fallback_api, device_keys
+
+
+def derive_content_key(spade_b64: str) -> bytes:
+    s = spade_b64.strip()
+    m = 4 - len(s) % 4
+    if m != 4:
+        s += "=" * m
+
+    raw = base64.b64decode(s)
+
+    if len(raw) < 3:
+        raise ValueError(f"spade_a too short: {len(raw)} bytes")
+
+    v6 = raw[0] ^ raw[1] ^ raw[2]
+    v8 = len(raw) - v6 + 47
+
+    if v8 <= 0 or v8 > len(raw) * 2:
+        raise ValueError(f"spade_a: computed v8={v8} out of range")
+    if 1 + v8 > len(raw):
+        v8 = len(raw) - 1
+    if v8 < 33:
+        raise ValueError(f"spade_a: v8={v8} too small (need >=33)")
+
+    v13 = bytearray(raw[1 : 1 + v8])
+
+    vA, vB = 85, 246
+    for i in range(v8):
+        popcnt = bin(i).count("1")
+        if i & 1:
+            v24 = vA
+            vA = v13[i]
+        else:
+            v24 = vB
+            vB = v13[i]
+        v25 = v24 ^ v13[i]
+        v26 = -21 - popcnt
+        v13[i] = (v26 + v25) & 0xFF
+
+    hex_str = bytes(v13[1:33]).decode("ascii")
+    key = binascii.unhexlify(hex_str)
+    return key
+
+
+def decrypt_mp4_cenc(data: bytes, content_key: bytes) -> bytes:
+    data = bytearray(data)
+
+    ftyp_end = struct.unpack(">I", data[0:4])[0]
+    if ftyp_end + 8 >= len(data):
+        raise ValueError("invalid MP4: ftyp too large")
+
+    moov_size = struct.unpack(">I", data[ftyp_end : ftyp_end + 4])[0]
+    if ftyp_end + 8 + moov_size > len(data):
+        raise ValueError("invalid MP4: moov out of range")
+    moov = data[ftyp_end + 8 : ftyp_end + moov_size]
+
+    t1_off, t1_sz = find_box(moov, "trak", 0)
+    t2_off, _ = find_box(moov, "trak", t1_off + t1_sz)
+
+    for t_off in (t1_off, t2_off):
+        if t_off < 0:
+            continue
+        result = parse_track(moov, t_off)
+        if result is None:
+            continue
+        sizes, offsets, cns, aux_off, aux_sz, ns = result
+        if ns == 0:
+            continue
+        if aux_off + aux_sz > len(data):
+            continue
+        aux = data[aux_off : aux_off + aux_sz]
+
+        si, ap = 0, 0
+        for ci, off in enumerate(offsets):
+            for k in range(cns[ci]):
+                if si >= ns:
+                    break
+                sz = sizes[si]
+                if off + sz > len(data):
+                    break
+
+                iv = bytearray(8)
+                if ap + 8 <= len(aux):
+                    iv[:] = aux[ap : ap + 8]
+                ctr_bytes = bytes(iv) + b"\x00" * 8
+
+                cipher = AES.new(content_key, AES.MODE_CTR, nonce=b"", initial_value=ctr_bytes)
+                decrypted = cipher.decrypt(bytes(data[off : off + sz]))
+                data[off : off + sz] = decrypted
+
+                off += sz
+                si += 1
+                ap += 8
+
+    for old, new in ((b"encv", b"hvc1"), (b"enca", b"mp4a")):
+        _replace_fourcc(data, old, new)
+
+    _replace_sinf(data)
+
+    return bytes(data)
+
+
+def find_box(data: bytearray, fourcc: str, start: int) -> Tuple[int, int]:
+    b = fourcc.encode("ascii")
+    for i in range(start, len(data) - 8):
+        if data[i : i + 4] == b and i >= 4:
+            sz = struct.unpack(">I", data[i - 4 : i])[0]
+            if 0 < sz < 5000000:
+                return i - 4, sz
+    return -1, 0
+
+
+def get_box(data: bytearray, fourcc: str, stbl_off: int):
+    o, sz = find_box(data, fourcc, stbl_off)
+    if o >= 0:
+        return data[o + 8 : o + sz]
     return None
 
 
-_QUALITY_ORDER = ("2160", "1440", "1080", "720", "576", "540", "480", "360")
+def parse_track(
+    moov: bytearray, t_off: int
+) -> Optional[Tuple[List[int], List[int], List[int], int, int, int]]:
+    stbl_off, _ = find_box(moov, "stbl", t_off + 8)
 
-def _int(value: Any) -> int:
-    match = re.search(r"\d+", _text(value))
-    return int(match.group()) if match else 0
-
-def _quality(value: Any) -> str:
-    text = _text(value).lower()
-    match = re.search(r"(2160|1440|1080|720|576|540|480|360)", text)
-    return match.group(1) if match else "1080"
-
-def _select_quality(video_list: Any, wanted: str = "1080") -> tuple[str, dict[str, Any]]:
-    def rows_from(value: Any, hinted_quality: str = "") -> list[tuple[str, dict[str, Any]]]:
-        if isinstance(value, list):
-            result: list[tuple[str, dict[str, Any]]] = []
-            for item in value:
-                result.extend(rows_from(item, hinted_quality))
-            return result
-        if not isinstance(value, Mapping):
-            return []
-        if any(
-            key in value
-            for key in (
-                "main_url",
-                "backup_url",
-                "backup_url_1",
-                "play_addr",
-                "spade_a",
-                "encrypt_info",
-            )
-        ):
-            return [(hinted_quality, dict(value))]
-        result = []
-        for key, item in value.items():
-            if key in {"dynamic_video", "video_info", "data"} and isinstance(item, Mapping):
-                result.extend(rows_from(item, hinted_quality))
-                continue
-            if key in {"video_list", "dynamic_video_list", "list"}:
-                result.extend(rows_from(item, _quality(key)))
-                continue
-            if isinstance(item, (Mapping, list)):
-                result.extend(rows_from(item, _quality(key)))
-        return result
-
-    candidates = rows_from(video_list)
-    rows: dict[str, dict[str, Any]] = {}
-    for hinted_quality, item in candidates:
-        definition = _quality(
-            item.get("definition")
-            or item.get("vheight")
-            or (item.get("video_meta") or {}).get("definition")
-            or hinted_quality
-        )
-        rows[definition] = item
-    if not rows:
-        raise HongguoPluginError("播放模型没有清晰度")
-    requested = _quality(wanted)
-    order = [requested] + [item for item in _QUALITY_ORDER if item != requested]
-    for definition in order:
-        if definition in rows:
-            return definition, rows[definition]
-    definition = max(rows, key=lambda item: _int(item))
-    return definition, rows[definition]
-
-def _fallback_api_value(value: Any) -> str:
-    if isinstance(value, Mapping):
-        return _first(
-            value.get("fallback_api"),
-            value.get("url"),
-            value.get("api"),
-            value.get("data"),
-        )
-    if isinstance(value, (list, tuple)):
-        for item in value:
-            result = _fallback_api_value(item)
-            if result:
-                return result
-        return ""
-    text = _text(value)
-    if text.startswith("{"):
-        try:
-            decoded = json.loads(text)
-        except ValueError:
-            decoded = {}
-        if decoded:
-            return _fallback_api_value(decoded)
-    return text if len(text) > 10 else ""
-
-def _decrypt_spade_url(value: str, key_seed: bytes) -> str:
-    raw = _b64(value)
-    if len(raw) < 20 or raw[0] != 0xA8 or raw[2:4] != b"\x01\x00":
-        raise HongguoPluginError("spade URL 头无效")
-    cipher_data = raw[4 : len(raw) - (len(raw) - 4) % 16]
-    if not cipher_data:
-        raise HongguoPluginError("spade URL 密文为空")
-    constants = bytes.fromhex(
-        "4dd4c2e6b83162090e52b3c7a6733ba4"
-        "1cb2462b829ab58a196b39db57177524"
-        "f49baf7f08e8d68d26a72e37c1a95a2f"
-        "1f05a51892aef2949732b62a38aadd58"
-    )
-    first = hashlib.sha512(key_seed).digest()
-    second = hashlib.sha512(first + constants).digest()
-    plaintext = _aes_cbc_decrypt(second[:16], second[16:32], cipher_data)
-    if plaintext:
-        padding = plaintext[-1]
-        if 1 <= padding <= 16 and padding <= len(plaintext):
-            plaintext = plaintext[:-padding]
-    return plaintext.rstrip(b"\0").decode("utf-8", errors="replace")
-
-def _parse_ref(value: str, prefix: str) -> str:
-    if not value.startswith(prefix):
-        raise HongguoPluginError("播放引用无效")
-    raw = value[len(prefix) :]
-    if not raw or not _VIDEO_ID.fullmatch(raw):
-        raise HongguoPluginError("播放引用格式无效")
-    return raw
-
-def _key_seed_from_model(model: Mapping[str, Any]) -> bytes:
-    value = _text(model.get("key_seed"))
-    if value:
-        return _b64(value)
-    for key in ("dynamic_video", "video_info", "data"):
-        nested = model.get(key)
-        if isinstance(nested, Mapping):
-            result = _key_seed_from_model(nested)
-            if result:
-                return result
-    return b""
-def _page(url):
-    r = requests.get(url, headers={"User-Agent": UA, "Accept-Language": "zh-CN,zh;q=0.9"}, timeout=30)
-    r.raise_for_status()
-    return r.text
-
-def _data(url):
-    html = _page(url)
-    m = re.search(r"(?:window\.)?_ROUTER_DATA\s*=\s*", html)
-    if not m:
-        return {}
-    try:
-        return json.JSONDecoder().raw_decode(html[m.end():])[0]
-    except (ValueError, TypeError):
-        return {}
-
-def _item(x):
-    x = x or {}
-    vd = x.get("video_data") if isinstance(x.get("video_data"), dict) else x
-    sid = str(vd.get("series_id") or x.get("keyword") or "")
-    name = str(vd.get("series_title") or vd.get("series_name") or x.get("name") or "未命名")
-    count = vd.get("episode_cnt") or 0
-    return {"vod_id": sid, "vod_name": name, "vod_pic": str(vd.get("series_cover") or ""),
-            "vod_remarks": "全%s集" % count if count else "", "vod_content": str(vd.get("series_intro") or "")}
-
-def _cat_item(x):
-    return _item(x)
-
-def _filter_group(key, name, values):
-    return {"key": key, "name": name, "value": [{"n": n, "v": v} for n, v in values]}
-
-class Spider(Spider):
-    def __init__(self):
-        self.device_id = str(random.randint(10**17, 10**18 - 1))
-        self.install_id = str(random.randint(10**17, 10**18 - 1))
-
-    def init(self, extend=""):
-        # 每次源实例使用随机合法设备标识；不依赖用户私有配置。
+    stsz = get_box(moov, "stsz", stbl_off)
+    if stsz is None:
         return None
+    ds = struct.unpack(">I", stsz[4:8])[0]
+    ns = struct.unpack(">I", stsz[8:12])[0]
+    sizes: List[int] = []
+    if ds == 0:
+        for i in range(ns):
+            sizes.append(struct.unpack(">I", stsz[12 + i * 4 : 16 + i * 4])[0])
+    else:
+        sizes = [ds] * ns
 
-    def homeContent(self, filter):
-        class_list = [
-            {"type_id": "all", "type_name": "短剧"},
-            {"type_id": "latest", "type_name": "最新"},
-            {"type_id": "hot", "type_name": "最热"},
-            {"type_id": "male", "type_name": "男频"},
-            {"type_id": "female", "type_name": "女频"},
-        ]
-        groups = [
-            {"key": "topic", "name": "主题", "value": [
-                {"n": "全部", "v": ""}, {"n": "现言", "v": "cate_1021"}, {"n": "女性成长", "v": "cate_1048"},
-                {"n": "脑洞", "v": "cate_262"}, {"n": "奇幻", "v": "cate_1020"}, {"n": "玄幻", "v": "cate_1019"},
-                {"n": "古言", "v": "cate_439"}, {"n": "战神", "v": "cate_1038"}, {"n": "宫斗", "v": "cate_246"},
-                {"n": "仙侠", "v": "cate_1013"}, {"n": "权谋", "v": "cate_1047"}, {"n": "种田", "v": "cate_1180"},
-                {"n": "年代爱情", "v": "cate_1022"}, {"n": "悬疑", "v": "cate_165"}, {"n": "喜剧", "v": "cate_303"},
-                {"n": "青春", "v": "cate_297"}, {"n": "志怪", "v": "cate_1027"}, {"n": "民国爱情", "v": "cate_1025"},
-                {"n": "灵异", "v": "cate_751"}, {"n": "家国情怀", "v": "cate_1235"}, {"n": "法律", "v": "cate_1136"},
-                {"n": "刑侦", "v": "cate_1148"}, {"n": "抗战", "v": "cate_504"}, {"n": "武侠", "v": "cate_1172"},
-                {"n": "民国传奇", "v": "cate_1240"}, {"n": "求生", "v": "cate_1168"}, {"n": "动作", "v": "cate_302"},
-                {"n": "科幻", "v": "cate_1092"}, {"n": "恐怖", "v": "cate_1219"}, {"n": "商战", "v": "cate_1225"},
-            ]},
-            {"key": "background", "name": "背景", "value": [
-                {"n": "全部", "v": ""}, {"n": "现代", "v": "cate_757"}, {"n": "都市", "v": "cate_1"},
-                {"n": "古代", "v": "cate_758"}, {"n": "乡村", "v": "cate_11"}, {"n": "年代", "v": "cate_79"},
-                {"n": "架空", "v": "cate_452"}, {"n": "职场", "v": "cate_127"}, {"n": "民国", "v": "cate_390"},
-                {"n": "校园", "v": "cate_4"}, {"n": "宫廷", "v": "cate_1153"}, {"n": "荒岛", "v": "cate_1162"},
-            ]},
-            {"key": "setting", "name": "设定", "value": [
-                {"n": "全部", "v": ""}, {"n": "打脸虐渣", "v": "cate_1051"}, {"n": "大男主", "v": "cate_1207"},
-                {"n": "大女主", "v": "cate_760"}, {"n": "马甲", "v": "cate_266"}, {"n": "重生", "v": "cate_36"},
-                {"n": "穿越", "v": "cate_37"}, {"n": "系统", "v": "cate_19"}, {"n": "先婚后爱", "v": "cate_265"},
-                {"n": "家长里短", "v": "cate_862"}, {"n": "小人物", "v": "cate_1010"}, {"n": "破镜重圆", "v": "cate_475"},
-                {"n": "神豪", "v": "cate_20"}, {"n": "豪门", "v": "cate_936"}, {"n": "强者回归", "v": "cate_1045"},
-                {"n": "异能", "v": "cate_598"}, {"n": "虐恋", "v": "cate_1008"}, {"n": "传承觉醒", "v": "cate_1007"},
-                {"n": "医生", "v": "cate_487"}, {"n": "强强联合", "v": "cate_1049"}, {"n": "赘婿逆袭", "v": "cate_1044"},
-                {"n": "甜宠", "v": "cate_96"}, {"n": "娱乐圈", "v": "cate_43"}, {"n": "神医", "v": "cate_26"},
-                {"n": "青梅竹马", "v": "cate_387"}, {"n": "姐弟恋", "v": "cate_762"}, {"n": "玄学", "v": "cate_929"},
-                {"n": "追妻火葬场", "v": "cate_616"}, {"n": "业界精英", "v": "cate_1293"}, {"n": "一见钟情", "v": "cate_477"},
-                {"n": "福宝", "v": "cate_1291"}, {"n": "捞偏门", "v": "cate_1287"}, {"n": "反派主角", "v": "cate_1042"},
-                {"n": "萌宠", "v": "cate_428"}, {"n": "双向救赎", "v": "cate_1200"}, {"n": "方言", "v": "cate_1255"},
-                {"n": "白月光", "v": "cate_615"}, {"n": "灵魂互换", "v": "cate_831"}, {"n": "病娇", "v": "cate_380"},
-                {"n": "暴富", "v": "cate_1191"}, {"n": "黑道", "v": "cate_826"}, {"n": "丧尸", "v": "cate_582"},
-                {"n": "特种兵", "v": "cate_375"},
-            ]},
-            {"key": "time", "name": "时间", "value": [
-                {"n": "全部", "v": ""}, {"n": "7天内上新", "v": "1"}, {"n": "14天内上新", "v": "2"},
-                {"n": "30天内上新", "v": "3"}, {"n": "90天内上新", "v": "4"},
-            ]},
-        ]
-        filter_dict = {c["type_id"]: groups for c in class_list}
-        return {"class": class_list, "filters": filter_dict}
-    def homeVideoContent(self):
-        return {"list": []}
+    stco = get_box(moov, "stco", stbl_off)
+    if stco is None:
+        return None
+    nc = struct.unpack(">I", stco[4:8])[0]
+    offsets = []
+    for i in range(nc):
+        offsets.append(struct.unpack(">I", stco[8 + i * 4 : 12 + i * 4])[0])
 
-    def _query(self, pg, q=None):
-        try: pg = max(1, int(pg))
-        except (TypeError, ValueError): pg = 1
-        if q is None:
-            q = {"tab": "1", "sort_type": "1"}
-        p = (_data(SITE + "/category?" + urlencode(q)).get("loaderData") or {}).get("category_page") or {}
-        return p
+    stsc = get_box(moov, "stsc", stbl_off)
+    if stsc is None:
+        return None
+    nsc = struct.unpack(">I", stsc[4:8])[0]
+    entries = []
+    for i in range(nsc):
+        entries.append((
+            struct.unpack(">I", stsc[8 + i * 12 : 12 + i * 12])[0],
+            struct.unpack(">I", stsc[12 + i * 12 : 16 + i * 12])[0],
+            struct.unpack(">I", stsc[16 + i * 12 : 20 + i * 12])[0],
+        ))
 
-    def categoryContent(self, tid, pg, filter, extend):
-        try: page = max(1, int(pg))
-        except (TypeError, ValueError): page = 1
-        q = {"tab": "2" if tid == "comic" else "1", "sort_type": "1"}
-        if tid == "latest": q["sort_type"] = "2"
-        elif tid == "hot": q["sort_type"] = "1"
-        elif tid == "male": q["gender"] = "1"
-        elif tid == "female": q["gender"] = "2"
-        if isinstance(extend, str) and extend:
-            try: extend = json.loads(extend)
-            except Exception: extend = {}
-        if isinstance(extend, dict):
-            for k, v in extend.items():
-                if v and str(v) not in ("", "all", "0"):
-                    q[k] = str(v)
-        if page > 1:
-            q["page"] = str(page)
-        p = self._query(page, q)
-        rows = p.get("recommendList") or []
-        page_data = p.get("pagination") or {}
-        return {"page": page, "pagecount": int(page_data.get("totalPages") or 1), "limit": len(rows), "total": int(page_data.get("total") or len(rows)), "list": [_cat_item(x) for x in rows]}
+    cns = [0] * nc
+    for i in range(nsc):
+        fc = entries[i][0]
+        spc = entries[i][1]
+        end = nc
+        if i + 1 < nsc:
+            end = entries[i + 1][0] - 1
+        for c in range(fc - 1, min(end, nc)):
+            cns[c] = spc
 
-    def searchContent(self, key, quick=False, pg="1"):
-        try: page = max(1, int(pg))
-        except (TypeError, ValueError): page = 1
-        # 官网当前搜索结果固定 10 条，页码由 SSR 路由自身控制；保留 pg 参数兼容壳。
-        p = (_data(SITE + "/search/" + quote(str(key), safe="")).get("loaderData") or {}).get("search_(keyword)/page") or {}
-        rows = p.get("searchList") or []
-        return {"page": page, "pagecount": max(1, (int(p.get("totalCount") or 0) + 9) // 10), "limit": len(rows), "total": int(p.get("totalCount") or len(rows)), "list": [_item(x) for x in rows]}
+    saiz = get_box(moov, "saiz", stbl_off)
+    if saiz is None:
+        return None
+    da = saiz[4]
+    na = struct.unpack(">I", saiz[5:9])[0]
 
-    def detailContent(self, ids):
-        sid = str(ids[0] if isinstance(ids, (list, tuple)) else ids)
-        sid = sid.replace("hg-series-v1:", "")
-        p = ((_data(SITE + "/detail?series_id=" + quote(sid, safe="")).get("loaderData") or {}).get("detail_page") or {})
-        s = p.get("seriesDetail") or {}
-        vids = s.get("vid_list") or []
-        actors = [str(x.get("nickname")) for x in (s.get("celebrities") or []) if isinstance(x, dict) and x.get("nickname")]
-        eps = "#".join("第%d集%s%s" % (i + 1, "$", EPISODE_PREFIX + str(v)) for i, v in enumerate(vids))
-        return {"list": [{"vod_id": sid, "vod_name": str(s.get("series_name") or ""), "vod_pic": str(s.get("series_cover") or ""), "vod_year": "", "vod_area": "", "vod_director": "", "vod_actor": ",".join(actors), "vod_content": str(s.get("series_intro") or ""), "vod_remarks": str(s.get("episode_right_text") or ""), "vod_play_from": "红果", "vod_play_url": eps}]}
+    saio = get_box(moov, "saio", stbl_off)
+    if saio is None:
+        return None
+    aux_off = struct.unpack(">I", saio[8:12])[0]
+    aux_sz = na * max(da, 8)
 
-    def playerContent(self, flag, id, vipFlags=None):
-        vid = str(id).replace(EPISODE_PREFIX, "")
+    return sizes, offsets, cns, aux_off, aux_sz, ns
+
+
+def _item_height(item: Dict[str, Any]) -> int:
+    """从多种命名里取清晰度高度，取不到返回 0。"""
+    for field in ("vheight", "height", "definition", "quality",
+                  "quality_desc", "video_height", "v_height"):
+        raw = item.get(field)
+        if raw in (None, ""):
+            continue
+        m = re.search(r"(2160|1440|1080|720|576|540|480|360)", str(raw))
+        if m:
+            return int(m.group(1))
         try:
-            port = _start_stream_server()
-        except Exception:
-            port = 0
-        if port and vid.isdigit():
-            query = urlencode(
-                {
-                    "vid": vid,
-                    "did": self.device_id or "",
-                    "iid": self.install_id or "",
-                }
+            value = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if 0 < value < 2161:
+            return value
+    meta = item.get("video_meta")
+    if isinstance(meta, dict):
+        m = re.search(r"(2160|1440|1080|720|576|540|480|360)",
+                      str(meta.get("definition") or meta.get("vheight") or ""))
+        if m:
+            return int(m.group(1))
+    return 0
+
+
+def _item_has_url(item: Dict[str, Any]) -> bool:
+    for field in ("main_url", "backup_url", "backup_url_1",
+                  "backup_url_2", "play_addr", "url"):
+        if item.get(field):
+            return True
+    return False
+
+
+def _normalize_video_list(video_list: Any) -> Dict[str, Dict[str, Any]]:
+    """把列表型 / 字符串包装型的 video_list 统一成 {key: item}。"""
+    result: Dict[str, Dict[str, Any]] = {}
+    if isinstance(video_list, dict):
+        for key, value in video_list.items():
+            if isinstance(value, dict):
+                result[str(key)] = value
+            elif isinstance(value, (list, tuple)) and value:
+                for idx, entry in enumerate(value):
+                    if isinstance(entry, dict):
+                        result["%s_%d" % (key, idx)] = entry
+    elif isinstance(video_list, (list, tuple)):
+        for idx, entry in enumerate(video_list):
+            if isinstance(entry, dict):
+                result[str(entry.get("definition")
+                           or entry.get("quality")
+                           or _item_height(entry)
+                           or idx)] = entry
+    elif isinstance(video_list, str) and video_list.strip().startswith("{"):
+        try:
+            return _normalize_video_list(json.loads(video_list))
+        except (ValueError, TypeError):
+            return result
+    return result
+
+
+def select_best_quality(
+    video_list: Dict[str, Any], preferred_key: Optional[str] = None
+) -> Tuple[str, Dict[str, Any]]:
+    if preferred_key and preferred_key in video_list and isinstance(
+        video_list[preferred_key], dict
+    ):
+        return preferred_key, video_list[preferred_key]
+    best_key = ""
+    best_item: Dict[str, Any] = {}
+    best_height = 0
+    if not isinstance(video_list, dict):
+        video_list = _normalize_video_list(video_list)
+    for k, item in video_list.items():
+        if not isinstance(item, dict):
+            continue
+        if not _item_has_url(item):
+            continue
+        try:
+            h = _item_height(item)
+        except (TypeError, ValueError):
+            h = 0
+        if h > best_height:
+            best_height = h
+            best_key = k
+            best_item = item
+        elif h == best_height and best_item:
+            cur_br = int(item.get("bitrate", 0))
+            best_br = int(best_item.get("bitrate", 0))
+            if cur_br > best_br:
+                best_key = k
+                best_item = item
+    return best_key, best_item
+
+
+def build_response_payload(
+    video_id: str,
+    video_model: Dict[str, Any],
+    video_data: Dict[str, Any],
+    best_item: Dict[str, Any],
+) -> Dict[str, Any]:
+    pic = first_non_empty(
+        best_item.get("cover"),
+        best_item.get("poster"),
+        video_model.get("origin_cover"),
+        video_model.get("cover_url"),
+        video_model.get("dynamic_cover"),
+        video_model.get("cover"),
+        video_data.get("cover"),
+        video_data.get("poster"),
+    )
+    url = first_non_empty(
+        best_item.get("main_url"),
+        best_item.get("play_addr"),
+        best_item.get("backup_url_1"),
+        best_item.get("url"),
+    )
+    height = stringify_int(first_non_empty(best_item.get("vheight"), best_item.get("height")))
+    width = stringify_int(first_non_empty(best_item.get("vwidth"), best_item.get("width")))
+
+    return {
+        "vid": video_id,
+        "pic": normalize_media_url(pic),
+        "url": normalize_media_url(url),
+        "quality": format_quality(best_item, height),
+        "duration": format_duration(first_non_empty(video_model.get("duration"), video_data.get("duration"))),
+        "size": format_size(first_non_empty(best_item.get("size"), best_item.get("data_size"), best_item.get("file_size"))),
+        "height": height,
+        "width": width,
+        "create_time": format_create_time(
+            first_non_empty(
+                video_model.get("create_time"),
+                video_model.get("publish_time"),
+                video_data.get("create_time"),
+                video_data.get("publish_time"),
             )
-            url = "http://127.0.0.1:%d/hg.mp4?%s" % (port, query)
-            return {"parse": 0, "jx": 0, "playUrl": "", "url": url,
-                    "header": {"User-Agent": UA}}
-        proxy = self.getProxyUrl() if hasattr(self, "getProxyUrl") else ""
-        if proxy:
-            sep = "&" if "?" in proxy else "?"
-            url = proxy + sep + "do=hg_cenc&vid=" + quote(vid, safe="")
-            return {"parse": 0, "jx": 0, "playUrl": "", "url": url,
-                    "header": {"User-Agent": UA}}
-        return {"parse": 1, "jx": 0, "playUrl": "", "url": SITE + "/", "header": {"User-Agent": UA}}
+        ),
+    }
 
-    def localProxy(self, param):
-        vid = str((param or {}).get("vid") or (param or {}).get("id") or "")
-        if not vid:
-            return [400, "text/plain", b"missing vid"]
+
+def first_non_empty(*values: Any) -> str:
+    for value in values:
+        normalized = unwrap_media_value(value)
+        if normalized:
+            return normalized
+    return ""
+
+
+def unwrap_media_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, list):
+        for item in value:
+            normalized = unwrap_media_value(item)
+            if normalized:
+                return normalized
+        return ""
+    if isinstance(value, dict):
+        for key in ("url", "uri", "src", "download_url"):
+            normalized = unwrap_media_value(value.get(key))
+            if normalized:
+                return normalized
+        for key in ("url_list", "urls"):
+            normalized = unwrap_media_value(value.get(key))
+            if normalized:
+                return normalized
+    return ""
+
+
+def normalize_media_url(value: str) -> str:
+    if value.startswith("//"):
+        return f"https:{value}"
+    return value
+
+
+def stringify_int(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    try:
+        return str(int(float(value)))
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def format_quality(best_item: Dict[str, Any], height: str) -> str:
+    label = first_non_empty(
+        best_item.get("quality"),
+        best_item.get("definition"),
+        best_item.get("gear_name"),
+        best_item.get("quality_desc"),
+    )
+    if label:
+        return label
+    if height:
+        return f"{height}p"
+    return ""
+
+
+def format_duration(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    try:
+        total_seconds = int(float(value))
+    except (TypeError, ValueError):
+        return str(value)
+
+    minutes, seconds = divmod(total_seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours > 0:
+        return f"{hours}小时{minutes}分钟{seconds}秒"
+    return f"{minutes}分钟{seconds}秒"
+
+
+def format_size(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    try:
+        size_bytes = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+    units = ["B", "KB", "MB", "GB", "TB"]
+    unit_index = 0
+    while size_bytes >= 1024 and unit_index < len(units) - 1:
+        size_bytes /= 1024
+        unit_index += 1
+    return f"{size_bytes:.2f}{units[unit_index]}"
+
+
+def format_create_time(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return ""
+        if text.endswith("Z"):
+            return datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone(
+                timezone(timedelta(hours=8))
+            ).isoformat()
         try:
-            model = _video_model(vid, {"device_id": self.device_id, "install_id": self.install_id})
-            _, item = _select_quality(_video_list_from_model(model), "1080")
-            url = _media_url(item)
-            spade = _spade_value(item)
-            if not url or not spade:
-                return [502, "text/plain", b"video model unavailable"]
+            numeric = float(text)
+        except ValueError:
+            return text
+        value = numeric
+
+    if isinstance(value, (int, float)):
+        timestamp = float(value)
+        if timestamp > 1e12:
+            timestamp /= 1000
+        dt = datetime.fromtimestamp(timestamp, tz=timezone(timedelta(hours=8)))
+        return dt.isoformat()
+    return str(value)
+
+
+def decrypt_spade_url(b64_str: str, key_seed: bytes) -> str:
+    if not b64_str:
+        return ""
+
+    raw = b64_decode_padded(b64_str)
+    if len(raw) < 5:
+        raise ValueError("Ciphertext too short")
+    if raw[0] != 0xA8 or raw[2] != 0x01 or raw[3] != 0x00:
+        raise ValueError("Ciphertext header format error")
+
+    cipher_data = raw[4:]
+    cipher_len = (len(cipher_data) // 16) * 16
+    cipher_data = cipher_data[:cipher_len]
+
+    constants = bytes([
+        0x4D, 0xD4, 0xC2, 0xE6, 0xB8, 0x31, 0x62, 0x09, 0x0E, 0x52, 0xB3, 0xC7, 0xA6, 0x73, 0x3B, 0xA4,
+        0x1C, 0xB2, 0x46, 0x2B, 0x82, 0x9A, 0xB5, 0x8A, 0x19, 0x6B, 0x39, 0xDB, 0x57, 0x17, 0x75, 0x24,
+        0xF4, 0x9B, 0xAF, 0x7F, 0x08, 0xE8, 0xD6, 0x8D, 0x26, 0xA7, 0x2E, 0x37, 0xC1, 0xA9, 0x5A, 0x2F,
+        0x1F, 0x05, 0xA5, 0x18, 0x92, 0xAE, 0xF2, 0x94, 0x97, 0x32, 0xB6, 0x2A, 0x38, 0xAA, 0xDD, 0x58,
+    ])
+
+    h1 = hashlib.sha512(key_seed).digest()
+    h2 = hashlib.sha512(h1 + constants).digest()
+    aes_key = h2[:16]
+    iv = h2[16:32]
+
+    cipher = AES.new(aes_key, AES.MODE_CBC, iv=iv)
+    plaintext = cipher.decrypt(cipher_data)
+
+    if plaintext:
+        pad = plaintext[-1]
+        if 1 <= pad <= 16 and pad <= len(plaintext):
+            plaintext = plaintext[:-pad]
+
+    return plaintext.rstrip(b"\x00").decode("utf-8", errors="replace")
+
+
+def b64_decode_padded(s: str) -> bytes:
+    s = s.strip()
+    pad = len(s) % 4
+    if pad:
+        s += "=" * (4 - pad)
+    try:
+        return base64.b64decode(s)
+    except Exception:
+        return base64.urlsafe_b64decode(s)
+
+
+def _replace_fourcc(data: bytearray, old: bytes, new: bytes) -> None:
+    old_len = len(old)
+    for i in range(len(data) - old_len):
+        if data[i : i + old_len] == old:
+            data[i : i + len(new)] = new
+
+
+def _replace_sinf(data: bytearray) -> None:
+    i = 0
+    while i < len(data) - 4:
+        if data[i : i + 4] == b"sinf":
+            if i >= 4:
+                sz = struct.unpack(">I", data[i - 4 : i])[0]
+                if 0 < sz < 50000:
+                    data[i : i + 4] = b"free"
+                    end = min(i - 4 + sz, len(data))
+                    for j in range(i + 4, end):
+                        data[j] = 0
+                    i = end
+                    continue
+        i += 1
+
+
+class _PlayHandler(BaseHTTPRequestHandler):
+    parser = None
+    src_dir = None
+    base_url = ''
+    _resolve_cache = {}
+    _vid_locks = {}
+    _guard = threading.Lock()
+    _download_locks = {}
+    _download_guard = threading.Lock()
+    _RESOLVE_TTL = 300
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        params = parse_qs(parsed.query)
+        if path == '/play':
+            self._handle_play(params)
+        elif path == '/stream':
+            self._handle_stream(params)
+        elif path == '/web':
+            self._handle_web(params)
+        elif path.startswith('/src/'):
+            self._handle_src(path[5:])
+        elif path == '/health':
+            self._handle_health()
+        else:
+            self.send_error(404)
+
+    def do_HEAD(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path == '/stream':
+            params = parse_qs(parsed.query)
+            self._handle_stream(params, head_only=True)
+        elif path == '/web':
+            params = parse_qs(parsed.query)
+            self._handle_web(params, head_only=True)
+        elif path.startswith('/src/'):
+            self._handle_src(path[5:], head_only=True)
+        else:
+            self.send_error(404)
+
+    def _handle_play(self, params):
+        vid = params.get('vid', [''])[0].strip()
+        if not vid.isdigit():
+            self._json(400, {'error': 'vid invalid'})
+            return
+        try:
+            result = self._resolve_cached(vid)
+            media_url = str(result.get('url') or '')
+            if not media_url:
+                self._json(502, {'error': 'no media url'})
+                return
+            self.send_response(302)
+            self.send_header('Location', media_url)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+        except Exception as exc:
+            self._json(502, {'error': str(exc)})
+
+    def _resolve_cached(self, vid):
+        with self._guard:
+            if vid not in self._vid_locks:
+                self._vid_locks[vid] = threading.Lock()
+            if len(self._resolve_cache) > 1000:
+                now = time.time()
+                for k in [k for k, v in self._resolve_cache.items()
+                          if now - v[0] > self._RESOLVE_TTL]:
+                    self._resolve_cache.pop(k, None)
+        lock = self._vid_locks[vid]
+        with lock:
+            hit = self._resolve_cache.get(vid)
+            if hit and time.time() - hit[0] < self._RESOLVE_TTL:
+                return hit[1]
+            result = handle_video_request(vid, None, max_retries=3, stream_mode=True)
+            self._resolve_cache[vid] = (time.time(), result)
+            return result
+
+    def _handle_src(self, filename, head_only=False):
+        if not self.src_dir:
+            self.send_error(503, 'src_dir not configured')
+            return
+        safe_name = Path(filename).name
+        filepath = self.src_dir / safe_name
+        if not filepath.exists() or not filepath.is_file():
+            self.send_error(404)
+            return
+        file_size = filepath.stat().st_size
+        range_header = self.headers.get('Range', '')
+        start = 0
+        end = file_size - 1
+        is_partial = False
+        if range_header:
+            m = re.match(r'bytes=(\d+)-(\d*)', range_header)
+            if m:
+                start = int(m.group(1))
+                if m.group(2):
+                    end = int(m.group(2))
+                is_partial = True
+        if start > end or start >= file_size:
+            self.send_response(416)
+            self.send_header('Content-Range', 'bytes */%d' % file_size)
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
+        content_length = end - start + 1
+        if is_partial:
+            self.send_response(206)
+            self.send_header('Content-Range',
+                             'bytes %d-%d/%d' % (start, end, file_size))
+        else:
+            self.send_response(200)
+        self.send_header('Content-Type', 'video/mp4')
+        self.send_header('Content-Length', str(content_length))
+        self.send_header('Accept-Ranges', 'bytes')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Expose-Headers',
+                         'Content-Length, Content-Range, Accept-Ranges')
+        self.end_headers()
+        if head_only:
+            return
+        with open(filepath, 'rb') as f:
+            f.seek(start)
+            remaining = content_length
+            while remaining > 0:
+                chunk = f.read(min(65536, remaining))
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                remaining -= len(chunk)
+
+    def _handle_health(self):
+        self._json(200, {
+            'ok': True,
+            'service': 'hongguo-embedded',
+            'parser': self.parser is not None,
+            'src_dir': str(self.src_dir) if self.src_dir else '',
+        })
+
+    def _handle_stream(self, params, head_only=False):
+        raw_url = params.get('url', [''])[0]
+        key_b64 = params.get('key', [''])[0]
+        if not raw_url:
+            self.send_error(400, 'missing url param')
+            return
+
+        backup_urls = [u for u in params.get('bk', []) if u]
+        candidate_urls = [raw_url] + backup_urls
+
+        try:
+            content_key = base64.b64decode(key_b64) if key_b64 else None
+        except Exception:
+            content_key = None
+
+        if content_key is not None:
+            url_hash = hashlib.md5(raw_url.encode()).hexdigest()[:16]
+            filename = 'video_%s.mp4' % url_hash
+            if not self.src_dir:
+                self.send_error(503, 'src_dir not configured')
+                return
+            filepath = self.src_dir / filename
+
+            if filepath.exists() and filepath.is_file():
+                self._handle_src(filename, head_only)
+                return
+
+        session = requests.Session()
+        session.trust_env = False
+        dl_headers = {
+            'User-Agent': 'com.phoenix.read/71332',
+            'Referer': 'https://novel.snssdk.com/',
+        }
+
+        total_size = 0
+        for cand in candidate_urls:
             try:
-                key_seed = _key_seed_from_model(model)
-                if key_seed:
-                    url = _decrypt_spade_url(url, key_seed)
+                head_resp = session.head(cand, headers=dl_headers, timeout=(8, 10))
+                total_size = int(head_resp.headers.get('Content-Length', 0) or 0)
+                if total_size:
+                    break
+            except Exception:
+                continue
+        if total_size == 0:
+            for cand in candidate_urls:
+                try:
+                    probe = session.get(cand, headers=dict(dl_headers, Range='bytes=0-0'),
+                                        timeout=(8, 15), stream=True)
+                    cr = probe.headers.get('Content-Range', '') or ''
+                    if '/' in cr:
+                        tail = cr.rsplit('/', 1)[1].strip()
+                        if tail.isdigit():
+                            total_size = int(tail)
+                    probe.close()
+                    if total_size:
+                        break
+                except Exception:
+                    continue
+
+        range_header = self.headers.get('Range', '') or ''
+        parsed = _parse_range(range_header, total_size)
+        if parsed is None:
+            self.send_response(416)
+            self.send_header('Content-Range', 'bytes */%d' % total_size)
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
+        start, end, is_partial = parsed
+        is_full = (not range_header
+                   or re.match(r'bytes=0-\s*$', range_header) is not None)
+
+        if content_key is not None:
+            # 带 Range / HEAD 的加密请求：走区间流式，不再整集下载后再解密
+            if not (is_full and not head_only):
+                try:
+                    self._stream_cenc(session, candidate_urls, dl_headers,
+                                      content_key, total_size, start, end,
+                                      is_partial, head_only)
+                    return
+                except Exception as exc:
+                    print('[stream] range stream failed: %s' % exc)
+                    try:
+                        self.send_error(502, 'stream failed: %s' % exc)
+                    except Exception:
+                        pass
+                    return
+
+            if is_full and not head_only:
+                try:
+                    with self._download_guard:
+                        if filename not in self._download_locks:
+                            self._download_locks[filename] = threading.Lock()
+                        s_lock = self._download_locks[filename]
+                    if s_lock.acquire(blocking=False):
+                        try:
+                            if filepath.exists() and filepath.is_file():
+                                self._handle_src(filename, head_only)
+                                return
+                            self._stream_cenc_direct(
+                                raw_url, backup_urls, content_key,
+                                total_size_hint=total_size, filename=filename,
+                                filepath=filepath)
+                            return
+                        finally:
+                            s_lock.release()
+                    else:
+                        with s_lock:
+                            pass
+                        if filepath.exists() and filepath.is_file():
+                            self._handle_src(filename, head_only)
+                            return
+                        print('[stream] streaming peer failed, fallback to full download')
+                except Exception as exc:
+                    print('[stream] streaming failed, fallback to full download: %s' % exc)
+
+            try:
+                with self._download_guard:
+                    if filename not in self._download_locks:
+                        self._download_locks[filename] = threading.Lock()
+                    dl_lock = self._download_locks[filename]
+                with dl_lock:
+                    if filepath.exists() and filepath.is_file():
+                        self._handle_src(filename, head_only)
+                        return
+                    print('[stream] full download + decrypt...')
+                    encrypted_data = download_video_bytes(raw_url, backup_urls)
+                    decrypted_data = decrypt_video_bytes(encrypted_data, content_key)
+                    filepath.write_bytes(decrypted_data)
+                    schedule_video_cleanup(filepath)
+                    print('[stream] cached %s (%d bytes)' % (filename, len(decrypted_data)))
+                self._handle_src(filename, head_only)
+            except Exception as exc:
+                print('[stream] download_decrypt error: %s' % exc)
+                try:
+                    self.send_error(502, 'stream failed: %s' % exc)
+                except Exception:
+                    pass
+            return
+
+        self._proxy_plain(candidate_urls, dl_headers, total_size=total_size)
+        return
+
+    def _probe_size(self, urls, headers):
+        """探测总长度，失败返回 0。用于正确响应 Range（否则拖动会退化成整片）。"""
+        for cand in urls:
+            try:
+                resp = requests.head(cand, headers=headers, timeout=(8, 10))
+                size = int(resp.headers.get('Content-Length', 0) or 0)
+                if not size and resp.headers.get('Content-Range'):
+                    tail = resp.headers['Content-Range'].rsplit('/', 1)[-1].strip()
+                    if tail.isdigit():
+                        size = int(tail)
+                if size:
+                    return size
+            except Exception:
+                continue
+        return 0
+
+    def _proxy_plain(self, urls, headers, total_size=0, head_only=False):
+        """明文流透传：带 Range / 206 / 多节点回退。"""
+        urls = [u for u in urls if u]
+        if not urls:
+            self.send_error(502, 'no url')
+            return
+        if not total_size:
+            total_size = self._probe_size(urls, headers)
+        range_header = self.headers.get('Range', '') or ''
+        start, end, is_partial = 0, (1 << 62), False
+        if total_size > 0:
+            parsed = _parse_range(range_header, total_size)
+            if parsed is None:
+                self.send_response(416)
+                self.send_header('Content-Range', 'bytes */%d' % total_size)
+                self.send_header('Content-Length', '0')
+                self.end_headers()
+                return
+            start, end, is_partial = parsed
+        try:
+            req_headers = dict(headers)
+            if is_partial:
+                req_headers['Range'] = 'bytes=%d-%d' % (start, end)
+            resp = None
+            last_exc = None
+            for cand in urls:
+                try:
+                    resp = requests.get(cand, headers=req_headers,
+                                        stream=True, timeout=(8, 90))
+                    resp.raise_for_status()
+                    break
+                except Exception as exc:
+                    last_exc = exc
+                    resp = None
+                    continue
+            if resp is None:
+                raise last_exc or RuntimeError('all cdn nodes failed')
+            content_length = int(resp.headers.get('Content-Length', 0) or 0)
+            if is_partial:
+                self.send_response(206)
+                self.send_header('Content-Range',
+                    resp.headers.get('Content-Range',
+                        'bytes %d-%d/%d' % (start, end, total_size)))
+            else:
+                self.send_response(200)
+            self.send_header('Content-Type', 'video/mp4')
+            if content_length:
+                self.send_header('Content-Length', str(content_length))
+            self.send_header('Accept-Ranges', 'bytes')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Expose-Headers',
+                'Content-Length, Content-Range, Accept-Ranges')
+            self.end_headers()
+            if head_only:
+                return
+            for chunk in resp.iter_content(65536):
+                self.wfile.write(chunk)
+        except Exception as exc:
+            try:
+                self.send_error(502, 'proxy failed: %s' % exc)
             except Exception:
                 pass
-            r = requests.get(url, headers={"User-Agent": MEDIA_UA, "Referer": "https://novel.snssdk.com/"}, timeout=120)
-            r.raise_for_status()
-            plain = decrypt_mp4_cenc(r.content, derive_content_key(spade))
-            return [200, "video/mp4", plain]
+
+    def _handle_web(self, params, head_only=False):
+        """/web：现取网页直链并以正确 UA/Referer 透传，规避防盗链与链接时效。"""
+        sid = (params.get('sid', [''])[0] or '').strip()
+        vid = (params.get('vid', [''])[0] or '').strip()
+        if not sid.isdigit():
+            self.send_error(400, 'sid invalid')
+            return
+        referer = 'https://hongguoduanju.com/player/%s' % sid
+        if vid:
+            referer += '/' + vid
+        headers = {
+            'User-Agent': get_web_spider().UA,
+            'Referer': referer,
+            'Accept': '*/*',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+        }
+        # 直链有时效：先用缓存的，取不通（403 等）就强制重抓播放页换新链
+        for attempt in (0, 1):
+            direct = ''
+            try:
+                direct = resolve_web_direct(sid, vid, refresh=bool(attempt))
+            except Exception as exc:
+                print('[web] resolve failed: %s' % exc)
+            if not direct:
+                continue
+            total_size = self._probe_size([direct], headers)
+            if total_size or attempt:
+                self._proxy_plain([direct], headers,
+                                  total_size=total_size, head_only=head_only)
+                return
+            print('[web] cached direct url unusable, refetch page')
+        self.send_error(502, 'web direct url unavailable')
+
+    def _stream_cenc_direct(self, raw_url, backup_urls, content_key,
+                            total_size_hint=0, filename='', filepath=None):
+
+        session = requests.Session()
+        session.trust_env = False
+        dl_headers = {
+            'User-Agent': 'com.phoenix.read/71332',
+            'Referer': 'https://novel.snssdk.com/',
+        }
+        candidate_urls = [raw_url] + (backup_urls or [])
+
+        resp = None
+        last_exc = None
+        for cand in candidate_urls:
+            try:
+                resp = session.get(cand, headers=dl_headers,
+                                    stream=True, timeout=(8, 90))
+                resp.raise_for_status()
+                break
+            except Exception as exc:
+                last_exc = exc
+                resp = None
+                continue
+        if resp is None:
+            raise last_exc or RuntimeError('all cdn nodes failed')
+
+        total_size = int(resp.headers.get('Content-Length', 0)) or total_size_hint
+        chunk_iter = resp.iter_content(256 * 1024)
+
+        buf = bytearray()
+        ftyp_size = 0
+        moov_end = 0
+        for chunk in chunk_iter:
+            buf.extend(chunk)
+            if len(buf) >= 8 and ftyp_size == 0:
+                ftyp_size = struct.unpack('>I', buf[0:4])[0]
+            if ftyp_size > 0 and len(buf) >= ftyp_size + 8 and moov_end == 0:
+                moov_size = struct.unpack('>I', buf[ftyp_size:ftyp_size + 4])[0]
+                moov_end = ftyp_size + moov_size
+            if moov_end > 0 and len(buf) >= moov_end:
+                break
+
+        if moov_end == 0 or len(buf) < moov_end:
+            raise RuntimeError('moov not found in first chunk')
+
+        moov_data = bytearray(buf[ftyp_size + 8:moov_end])
+        for old, new in ((b'encv', b'hvc1'), (b'enca', b'mp4a')):
+            _replace_fourcc(moov_data, old, new)
+        _replace_sinf(moov_data)
+
+        decrypt_map = {}
+        t1_off, t1_sz = find_box(moov_data, 'trak', 0)
+        t2_off, _ = find_box(moov_data, 'trak', t1_off + t1_sz)
+        for t_off in (t1_off, t2_off):
+            if t_off < 0:
+                continue
+            result = parse_track(moov_data, t_off)
+            if result is None:
+                continue
+            sizes, offsets, cns, aux_off, aux_sz, ns = result
+            if ns == 0:
+                continue
+
+            aux_data = None
+            if aux_off + aux_sz <= len(buf):
+                aux_data = bytes(buf[aux_off:aux_off + aux_sz])
+            else:
+                try:
+                    aux_resp = session.get(cand, headers={
+                        **dl_headers,
+                        'Range': 'bytes=%d-%d' % (aux_off, aux_off + aux_sz - 1),
+                    }, timeout=10)
+                    aux_data = aux_resp.content
+                except Exception:
+                    aux_data = None
+            if not aux_data:
+                continue
+
+            ivs = []
+            for i in range(0, len(aux_data), 8):
+                if i + 8 <= len(aux_data):
+                    ivs.append(aux_data[i:i + 8])
+
+            si = 0
+            for ci, chunk_off in enumerate(offsets):
+                off = chunk_off
+                for _ in range(cns[ci]):
+                    if si >= ns:
+                        break
+                    sz = sizes[si]
+                    iv = ivs[si] if si < len(ivs) else b'\x00' * 8
+                    decrypt_map[off] = (sz, iv)
+                    off += sz
+                    si += 1
+
+        sorted_offsets = sorted(decrypt_map)
+
+        self.send_response(200)
+        if total_size > 0:
+            self.send_header('Content-Length', str(total_size))
+        self.send_header('Content-Type', 'video/mp4')
+        self.send_header('Accept-Ranges', 'bytes')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Expose-Headers',
+                         'Content-Length, Content-Range, Accept-Ranges')
+        self.end_headers()
+
+        header_bytes = bytes(buf[0:ftyp_size]) + buf[ftyp_size:ftyp_size + 8] + bytes(moov_data)
+
+        part_path = filepath.with_suffix('.part') if filepath else None
+        file_handle = None
+        try:
+            if part_path:
+                file_handle = open(part_path, 'wb')
         except Exception:
-            return [502, "text/plain", b"media resolve failed"]
+            file_handle = None
+
+        try:
+            self.wfile.write(header_bytes)
+            if file_handle:
+                file_handle.write(header_bytes)
+            current_pos = moov_end
+
+            if len(buf) > moov_end:
+                remaining = bytearray(buf[moov_end:])
+                decrypted = stream_cenc_decrypt_chunk(
+                    remaining, current_pos, decrypt_map, content_key, sorted_offsets)
+                self.wfile.write(decrypted)
+                self.wfile.flush()
+                if file_handle:
+                    file_handle.write(decrypted)
+                current_pos += len(remaining)
+
+            buf = None
+
+            for chunk in chunk_iter:
+                chunk = bytearray(chunk)
+                decrypted = stream_cenc_decrypt_chunk(
+                    chunk, current_pos, decrypt_map, content_key, sorted_offsets)
+                self.wfile.write(bytes(decrypted))
+                self.wfile.flush()
+                if file_handle:
+                    file_handle.write(decrypted)
+                current_pos += len(chunk)
+
+            if file_handle:
+                file_handle.close()
+                file_handle = None
+            if part_path and part_path.exists() and part_path.stat().st_size > 0:
+                part_path.replace(filepath)
+                schedule_video_cleanup(filepath)
+                print('[stream] streaming complete, cached %s' % filename)
+        except BrokenPipeError:
+            print('[stream] player disconnected mid-stream')
+        except Exception as exc:
+            print('[stream] write error: %s' % exc)
+        finally:
+            if file_handle:
+                file_handle.close()
+            if part_path and part_path.exists():
+                try:
+                    part_path.unlink()
+                except Exception:
+                    pass
+
+    def _stream_cenc(self, session, candidate_urls, dl_headers, content_key,
+                     total_size, req_start, req_end, is_partial, head_only):
+
+        resp = None
+        last_exc = None
+        for cand in candidate_urls:
+            try:
+                resp = session.get(cand, headers=dl_headers, stream=True, timeout=(8, 90))
+                resp.raise_for_status()
+                break
+            except Exception as exc:
+                last_exc = exc
+                resp = None
+                continue
+        if resp is None:
+            raise last_exc or RuntimeError('all cdn nodes failed')
+        chunk_iter = resp.iter_content(256 * 1024)
+
+        buf = bytearray()
+        ftyp_size = 0
+        moov_end = 0
+
+        for chunk in chunk_iter:
+            buf.extend(chunk)
+            if len(buf) >= 8 and ftyp_size == 0:
+                ftyp_size = struct.unpack('>I', buf[0:4])[0]
+            if ftyp_size > 0 and len(buf) >= ftyp_size + 8 and moov_end == 0:
+                moov_size = struct.unpack('>I', buf[ftyp_size:ftyp_size + 4])[0]
+                moov_end = ftyp_size + moov_size
+            if moov_end > 0 and len(buf) >= moov_end:
+                break
+
+        if moov_end == 0 or len(buf) < moov_end:
+            print('[stream] moov parse failed, falling back to full download')
+            for chunk in chunk_iter:
+                buf.extend(chunk)
+            decrypted = decrypt_mp4_cenc(buf, content_key)
+            self._send_cenc_response(decrypted, total_size,
+                                      req_start, req_end, is_partial, head_only)
+            return
+
+        moov_data = bytearray(buf[ftyp_size + 8:moov_end])
+
+        for old, new in ((b'encv', b'hvc1'), (b'enca', b'mp4a')):
+            _replace_fourcc(moov_data, old, new)
+        _replace_sinf(moov_data)
+
+        decrypt_map = {}
+        t1_off, t1_sz = find_box(moov_data, 'trak', 0)
+        t2_off, _ = find_box(moov_data, 'trak', t1_off + t1_sz)
+
+        for t_off in (t1_off, t2_off):
+            if t_off < 0:
+                continue
+            result = parse_track(moov_data, t_off)
+            if result is None:
+                continue
+            sizes, offsets, cns, aux_off, aux_sz, ns = result
+            if ns == 0:
+                continue
+
+            aux_data = None
+            if aux_off + aux_sz <= len(buf):
+                aux_data = bytes(buf[aux_off:aux_off + aux_sz])
+            else:
+                try:
+                    aux_resp = session.get(cand, headers={
+                        **dl_headers,
+                        'Range': 'bytes=%d-%d' % (aux_off, aux_off + aux_sz - 1),
+                    }, timeout=10)
+                    aux_data = aux_resp.content
+                except Exception as exc:
+                    print('[stream] aux fetch failed: %s' % exc)
+                    aux_data = None
+
+            if not aux_data:
+                continue
+
+            ivs = []
+            for i in range(0, len(aux_data), 8):
+                if i + 8 <= len(aux_data):
+                    ivs.append(aux_data[i:i + 8])
+
+            si = 0
+            for ci, chunk_off in enumerate(offsets):
+                off = chunk_off
+                for _ in range(cns[ci]):
+                    if si >= ns:
+                        break
+                    sz = sizes[si]
+                    iv = ivs[si] if si < len(ivs) else b'\x00' * 8
+                    decrypt_map[off] = (sz, iv)
+                    off += sz
+                    si += 1
+
+        sorted_offsets = sorted(decrypt_map)
+
+        if total_size > 0:
+            content_length = req_end - req_start + 1
+            if is_partial:
+                self.send_response(206)
+                self.send_header('Content-Range',
+                    'bytes %d-%d/%d' % (req_start, req_end, total_size))
+            else:
+                self.send_response(200)
+            self.send_header('Content-Length', str(content_length))
+        else:
+            self.send_response(200)
+        self.send_header('Content-Type', 'video/mp4')
+        self.send_header('Accept-Ranges', 'bytes')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Expose-Headers',
+            'Content-Length, Content-Range, Accept-Ranges')
+        self.end_headers()
+
+        if head_only:
+            return
+
+        header_bytes = bytes(buf[0:ftyp_size]) + buf[ftyp_size:ftyp_size + 8] + bytes(moov_data)
+
+        if req_start < moov_end:
+            write_end = min(req_end + 1, moov_end)
+            self.wfile.write(header_bytes[req_start:write_end])
+
+        current_pos = moov_end
+
+        if len(buf) > moov_end:
+            remaining = bytearray(buf[moov_end:])
+            decrypted_remaining = stream_cenc_decrypt_chunk(
+                remaining, current_pos, decrypt_map, content_key, sorted_offsets)
+            self._write_range_data(decrypted_remaining, current_pos,
+                                   req_start, req_end)
+            current_pos += len(remaining)
+
+        buf = None
+
+        for chunk in chunk_iter:
+            chunk = bytearray(chunk)
+            decrypted = stream_cenc_decrypt_chunk(
+                chunk, current_pos, decrypt_map, content_key, sorted_offsets)
+            if not self._write_range_data(decrypted, current_pos,
+                                          req_start, req_end):
+                break
+            current_pos += len(chunk)
+
+    def _write_range_data(self, data, data_start, req_start, req_end):
+        data_end = data_start + len(data)
+        if data_end <= req_start:
+            return True
+        if data_start > req_end:
+            return False
+        write_start = max(0, req_start - data_start)
+        write_end = min(len(data), req_end - data_start + 1)
+        if write_start < write_end:
+            self.wfile.write(data[write_start:write_end])
+        return True
+
+    def _send_cenc_response(self, data, total_size, req_start, req_end, is_partial, head_only):
+        content_length = len(data)
+        if is_partial:
+            self.send_response(206)
+            self.send_header('Content-Range',
+                'bytes %d-%d/%d' % (req_start, req_end, total_size or content_length))
+            self.send_header('Content-Length', str(req_end - req_start + 1))
+        else:
+            self.send_response(200)
+            self.send_header('Content-Length', str(content_length))
+        self.send_header('Content-Type', 'video/mp4')
+        self.send_header('Accept-Ranges', 'bytes')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Expose-Headers',
+            'Content-Length, Content-Range, Accept-Ranges')
+        self.end_headers()
+        if head_only:
+            return
+        if is_partial:
+            self.wfile.write(data[req_start:req_end + 1])
+        else:
+            self.wfile.write(data)
+
+    def _json(self, code, data):
+        body = json.dumps(data, ensure_ascii=False).encode('utf-8')
+        self.send_response(code)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Content-Length', str(len(body)))
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+def _find_free_port(preferred):
+    for port in range(preferred, preferred + 50):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('0.0.0.0', port))
+                return port
+        except OSError:
+            continue
+    return 0
+
+
+class Spider(Spider):
+    SITE = 'https://hongguoduanju.com'
+    UA = ('Mozilla/5.0 (Linux; Android 12; TV) AppleWebKit/537.36 '
+          '(KHTML, like Gecko) Chrome/126.0 Safari/537.36')
+    HEADERS = {
+        'User-Agent': UA,
+        'Accept': ('text/html,application/xhtml+xml,application/xml;q=0.9,'
+                   'image/avif,image/webp,image/apng,*/*;q=0.8'),
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        'Accept-Encoding': 'gzip, deflate',
+        'Referer': 'https://hongguoduanju.com/',
+        'Origin': 'https://hongguoduanju.com/',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'no-cache',
+    }
+
+    DEFAULT_PORT = 9877
+
+    CATEGORY_CONFIG = {
+        'rank_hot':   {'type_name': '红果热播榜',    'kind': 'rank', 'route': 'hot-drama'},
+        'rank_human': {'type_name': '真人剧热播榜',  'kind': 'rank', 'route': 'hot-real-drama'},
+        'rank_comic': {'type_name': '漫剧热播榜',    'kind': 'rank', 'route': 'hot-comic-drama'},
+        'rank_ai':    {'type_name': 'AI剧热播榜',    'kind': 'rank', 'route': 'hot-ai-drama'},
+        'short':      {'type_name': '短剧',     'kind': 'category', 'query': 'tab=1&sort_type=1'},
+    }
+
+    CATEGORIES = [
+        {'type_id': k, 'type_name': v['type_name']}
+        for k, v in CATEGORY_CONFIG.items()
+    ]
+
+    RANK_ROUTES = {'hot-drama', 'hot-real-drama', 'hot-comic-drama', 'hot-ai-drama'}
+
+    # 官网首页 JSON 的 homeSections[].tab_type 与榜单路由的对应关系
+    RANK_TAB_MAP = {
+        'hot-drama': 'all',
+        'hot-real-drama': 'human',
+        'hot-comic-drama': 'comic',
+        'hot-ai-drama': 'ai',
+    }
+
+    SELECTOR_GROUPS = [
+        {
+            'key': 'background', 'name': '\u5168\u90e8\u80cc\u666f',
+            'items': [
+                ['\u73b0\u4ee3', 'cate_757'], ['\u90fd\u5e02', 'cate_1'], ['\u53e4\u4ee3', 'cate_758'],
+                ['\u4e61\u6751', 'cate_11'], ['\u5e74\u4ee3', 'cate_79'], ['\u67b6\u7a7a', 'cate_452'],
+                ['\u804c\u573a', 'cate_127'], ['\u6c11\u56fd', 'cate_390'], ['\u6821\u56ed', 'cate_4'],
+                ['\u5bab\u5ef7', 'cate_1153'], ['\u8352\u5c9b', 'cate_1162'],
+            ],
+        },
+        {
+            'key': 'topic', 'name': '\u5168\u90e8\u4e3b\u9898',
+            'items': [
+                ['\u73b0\u8a00', 'cate_1021'], ['\u5973\u6027\u6210\u957f', 'cate_1048'], ['\u8111\u6d1e', 'cate_262'],
+                ['\u5947\u5e7b', 'cate_1020'], ['\u7384\u5e7b', 'cate_1019'], ['\u53e4\u8a00', 'cate_439'],
+                ['\u6218\u795e', 'cate_1038'], ['\u5bab\u6597', 'cate_246'], ['\u4ed9\u4fa0', 'cate_1013'],
+                ['\u6743\u8c0b', 'cate_1047'], ['\u79cd\u7530', 'cate_1180'], ['\u5e74\u4ee3\u7231\u60c5', 'cate_1022'],
+                ['\u559c\u5267', 'cate_303'], ['\u60ac\u7591', 'cate_165'], ['\u9752\u6625', 'cate_297'],
+                ['\u5fd7\u602a', 'cate_1027'], ['\u6c11\u56fd\u7231\u60c5', 'cate_1025'], ['\u7075\u5f02', 'cate_751'],
+                ['\u5bb6\u56fd\u60c5\u6000', 'cate_1235'], ['\u6cd5\u5f8b', 'cate_1136'], ['\u5211\u4fa6', 'cate_1148'],
+                ['\u6297\u6218', 'cate_504'], ['\u6b66\u4fa0', 'cate_1172'], ['\u6c11\u56fd\u4f20\u5947', 'cate_1240'],
+                ['\u52a8\u4f5c', 'cate_302'], ['\u6c42\u751f', 'cate_1168'], ['\u79d1\u5e7b', 'cate_1092'],
+                ['\u6050\u6016', 'cate_1219'], ['\u5546\u6218', 'cate_1225'],
+            ],
+        },
+        {
+            'key': 'setting', 'name': '\u5168\u90e8\u8bbe\u5b9a',
+            'items': [
+                ['\u6253\u8138\u8650\u6e23', 'cate_1051'], ['\u5927\u7537\u4e3b', 'cate_1207'], ['\u5927\u5973\u4e3b', 'cate_760'],
+                ['\u9a6c\u7532', 'cate_266'], ['\u91cd\u751f', 'cate_36'], ['\u7a7f\u8d8a', 'cate_37'],
+                ['\u7cfb\u7edf', 'cate_19'], ['\u5148\u5a5a\u540e\u7231', 'cate_265'], ['\u5bb6\u957f\u91cc\u77ed', 'cate_862'],
+                ['\u5c0f\u4eba\u7269', 'cate_1010'], ['\u7834\u955c\u91cd\u5706', 'cate_475'], ['\u795e\u8c6a', 'cate_20'],
+                ['\u8c6a\u95e8', 'cate_936'], ['\u5f3a\u8005\u56de\u5f52', 'cate_1045'], ['\u5f02\u80fd', 'cate_598'],
+                ['\u4f20\u627f\u89c9\u9192', 'cate_1007'], ['\u8650\u604b', 'cate_1008'], ['\u533b\u751f', 'cate_487'],
+                ['\u5f3a\u5f3a\u8054\u5408', 'cate_1049'], ['\u8d58\u5a7f\u9006\u88ad', 'cate_1044'], ['\u751c\u5ba0', 'cate_96'],
+                ['\u5a31\u4e50\u5708', 'cate_43'], ['\u795e\u533b', 'cate_26'], ['\u9752\u6885\u7af9\u9a6c', 'cate_387'],
+                ['\u59d0\u5f1f\u604b', 'cate_762'], ['\u7384\u5b66', 'cate_929'], ['\u8ffd\u59bb\u706b\u846c\u573a', 'cate_616'],
+                ['\u4e1a\u754c\u7cbe\u82f1', 'cate_1293'], ['\u4e00\u89c1\u949f\u60c5', 'cate_477'], ['\u798f\u5b9d', 'cate_1291'],
+                ['\u635e\u504f\u95e8', 'cate_1287'], ['\u53cd\u6d3e\u4e3b\u89d2', 'cate_1042'], ['\u840c\u5ba0', 'cate_428'],
+                ['\u65b9\u8a00', 'cate_1255'], ['\u53cc\u5411\u6551\u8d4e', 'cate_1200'], ['\u767d\u6708\u5149', 'cate_615'],
+                ['\u7075\u9b42\u4e92\u6362', 'cate_831'], ['\u75c5\u5a07', 'cate_380'], ['\u66b4\u5bcc', 'cate_1191'],
+                ['\u9ed1\u9053', 'cate_826'], ['\u4e27\u5c38', 'cate_582'], ['\u7279\u79cd\u5175', 'cate_375'],
+            ],
+        },
+        {
+            'key': 'gender', 'name': '\u5168\u90e8\u53d7\u4f17',
+            'items': [['\u7537\u9891', '1'], ['\u5973\u9891', '0']],
+        },
+        {
+            'key': 'time', 'name': '\u5168\u90e8\u65f6\u95f4',
+            'items': [
+                ['7\u5929\u5185\u4e0a\u65b0', '1'], ['14\u5929\u5185\u4e0a\u65b0', '2'],
+                ['30\u5929\u5185\u4e0a\u65b0', '3'], ['90\u5929\u5185\u4e0a\u65b0', '4'],
+            ],
+        },
+        {
+            'key': 'sort_type', 'name': '\u5168\u90e8\u63a8\u8350',
+            'items': [['\u6700\u65b0', '2'], ['\u6700\u70ed', '1']],
+        },
+    ]
+
+    PAGE_SIZE = 24
+
+    def __init__(self):
+        self._cache = {}
+        self._server = None
+        self._server_port = self.DEFAULT_PORT
+        self._server_started = False
+        self._parser = None
+
+    def getName(self):
+        return '\u7ea2\u679c\u679c[\u77ed]'
+
+    def init(self, extend=''):
+        if not self._server_started:
+            try:
+                self._start_embedded_server(self.DEFAULT_PORT)
+            except Exception as exc:
+                print('[红果果] 内嵌服务启动失败: %s' % exc)
+
+    def _port_file(self):
+        return Path(os.path.dirname(os.path.abspath(__file__))) / '.hongguo_embedded_port'
+
+    def _read_registered_port(self):
+        try:
+            return int(self._port_file().read_text().strip())
+        except Exception:
+            return 0
+
+    def _ensure_server(self):
+        if self._server_started:
+            if _probe_own_server(self._server_port):
+                return
+            self._server_started = False
+            self._server = None
+
+        reg_port = self._read_registered_port()
+        if reg_port and _probe_own_server(reg_port):
+            self._server_port = reg_port
+            self._server_started = True
+            global _CURRENT_DOMAIN
+            _CURRENT_DOMAIN = 'http://127.0.0.1:%d' % reg_port
+            return
+
+        try:
+            self._start_embedded_server(self.DEFAULT_PORT)
+        except Exception as exc:
+            print('[红果果] 内嵌服务重启失败: %s' % exc)
+
+    def _start_embedded_server(self, port):
+        global _CURRENT_DOMAIN, _EMBEDDED_SERVER, _EMBEDDED_PORT
+
+        if _EMBEDDED_SERVER is not None and _probe_own_server(_EMBEDDED_PORT):
+            self._server = _EMBEDDED_SERVER
+            self._server_port = _EMBEDDED_PORT
+            self._server_started = True
+            _CURRENT_DOMAIN = 'http://127.0.0.1:%d' % _EMBEDDED_PORT
+            return
+
+        reg_port = self._read_registered_port()
+        if reg_port and reg_port != port and _probe_own_server(reg_port):
+            self._server_port = reg_port
+            self._server_started = True
+            _CURRENT_DOMAIN = 'http://127.0.0.1:%d' % reg_port
+            return
+
+        actual_port = _find_free_port(port)
+        if actual_port == 0:
+            raise RuntimeError('no free port near %d' % port)
+
+        public_url = 'http://127.0.0.1:%d' % actual_port
+        _CURRENT_DOMAIN = public_url
+
+        src_dir = Path(os.path.dirname(os.path.abspath(__file__))) / 'src'
+        src_dir.mkdir(parents=True, exist_ok=True)
+
+        _PlayHandler.src_dir = src_dir
+        _PlayHandler.base_url = public_url
+
+        os.environ['APP_PORT'] = str(actual_port)
+
+        server = ThreadingHTTPServer(('0.0.0.0', actual_port), _PlayHandler)
+        server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        server_thread.start()
+
+        _EMBEDDED_SERVER = server
+        _EMBEDDED_PORT = actual_port
+
+        try:
+            self._port_file().write_text(str(actual_port))
+        except Exception:
+            pass
+
+        self._server = server
+        self._server_port = actual_port
+        self._server_started = True
+
+        print('[\u7ea2\u679c\u679c] \u5185\u5d4c\u670d\u52a1\u5df2\u542f\u52a8: %s' % public_url)
+
+    def isVideoFormat(self, url):
+        return False
+
+    def manualVideoCheck(self):
+        return False
+
+    def destroy(self):
+        return
+
+    def _get(self, url):
+        # 官网偶发 403/超时/短包，重试几次再放弃，避免整页静默变空
+        last_exc = None
+        for attempt in range(3):
+            try:
+                resp = requests.get(url, headers=self.HEADERS,
+                                    timeout=25, verify=False)
+                if resp.status_code in (403, 429, 503):
+                    last_exc = RuntimeError('http %s' % resp.status_code)
+                    time.sleep(0.8 * (attempt + 1))
+                    continue
+                resp.raise_for_status()
+                resp.encoding = resp.encoding or 'utf-8'
+                text = resp.text or ''
+                if len(text) > 200:
+                    return text
+                last_exc = RuntimeError('response too short (%d bytes)' % len(text))
+            except Exception as exc:
+                last_exc = exc
+            if attempt < 2:
+                time.sleep(0.8 * (attempt + 1))
+        print('[\u7ea2\u679c\u679c] page fetch failed: %s url=%s' % (last_exc, url))
+        return ''
+
+    def _player_url(self, sid, vid=''):
+        base = self.SITE + '/player/' + str(sid)
+        return base + '/' + str(vid) if vid else base
+
+    def _player_html(self, sid, vid='', refresh=False):
+        """抓播放页 HTML。SSR 直出失败也不影响，<video src> 是前端渲染的。"""
+        url = self._player_url(sid, vid)
+        # refresh 必须穿透缓存：直链过期时页面内容已变，读缓存只会拿到旧链
+        if not refresh:
+            cached = self._cache.get(url)
+            if cached and time.time() - cached[0] < 300:
+                return cached[1]
+        html = self._get(url)
+        if html:
+            self._cache[url] = (time.time(), html)
+        return html
+
+    @staticmethod
+    def _video_src(html):
+        """从播放页抠 <video src="...">，这就是明文直链，无需签名也无需解密。"""
+        if not html:
+            return ''
+        patterns = (
+            r'<video[^>]+src="([^"]+)"',
+            r'<video[^>]+src=\\?"([^"\\]+)',
+            r'"main_url"\\?:\\?"([^"]+)"',
+        )
+        for pattern in patterns:
+            m = re.search(pattern, html)
+            if not m:
+                continue
+            url = (m.group(1)
+                   .replace('&amp;', '&')
+                   .replace('\\u0026', '&')
+                   .replace('\\/', '/')
+                   .strip())
+            if url.startswith('http'):
+                return url
+        return ''
+
+    def _web_direct_url(self, sid, vid='', refresh=False):
+        """网页明文直链；拿不到返回 ''。直链有时效，播放前才现取。"""
+        key = '__direct__%s_%s' % (sid, vid)
+        if not refresh:
+            cached = self._cache.get(key)
+            if cached and time.time() - cached[0] < 60:
+                return cached[1]
+        url = self._video_src(self._player_html(sid, vid, refresh=refresh))
+        if url:
+            self._cache[key] = (time.time(), url)
+        return url
+
+    @classmethod
+    def _episode_vids(cls, html):
+        """从选集区抠 /player/{sid}/{vid} 里的 vid，保持页面顺序去重。"""
+        vids = []
+        if not html:
+            return vids
+        for m in re.finditer(r'/player/(\d+)/(\d+)', html):
+            vid = m.group(2)
+            # 第 1 集的链接是 /player/{sid} 无 vid，从 video src 补
+            if vid and vid not in vids:
+                vids.append(vid)
+        return vids
+
+    @classmethod
+    def _has_plain_first_episode(cls, html):
+        """首页选集里第 1 集是否形如 /player/{sid}（不带 vid）。"""
+        return bool(html) and bool(re.search(r'/player/\d+["\']', html))
+
+    def _crawl_vids(self, sid, total_hint=0, max_rounds=12):
+        """播放页每页只渲染 15 集，从最后一条往下翻，逐段抓全集。
+
+        第 1 集的链接是 /player/{sid}（无 vid），用空串占位——playerContent
+        收到空 vid 时会直接抓 /player/{sid}，正好就是第 1 集。
+        """
+        collected = []
+        seen = set()
+        cursor = ''
+        first_added = False
+        for _ in range(max_rounds):
+            html = self._player_html(sid, cursor)
+            if not html:
+                break
+            if not first_added:
+                # 第 1 集必然存在且排在最前，先占位
+                collected.append('')
+                first_added = True
+            batch = [v for v in self._episode_vids(html) if v not in seen]
+            if not batch:
+                break
+            for v in batch:
+                seen.add(v)
+                collected.append(v)
+            if total_hint and len(collected) >= total_hint:
+                break
+            cursor = collected[-1]
+        return collected
+
+    @staticmethod
+    def _loader_url(url):
+        """官网走 Modern.js SSR，不同路由用不同 loader 参数返回纯 JSON。"""
+        parsed = urlparse(url)
+        path = parsed.path.rstrip('/')
+        if '/detail' in path:
+            loader_name = 'detail_page'
+        elif '/category' in path:
+            loader_name = 'category_page'
+        elif '/search' in path:
+            # 官网搜索是路径路由 /search/{keyword}，对应 loader 必须是
+            # search_(keyword)/page；裸 /search（没有关键词）才用 search_page。
+            # 用错 loader 会直接 403（Route does not match），导致搜索整体失败。
+            if path.startswith('/search/') and len(path) > len('/search/'):
+                loader_name = 'search_(keyword)/page'
+            else:
+                loader_name = 'search_page'
+        else:
+            loader_name = 'page'
+        sep = '&' if '?' in url else '?'
+        return url + sep + '__loader=' + loader_name + '&__ssrDirect=true'
+
+    def _loader_json(self, url):
+        """直接取 SSR loader JSON；拿不到返回 None，由调用方回退 HTML 解析。"""
+        target = self._loader_url(url)
+        try:
+            resp = requests.get(target, headers=self.HEADERS,
+                                timeout=25, verify=False)
+            if resp.status_code in (403, 429, 503):
+                print('[红果果] loader 被拦截 http=%s（多为 IP/风控，非解析问题）'
+                      % resp.status_code)
+                return None
+            resp.raise_for_status()
+            resp.encoding = resp.encoding or 'utf-8'
+            text = (resp.text or '').strip()
+            if not text or text[0] not in '{[':
+                return None
+            data = json.loads(text)
+        except Exception as exc:
+            print('[红果果] loader 请求失败: %s' % exc)
+            return None
+        if isinstance(data, list) and data:
+            data = data[0]
+        return data if isinstance(data, dict) else None
+
+    def _home_json(self):
+        """首页直出 JSON：{isSuccess, req, bannerList, mBannerList, homeSections}。"""
+        cached = self._cache.get('__home_json__')
+        if cached and time.time() - cached[0] < 300:
+            return cached[1]
+        data = None
+        try:
+            data = self._loader_json(self.SITE + '/')
+        except Exception as exc:
+            print('[\u7ea2\u679c\u679c] home json failed: %s' % exc)
+        if not isinstance(data, dict):
+            data = {}
+        self._cache['__home_json__'] = (time.time(), data)
+        return data
+
+    def _home_sections(self):
+        data = self._home_json()
+        sections = data.get('homeSections')
+        return [s for s in sections if isinstance(s, dict)] if isinstance(sections, list) else []
+
+    def _home_section(self, tab_type):
+        """按 tab_type(all/human/comic/ai) 取首页某个榜单的剧集列表。"""
+        for sec in self._home_sections():
+            if sec.get('tab_type') != tab_type:
+                continue
+            items = sec.get('video_list')
+            if isinstance(items, list) and items:
+                return items
+        return []
+
+    def _home_banners(self):
+        data = self._home_json()
+        result = []
+        for field in ('bannerList', 'mBannerList'):
+            items = data.get(field)
+            if isinstance(items, list):
+                result.extend(x for x in items if isinstance(x, dict))
+        return result
+
+    def _router_data(self, url):
+        cached = self._cache.get(url)
+        if cached and time.time() - cached[0] < 180:
+            return cached[1]
+        # 优先走 SSR JSON 直连，比解析 HTML 里的 _ROUTER_DATA 稳得多
+        json_data = self._loader_json(url)
+        if isinstance(json_data, dict) and json_data:
+            self._cache[url] = (time.time(), json_data)
+            return json_data
+        html = self._get(url)
+        if not html:
+            raise RuntimeError('\u9875\u9762\u83b7\u53d6\u5931\u8d25: ' + url)
+        idx = html.find('_ROUTER_DATA')
+        if idx < 0:
+            raise RuntimeError('\u9875\u9762\u6ca1\u6709\u8def\u7531\u6570\u636e')
+        eq_idx = html.find('=', idx)
+        if eq_idx < 0:
+            raise RuntimeError('\u9875\u9762\u6ca1\u6709\u8def\u7531\u6570\u636e')
+        brace_start = html.find('{', eq_idx)
+        if brace_start < 0:
+            raise RuntimeError('\u9875\u9762\u6ca1\u6709\u8def\u7531\u6570\u636e')
+        script_end = html.find('</script>', brace_start)
+        if script_end < 0:
+            script_end = len(html)
+        depth = 0
+        i = brace_start
+        in_str = False
+        escape = False
+        while i < script_end:
+            ch = html[i]
+            if in_str:
+                if escape:
+                    escape = False
+                elif ch == '\\':
+                    escape = True
+                elif ch == '"':
+                    in_str = False
+            else:
+                if ch == '"':
+                    in_str = True
+                elif ch == '{':
+                    depth += 1
+                elif ch == '}':
+                    depth -= 1
+                    if depth == 0:
+                        break
+            i += 1
+        json_str = html[brace_start:i + 1]
+        data = self._loads_lenient(json_str)
+        if not isinstance(data, dict):
+            raise RuntimeError('route JSON is not an object')
+        self._cache[url] = (time.time(), data)
+        return data
+
+    def _loads_lenient(self, json_str):
+        """官网会把路由 JSON 塞进 JS 字符串或 HTML 属性，逐层还原后重试。"""
+        candidates = [json_str]
+        repaired = (json_str.replace('\\"', '"')
+                    .replace('\\/', '/')
+                    .replace('\\\\', '\\'))
+        candidates.append(repaired)
+        candidates.append(self._decode_html(repaired))
+        for text in candidates:
+            try:
+                return json.loads(text)
+            except ValueError:
+                continue
+        for text in candidates:
+            try:
+                value, _ = json.JSONDecoder().raw_decode(text)
+                return value
+            except ValueError:
+                continue
+        raise RuntimeError('route JSON parse failed')
+
+    @staticmethod
+    def _clean_url(value):
+        if not value:
+            return ''
+        return str(value).replace('\\/', '/').replace('\\u0026', '&').replace('&amp;', '&')
+
+    @staticmethod
+    def _decode_html(value):
+        if not value:
+            return ''
+        return (str(value)
+                .replace('&quot;', '"')
+                .replace('&#x2F;', '/').replace('&#47;', '/')
+                .replace('&#x27;', "'").replace('&#39;', "'")
+                .replace('&lt;', '<').replace('&gt;', '>')
+                .replace('&amp;', '&'))
+
+    @staticmethod
+    def _tag_names(source):
+        """标签可能叫 tags(字符串/字典) 或 category_list(字典数组)。"""
+        for field in ('tags', 'category_list', 'tag_infos', 'recommend_tags'):
+            raw = source.get(field)
+            if not isinstance(raw, list) or not raw:
+                continue
+            names = []
+            for entry in raw:
+                if isinstance(entry, dict):
+                    name = entry.get('name') or entry.get('tag_name') or entry.get('text')
+                else:
+                    name = entry
+                if name and str(name) not in names:
+                    names.append(str(name))
+            if names:
+                return names
+        return []
+
+    def _vod(self, item):
+        source = item.get('video_data') if isinstance(item.get('video_data'), dict) else item
+        tags = self._tag_names(source)
+        if isinstance(tags, list):
+            tags = ' / '.join(tags[:5])
+        count = source.get('episode_cnt') or source.get('series_episode_info', {}).get('episode_cnt') or 0
+        remark = str(source.get('episode_right_text') or '')
+        if not remark and count:
+            remark = '\u5168%s\u96c6' % count
+        return {
+            'vod_id': str(source.get('series_id') or ''),
+            'vod_name': str(source.get('series_name') or source.get('series_title') or item.get('name') or ''),
+            'vod_pic': self._clean_url(source.get('series_cover')),
+            'vod_remarks': remark,
+            'vod_tag': str(tags or ''),
+            'vod_content': str(source.get('series_intro') or ''),
+        }
+
+    LIST_FIELDS = ('recommendList', 'categoryList', 'seriesList',
+                   'searchList', 'dramaList', 'video_list', 'list', 'items', 'data')
+
+    @classmethod
+    def _find_page(cls, router, fields):
+        """loaderData 下的页面键名会随官网改版变化，按字段特征自动定位。"""
+        if cls._page_items(router, fields):
+            return router
+        loader = router.get('loaderData') or {}
+        if not isinstance(loader, dict):
+            return {}
+        for key in loader:
+            page = loader.get(key)
+            if not isinstance(page, dict):
+                continue
+            if cls._page_items(page, fields):
+                return page
+        return {}
+
+    @classmethod
+    def _page_items(cls, page_data, fields=LIST_FIELDS):
+        if not isinstance(page_data, dict):
+            return []
+        for field in fields:
+            value = page_data.get(field)
+            if isinstance(value, list) and value:
+                return value
+            if isinstance(value, dict):
+                for nested in fields:
+                    inner = value.get(nested)
+                    if isinstance(inner, list) and inner:
+                        return inner
+        return []
+
+    @classmethod
+    def _find_series_detail(cls, router):
+        top = router.get('seriesDetail')
+        if isinstance(top, dict) and top:
+            return top
+        loader = router.get('loaderData') or {}
+        if not isinstance(loader, dict):
+            return {}
+        for key in loader:
+            page = loader.get(key)
+            if not isinstance(page, dict):
+                continue
+            series = page.get('seriesDetail')
+            if isinstance(series, dict) and series:
+                return series
+        return {}
+
+    @staticmethod
+    def _collect_vids(series):
+        """vid 可能藏在 episode_list / video_list 等结构里，逐个兜底。"""
+        if not isinstance(series, dict):
+            return []
+        for field in ('vid_list', 'vids', 'video_ids', 'episode_ids'):
+            value = series.get(field)
+            if isinstance(value, list) and value:
+                return [str(v) for v in value if str(v)]
+        for field in ('episode_list', 'video_list', 'episodes', 'list'):
+            value = series.get(field)
+            if not isinstance(value, list):
+                continue
+            collected = []
+            for entry in value:
+                if isinstance(entry, dict):
+                    vid = entry.get('vid') or entry.get('video_id') or entry.get('id')
+                else:
+                    vid = entry
+                if vid and str(vid).isdigit():
+                    collected.append(str(vid))
+            if collected:
+                return collected
+        return []
+
+    def _category_items(self, query, page=1):
+        url = self.SITE + '/category?' + query
+        if page > 1:
+            url += '&page=' + str(page)
+        data = self._router_data(url)
+        # 新版官网：recommendList 直接在顶层
+        items = self._page_items(data, ('recommendList',))
+        if not items:
+            # 兼容旧版结构
+            page_data = data.get('loaderData', {}).get('category_page', {})
+            items = self._page_items(page_data)
+        if not items:
+            items = self._page_items(
+                page_data.get('categoryData') if isinstance(page_data, dict) else {})
+        if not items:
+            items = self._page_items(self._find_page(data, self.LIST_FIELDS))
+        seen = set()
+        result = []
+        for item in items:
+            sid = str(item.get('series_id') or '')
+            if sid and sid not in seen:
+                seen.add(sid)
+                result.append(item)
+        return result
+
+    def _rank_items(self, route, page=1):
+        # 首页 JSON 里就有四个榜单，直接拿来用，省掉 HTML 正则
+        tab_type = self.RANK_TAB_MAP.get(route)
+        if tab_type and page <= 1:
+            items = self._home_section(tab_type)
+            if items:
+                vods = [self._vod(x) for x in items]
+                return [v for v in vods if v['vod_id'] and v['vod_name']]
+        suffix = '?page=%d' % page if page > 1 else ''
+        html = self._get(self.SITE + '/rank/' + route + suffix)
+        if not html:
+            raise RuntimeError('\u699c\u5355\u9875\u9762\u83b7\u53d6\u5931\u8d25')
+        match = re.search(r'data-fn-name="r"[^>]*data-fn-args="([^"]+)"', html)
+        if not match:
+            raise RuntimeError('\u699c\u5355\u9875\u9762\u6ca1\u6709\u6570\u636e')
+        args = json.loads(self._decode_html(match.group(1)))
+        payload = args[2] if isinstance(args, list) else None
+        if not payload or not payload.get('isSuccess') or not isinstance(payload.get('rankList'), list):
+            raise RuntimeError('\u699c\u5355\u6570\u636e\u683c\u5f0f\u9519\u8bef')
+        result = []
+        for item in payload['rankList']:
+            vod = self._vod({
+                'series_id': item.get('seriesId') or item.get('series_id') or item.get('id'),
+                'series_name': item.get('title') or item.get('seriesTitle') or item.get('series_name'),
+                'series_cover': item.get('cover') or item.get('seriesCover') or item.get('series_cover'),
+                'series_intro': item.get('description') or item.get('intro') or item.get('seriesIntro'),
+                'episode_cnt': item.get('episodeCount') or item.get('episode_cnt'),
+                'tags': item.get('tags'),
+            })
+            if vod['vod_id'] and vod['vod_name']:
+                result.append(vod)
+        return result
+
+    def _category_type(self, value):
+        raw = str(value).replace('category?', '').replace('type_id=', '')
+        if raw in self.CATEGORY_CONFIG:
+            return raw
+        parsed = parse_qs(raw)
+        route = parsed.get('rank', [''])[0] or parsed.get('route', [''])[0]
+        if route in self.RANK_ROUTES:
+            for k, v in self.CATEGORY_CONFIG.items():
+                if v.get('route') == route and v['kind'] == 'rank':
+                    return k
+        return 'short'
+
+    @staticmethod
+    def _filter_values(extend):
+        if not extend or not isinstance(extend, dict):
+            return {}
+        result = {}
+        for k, v in extend.items():
+            if k == 'filters':
+                continue
+            if v is not None and str(v) and str(v) != '-1':
+                result[k] = str(v)
+        return result
+
+    def _build_filters(self):
+        filters = {}
+        filter_groups = []
+        for group in self.SELECTOR_GROUPS:
+            filter_groups.append({
+                'key': group['key'],
+                'name': group['name'],
+                'value': [{'n': '\u5168\u90e8', 'v': ''}] + [
+                    {'n': n, 'v': v} for n, v in group['items']
+                ],
+            })
+        for type_id, cfg in self.CATEGORY_CONFIG.items():
+            if cfg['kind'] == 'category':
+                filters[type_id] = [dict(g) for g in filter_groups]
+            else:
+                filters[type_id] = []
+        return filters
+
+    def homeContent(self, filter):
+        result = {'class': [dict(c) for c in self.CATEGORIES]}
+        if filter:
+            result['filters'] = self._build_filters()
+        result['list'] = self.homeVideoContent().get('list', [])
+        return result
+
+    def homeVideoContent(self):
+        try:
+            items = self._home_section('all')
+            if not items:
+                items = self._home_banners()
+            if not items:
+                items = self._category_items('tab=1&sort_type=1')
+            vods = [self._vod(x) for x in items]
+            vods = [v for v in vods if v['vod_id'] and v['vod_name']]
+            return {'list': vods[:12]}
+        except Exception as exc:
+            print('[\u7ea2\u679c\u679c] \u9996\u9875\u8bfb\u53d6\u5931\u8d25:', exc)
+            return {'list': []}
+
+    def categoryContent(self, tid, pg, filter, extend):
+        page = max(1, int(pg or 1))
+        raw_id = str(tid or 'short')
+        type_id = self._category_type(raw_id)
+        config = self.CATEGORY_CONFIG[type_id]
+        requested = self._filter_values(extend or {})
+        try:
+            if config['kind'] == 'rank':
+                items = self._rank_items(config['route'], page)
+                return {'list': items, 'page': page, 'pagecount': 1,
+                        'limit': len(items), 'total': len(items)}
+            query = config['query']
+            if '=' in raw_id and raw_id not in self.CATEGORY_CONFIG:
+                parsed = parse_qs(raw_id.replace('category?', ''))
+                for k, v_list in parsed.items():
+                    query = self._set_param(query, k, v_list[0])
+            for k, v in requested.items():
+                query = self._set_param(query, k, v)
+            if page > 1:
+                query = self._set_param(query, 'page', str(page))
+            items = self._category_items(query, page)
+            vods = [self._vod(x) for x in items]
+            page_count = max(1, page + 1) if len(vods) >= self.PAGE_SIZE else page
+            return {'list': vods, 'page': page, 'pagecount': page_count,
+                    'limit': self.PAGE_SIZE, 'total': page * self.PAGE_SIZE + len(vods)}
+        except Exception as exc:
+            print('[红果果] 分类读取失败:', exc)
+            return {'list': [], 'page': page, 'pagecount': 1, 'limit': 0, 'total': 0}
+
+    @staticmethod
+    def _set_param(query, key, value):
+        params = parse_qs(query)
+        params[key] = [value]
+        return urlencode({k: v[0] for k, v in params.items()})
+
+    def detailContent(self, ids):
+        series_id = str(ids[0])
+        url = self.SITE + '/detail?series_id=' + quote(series_id)
+        try:
+            data = self._router_data(url)
+            # 新版官网数据在顶层，旧版在 loaderData 下
+            series = data.get('seriesDetail') or {}
+            if not series:
+                detail = data.get('loaderData', {}).get('detail_page', {})
+                series = detail.get('seriesDetail') or {}
+                # 遍历 loaderData 找 seriesDetail
+                if not series:
+                    loader = data.get('loaderData', {})
+                    for k, v in loader.items():
+                        if isinstance(v, dict) and v.get('seriesDetail'):
+                            series = v['seriesDetail']
+                            break
+            vids = series.get('vid_list') or []
+            if not vids:
+                # 页面键名/结构变了，在整个 loaderData 里找 seriesDetail
+                found = self._find_series_detail(data)
+                if found:
+                    series = found
+                    vids = series.get('vid_list') or []
+            if not vids:
+                vids = self._collect_vids(series)
+            vids = [str(v) for v in vids if str(v)]
+            if not vids:
+                # 新版首页/详情 JSON 的 vid_list 是空的，改从播放页选集里抓
+                try:
+                    count_hint = int(series.get('episode_cnt') or 0)
+                except (TypeError, ValueError):
+                    count_hint = 0
+                vids = self._crawl_vids(series_id, total_hint=count_hint)
+            # 全空说明连第 1 集都没抓到，确实没数据
+            if not vids or not any(vids):
+                return {'list': []}
+
+            try:
+                accessible = int(series.get('accessible_episode_cnt') or 0)
+            except (TypeError, ValueError):
+                accessible = 0
+            if accessible <= 0:
+                accessible = len(vids)
+
+            rows = []
+            web_ok = False
+            probe_vid = next((v for v in vids if v), '')
+            try:
+                web_ok = bool(self._web_direct_url(series_id, probe_vid))
+            except Exception:
+                web_ok = False
+            if not web_ok:
+                # 直连拿不到才走 App 签名接口换多清晰度，省一次耗时请求
+                try:
+                    rows = fetch_quality_rows(vids[0])
+                except Exception as exc:
+                    print('[红果果] 清晰度列表获取失败:', exc)
+            if not rows:
+                rows = [{'key': 'auto', 'quality': 'auto'}]
+
+            sources = []
+            for row in rows:
+                qkey = row.get('key', 'auto')
+                qname = _quality_label(row.get('quality', qkey))
+                episodes = []
+                for idx, vid in enumerate(vids):
+                    ep = idx + 1
+                    label = '第%d集' % ep
+                    # 形如 vid_seriesId，playerContent 靠 sid 走网页直连
+                    episodes.append('%s$%s_%s|%s' % (label, vid, series_id, qkey))
+                sources.append({'name': qname, 'episodes': '#'.join(episodes)})
+
+            tags = series.get('tags') or []
+            if isinstance(tags, list):
+                tags = ' / '.join(str(t) for t in tags[:5] if t)
+            count = series.get('episode_cnt') or len(vids)
+            remark = str(series.get('episode_right_text') or '')
+            if not remark and count:
+                remark = '全%s集' % count
+
+            vod = {
+                'vod_id': series_id,
+                'vod_name': str(series.get('series_name') or series.get('series_title') or '红果短剧'),
+                'vod_pic': self._clean_url(series.get('series_cover')),
+                'type_name': str(tags or ''),
+                'vod_remarks': remark,
+                'vod_content': str(series.get('series_intro') or ''),
+                'vod_play_from': '$$$'.join(s['name'] for s in sources),
+                'vod_play_url': '$$$'.join(s['episodes'] for s in sources),
+            }
+            return {'list': [vod]}
+        except Exception as exc:
+            print('[红果果] 详情读取失败:', exc)
+            return {'list': []}
+
+    def searchContent(self, key, quick, pg=1):
+        page = max(1, int(pg or 1))
+        word = str(key).strip()
+        if not word:
+            return {'list': [], 'page': page}
+
+        try:
+            url = self.SITE + '/search/' + quote(word) + '?page=' + str(page)
+            data = self._router_data(url)
+            # 搜索 loader 把结果放在顶层 searchList；拿不到再兜底深层结构
+            search_list = self._page_items(data, ('searchList',))
+            if not search_list:
+                search_list = self._page_items(
+                    self._find_page(data, self.LIST_FIELDS))
+            result = []
+            for item in search_list:
+                vod = self._vod(item)
+                if vod['vod_id'] and vod['vod_name']:
+                    result.append(vod)
+            if result:
+                return {'list': result, 'page': page}
+        except Exception as exc:
+            print('[红果果] 官网搜索失败:', exc)
+
+        try:
+            # 兜底：官网搜索不可用时在热门列表里本地模糊匹配。
+            # 数据在 item.video_data 里（series_name/series_intro 在顶层取不到），
+            # 必须经 _vod 解析后再匹配；抓前 2 页分类覆盖更多剧，避免漏搜。
+            items = []
+            for pno in (1, 2):
+                batch = self._category_items('tab=1&sort_type=1', pno)
+                items.extend(batch)
+                if len(batch) < self.PAGE_SIZE:
+                    break
+            keyword = word.lower().replace(' ', '').replace('\u3000', '')
+            matches = []
+            for x in items:
+                try:
+                    vod = self._vod(x)
+                except Exception:
+                    continue
+                hay = ('%s %s' % (vod.get('vod_name') or '',
+                                  vod.get('vod_content') or '')).lower()
+                if keyword in hay.replace(' ', '').replace('\u3000', ''):
+                    matches.append(vod)
+            per_page = 20
+            start = (page - 1) * per_page
+            return {
+                'list': matches[start:start + per_page],
+                'page': page,
+            }
+        except Exception as exc:
+            print('[红果果] 搜索回退失败:', exc)
+            return {'list': [], 'page': page}
+
+    def searchContentPage(self, key, quick, pg=1):
+        return self.searchContent(key, quick, pg)
+
+    def playerContent(self, flag, pid, vipFlags):
+        raw = str(pid).split('#')[0]
+        quality_key = 'auto'
+        if '|' in raw:
+            vid_part, quality_key = raw.split('|', 1)
+            quality_key = quality_key or 'auto'
+        else:
+            vid_part = raw
+
+        if '_' in vid_part:
+            vid, sid = vid_part.split('_', 1)
+        else:
+            vid, sid = vid_part, ''
+
+        try:
+            self._ensure_server()
+        except Exception as exc:
+            print('[playerContent] 内嵌服务启动异常: %s' % exc)
+
+        result = {
+            'parse': 0,
+            'playUrl': '',
+            'url': '',
+            'header': {
+                'User-Agent': self.UA,
+                'Referer': self.SITE + '/',
+            },
+        }
+
+        if sid:
+            # 1) 播放页 <video src> 明文直链：不用签名、不用解密
+            try:
+                direct = self._web_direct_url(sid, vid)
+            except Exception as exc:
+                print('[playerContent] web direct failed: %s' % exc)
+                direct = ''
+            if direct:
+                # 优先本地服务中转：服务端带正确 UA/Referer 取流，
+                # 规避防盗链，且播放时才现取链，不怕链接时效。
+                if _probe_own_server(self._server_port):
+                    result['url'] = 'http://127.0.0.1:%d/web?%s' % (
+                        self._server_port,
+                        urlencode({'sid': sid, 'vid': vid}))
+                    return result
+                # 服务起不来（安卓环境限制/端口被占）时回退直连，
+                # 把 UA/Referer 交给播放器带，总比返回连不上的地址强。
+                print('[playerContent] 本地服务不可用，回退直连')
+                result['url'] = direct
+                result['header'] = {
+                    'User-Agent': self.UA,
+                    'Referer': self._player_url(sid, vid),
+                    'Accept': '*/*',
+                }
+                return result
+
+            # 2) 回退：解析 SSR loader JSON（仅当确认未加密时才用）
+            try:
+                player_url = self.SITE + '/player/%s/%s' % (sid, vid)
+                data = self._router_data(player_url)
+                loader = (data or {}).get('loaderData', {}) or {}
+                page = loader.get('player_(series_id)/(vid)/page') or {}
+                vpi = page.get('video_player_info') or {}
+                play_url = vpi.get('main_url') or ''
+                # 带 spade/encrypt_info 说明是 CENC 加密流，直连会花屏，走本地解密
+                if play_url and (vpi.get('spade_a') or vpi.get('encrypt_info')
+                                 or vpi.get('key_seed')):
+                    print('[playerContent] web url is encrypted, use local proxy')
+                elif play_url:
+                    play_url = self._clean_url(play_url)
+                    result['url'] = play_url
+                    result['header'] = {'User-Agent': self.UA}
+                    return result
+            except Exception:
+                pass
+
+        if self._server_started:
+            try:
+                resolved = handle_video_request(str(vid), None, max_retries=3,
+                                                 stream_mode=True, quality_key=quality_key)
+                stream_url = str(resolved.get('url') or '')
+                if stream_url and stream_url.startswith('http'):
+                    result['url'] = stream_url
+                    result['header'] = {'User-Agent': self.UA}
+                    return result
+            except Exception as exc:
+                print('[playerContent] resolve_direct_failed: %s' % exc)
+
+        play_url = 'http://127.0.0.1:%d/play?%s' % (
+            self._server_port, urlencode({'vid': vid}))
+        result['url'] = play_url
+        return result
+
+    def localProxy(self, params):
+        return None
