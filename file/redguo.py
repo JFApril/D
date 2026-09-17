@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# version: 2.2.6
+# version: 2.2.7
 # date: 2026-09-17
-# upgrade: v2.2.1 增强 hgcenc localProxy/CDN/解密诊断；v2.2.2 修正 FongMi/peekPRO 原生代理端口为 9979；v2.2.3 根据 TV 日志限制 bytes=0- 开放 Range 首包；v2.2.4 修复开放 Range 解析并强制客户端分块截断；v2.2.5 根据 TV 实测将开放 Range 首包扩至 8MiB，避免约 7-8 秒 EOF 后回零重播；v2.2.6 关闭 hgcenc 调试日志写入
+# upgrade: v2.2.1 增强 hgcenc localProxy/CDN/解密诊断；v2.2.2 修正 FongMi/peekPRO 原生代理端口为 9979；v2.2.3 根据 TV 日志限制 bytes=0- 开放 Range 首包；v2.2.4 修复开放 Range 解析并强制客户端分块截断；v2.2.5 根据 TV 实测将开放 Range 首包扩至 8MiB，避免约 7-8 秒 EOF 后回零重播；v2.2.6 关闭 hgcenc 调试日志写入；v2.2.7 对不超过 64MiB 的媒体整集取回并返回完整 200 响应，避免分块结束被播放器当作 EOF 回零
 
 import base64
 
@@ -35,9 +35,10 @@ except Exception:
 # 调试日志已关闭；保留函数接口，避免改动各调用点。
 # _HG_DIAG_LOG = "/sdcard/Download/spider/log.txt"
 # _HG_DIAG_LOG_ALT = "/storage/emulated/0/Download/spider/log.txt"
-# TV 首次请求常传 bytes=0-；1MiB 仅够约 7-8 秒，播放器会把它当 EOF 后回零重播。
-# 将首包扩到 8MiB，覆盖更长播放窗口，同时避免开放 Range 触发整文件拉取。
+# TV 首次请求常传 bytes=0-；小首包会被播放器当作 EOF 后回零重播。
+# 小文件直接取完整媒体；超过 64MiB 的文件仍用 8MiB 首包作为保护。
 _HG_BOOTSTRAP_BYTES = 8 * 1024 * 1024
+_HG_FULL_FETCH_MAX_BYTES = 64 * 1024 * 1024
 
 
 def _hg_diag(msg):
@@ -545,7 +546,7 @@ def _hg_fetch_follow(sess, url, headers, timeout, stream=True):
 MV_PLUGIN = {
     "id": "hongguo",
     "name": "红果短剧",
-    "version": "2.2.6",
+    "version": "2.2.7",
     "profile": "python-basic-v1",
     "capabilities": {
         "content": True,
@@ -2245,6 +2246,7 @@ class Spider(_BaseSpider):
                 )
             )
             chunks: List[bytes] = []
+            fetched_bytes = 0
             remaining = _HG_BOOTSTRAP_BYTES if range_was_open else None
             try:
                 for ch in r.iter_content(256 * 1024):
@@ -2255,16 +2257,125 @@ class Spider(_BaseSpider):
                             break
                         if len(ch) > remaining:
                             chunks.append(ch[:remaining])
+                            fetched_bytes += remaining
                             remaining = 0
                             break
+                        chunks.append(ch)
+                        fetched_bytes += len(ch)
                         remaining -= len(ch)
-                    chunks.append(ch)
+                    else:
+                        chunks.append(ch)
+                        fetched_bytes += len(ch)
             finally:
                 try:
                     r.close()
                 except Exception:
                     pass
+
+            # v2.2.7：TV 实测只发一次 bytes=0-，收到 8MiB 的 206 后不再续段，
+            # 而是把短集当 EOF 回零。日志中的媒体均小于 41MiB，因此对 64MiB
+            # 以内文件循环补齐剩余 Range，组装成完整 200 响应；更大文件仍保留 8MiB 保护。
+            full_media = False
+            if (
+                range_was_open
+                and req_lo is not None
+                and req_lo == 0
+                and total > 0
+                and total <= _HG_FULL_FETCH_MAX_BYTES
+            ):
+                if fetched_bytes >= total:
+                    full_media = True
+                else:
+                    media_url = _final_url or src
+                    loops = 0
+                    while fetched_bytes < total and loops < 16:
+                        loops += 1
+                        remainder_start = fetched_bytes
+                        remainder_end = total - 1
+                        if remainder_end - remainder_start + 1 > 8 * 1024 * 1024:
+                            remainder_end = remainder_start + 8 * 1024 * 1024 - 1
+                        remainder_response = None
+                        try:
+                            remainder_response, _ = _hg_fetch_follow(
+                                sess,
+                                media_url,
+                                {
+                                    "User-Agent": _USER_AGENT,
+                                    "Range": "bytes=%d-%d" % (remainder_start, remainder_end),
+                                },
+                                (5, 30),
+                                True,
+                            )
+                            if remainder_response is None:
+                                break
+                            remainder_status = int(remainder_response.status_code or 0)
+                            part = []
+                            part_len = 0
+                            for _ch in remainder_response.iter_content(256 * 1024):
+                                if _ch:
+                                    part.append(_ch)
+                                    part_len += len(_ch)
+                            if part_len <= 0:
+                                break
+
+                            if remainder_status == 200:
+                                cr = _hg_header(remainder_response.headers, "Content-Range")
+                                response_start = None
+                                if cr:
+                                    mm = re.match(r"\s*bytes\s+(\d+)-(\d+)/(\d+|\*)", cr)
+                                    if mm:
+                                        response_start = int(mm.group(1))
+                                # CDN 若忽略 Range 并返回整文件，直接以整文件替换首包，避免重复拼接。
+                                if response_start in (None, 0):
+                                    chunks = part
+                                    fetched_bytes = part_len
+                                else:
+                                    if response_start != remainder_start:
+                                        break
+                                    chunks.extend(part)
+                                    fetched_bytes += part_len
+                                if fetched_bytes >= total:
+                                    full_media = True
+                                break
+
+                            if remainder_status != 206:
+                                break
+                            cr = _hg_header(remainder_response.headers, "Content-Range")
+                            mm = re.match(r"\s*bytes\s+(\d+)-(\d+)/(\d+|\*)", cr)
+                            if not mm or int(mm.group(1)) != remainder_start:
+                                break
+                            chunks.extend(part)
+                            fetched_bytes += part_len
+                            response_end = int(mm.group(2))
+                            if response_end >= total - 1 and fetched_bytes >= total:
+                                full_media = True
+                                break
+                        except Exception:
+                            full_media = False
+                            break
+                        finally:
+                            if remainder_response is not None:
+                                try:
+                                    remainder_response.close()
+                                except Exception:
+                                    pass
+
             data = b"".join(chunks)
+            try:
+                del chunks
+            except Exception:
+                pass
+            if total > 0 and len(data) > total:
+                data = data[:total]
+                fetched_bytes = total
+            if range_was_open and req_lo == 0 and total > 0 and len(data) >= total:
+                full_media = True
+            if full_media:
+                range_was_open = False
+                status = 200
+                fetch_range_header = ""
+                lo = 0
+                hi = total - 1
             if range_was_open:
                 _hg_diag(
                     "cdn_data range=%s fetch_range=%s bytes=%d cap=%d truncated=%d"
@@ -2293,8 +2404,7 @@ class Spider(_BaseSpider):
             if total < 0:
                 if status == 200:
                     total = len(data)
-            # 开放 Range 被 CDN 忽略时，客户端已截断首包；有真 total 就以 206
-            # 返回 1MiB 块，播放器可继续发下一段 Range。
+            # 大于 64MiB 的媒体仍返回受控 8MiB 分段；只有播放器继续请求后续 Range 时才适用。
             if range_was_open and status == 200 and total > 0:
                 status = 206
             buf = bytearray(data)
