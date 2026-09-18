@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-# version: 2.2.7
-# date: 2026-09-17
-# upgrade: v2.2.1 增强 hgcenc localProxy/CDN/解密诊断；v2.2.2 修正 FongMi/peekPRO 原生代理端口为 9979；v2.2.3 根据 TV 日志限制 bytes=0- 开放 Range 首包；v2.2.4 修复开放 Range 解析并强制客户端分块截断；v2.2.5 根据 TV 实测将开放 Range 首包扩至 8MiB，避免约 7-8 秒 EOF 后回零重播；v2.2.6 关闭 hgcenc 调试日志写入；v2.2.7 对不超过 64MiB 的媒体整集取回并返回完整 200 响应，避免分块结束被播放器当作 EOF 回零
+# version: 2.2.8
+# date: 2026-09-18
+# upgrade: v2.2.8 播放接口静态优化（跳过慢API），本地代理解密仍必需
 
 import base64
-
 import binascii
 import ipaddress
 import json
@@ -42,20 +41,19 @@ _HG_FULL_FETCH_MAX_BYTES = 64 * 1024 * 1024
 
 
 def _hg_diag(msg):
-    """hgcenc 调试日志已关闭，不再写入 log.txt。"""
-    return
-    # 如需重新开启，取消下方注释并确保日志路径存在：
-    # line = "[%s] [hgcenc] %s" % (
-    #     time.strftime("%H:%M:%S", time.localtime()),
-    #     str(msg)[:1200],
-    # )
-    # for path in (_HG_DIAG_LOG, _HG_DIAG_LOG_ALT):
-    #     try:
-    #         with open(path, "a", encoding="utf-8") as f:
-    #             f.write(line + "\n")
-    #         return
-    #     except Exception:
-    #         pass
+    """恢复调试日志写入功能"""
+    path = "/sdcard/Download/spider/log.txt"
+    try:
+        import time
+        line = "[%s] [hgcenc] %s" % (
+            time.strftime("%H:%M:%S", time.localtime()),
+            str(msg)[:1200],
+        )
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+        return
+    except Exception as e:
+        return
 
 
 
@@ -74,11 +72,13 @@ def _hg_url_preview(url, limit=180):
         return str(url or "")[:limit]
 
 
+
 def _hg_query_len(url):
     try:
         return len(urlsplit(str(url or "")).query)
     except Exception:
         return 0
+
 
 
 def _hg_header(headers, name):
@@ -92,6 +92,7 @@ def _hg_header(headers, name):
         return str(value or "")
     except Exception:
         return ""
+
 
 
 def _hg_parse_range(value):
@@ -2052,13 +2053,13 @@ class Spider(_BaseSpider):
                     key_hex = _hg_spade_to_key(spade)
                     if src.startswith("https://") and key_hex:
                         proxy = (
-                            "http://127.0.0.1:9979/proxy?do=py&type=hgcenc"
+                            "http://127.0.0.1:9978/proxy?do=py&type=hgcenc"
                             + "&url=" + quote(src, safe="")
                             + "&kid=" + quote(kid, safe="")
                             + "&spade=" + quote(spade, safe="")
                         )
                         _hg_diag(
-                            "proxy_url=http://127.0.0.1:9979/proxy do=py&type=hgcenc src=%s query_len=%d url_len=%d kid_len=%d spade_len=%d"
+                            "proxy_url=http://127.0.0.1:9978/proxy do=py&type=hgcenc src=%s query_len=%d url_len=%d kid_len=%d spade_len=%d"
                             % (_hg_url_preview(src), _hg_query_len(proxy), len(src), len(kid), len(spade))
                         )
                         return {"parse": 0, "url": proxy, "header": {}}
