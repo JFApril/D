@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-# 看球8直播爬虫 V2.2 - 修复预告比赛日期时间缺失，比赛开赛时间（北京时间）与主播开播时间双重兼容
+# version: v2.3
+# date: 2026-09-25
+# upgrade: 修复 API 域名失效 - zhiboapi1001.bszb.me → livestreamfeed1.123kq.live
 import json, re, time, requests
 from datetime import datetime, timezone, timedelta
 from urllib.parse import quote
 from base.spider import Spider as BaseSpider
 
-API_HOST = "https://zhiboapi1001.bszb.me"
+API_HOST = "https://livestreamfeed1.123kq.live"
 WEB_HOST = "https://kanqiu8svip-cctv.123kq.live"
 UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 TZ_BJ = timezone(timedelta(hours=8))
