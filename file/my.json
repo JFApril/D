@@ -372,6 +372,15 @@
             }
         },
         {
+            "key": "hongguo",
+            "name": "正版红果py[短]",
+            "type": 3,
+            "api": "./hongguo.py",
+            "searchable": 1,
+            "quickSearch": 0,
+            "filterable": 1
+        },
+        {
             "key": "redguo",
             "name": "红果py[短]",
             "type": 3,
