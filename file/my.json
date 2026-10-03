@@ -373,7 +373,7 @@
         },
         {
             "key": "hongguo",
-            "name": "正版红果py[短]",
+            "name": "聚合短剧py[短]",
             "type": 3,
             "api": "./hongguo.py",
             "searchable": 1,
