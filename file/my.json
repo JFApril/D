@@ -408,6 +408,15 @@
             "filterable": 1
         },
         {
+            "key": "zizhuiju",
+            "name": "爱追剧py[影]",
+            "type": 3,
+            "api": "./aizhuiju.py",
+            "searchable": 1,
+            "quickSearch": 0,
+            "filterable": 1
+        },
+        {
             "key": "VIP2",
             "name": "VIP兔py[影]",
             "type": 3,
