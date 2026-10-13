@@ -10,7 +10,7 @@
             "filterable": 0,
             "playerType": 2,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -24,7 +24,7 @@
             "filterable": 0,
             "playerType": 2,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -38,7 +38,7 @@
             "filterable": 0,
             "playerType": 2,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -52,7 +52,7 @@
             "filterable": 0,
             "playerType": 2,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -66,7 +66,7 @@
             "filterable": 0,
             "playerType": 2,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -80,33 +80,7 @@
             "filterable": 0,
             "playerType": 2,
             "style": {
-                "type": "list",
-                "ratio": 1
-            }
-        },
-        {
-            "key": "feilijs",
-            "name": "菲利js[体]",
-            "type": 3,
-            "api": "./feili.js",
-            "searchable": 1,
-            "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "list",
-                "ratio": 1
-            }
-        },
-        {
-            "key": "feilipy",
-            "name": "菲利py[体]",
-            "type": 3,
-            "api": "./feili.py",
-            "searchable": 1,
-            "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -119,7 +93,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -132,7 +106,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 0.75
             }
         },
@@ -145,7 +119,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -158,7 +132,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 0.75
             }
         },
@@ -172,7 +146,7 @@
             "filterable": 0,
             "playerType": 2,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -186,7 +160,7 @@
             "filterable": 0,
             "playerType": 2,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -199,7 +173,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -212,20 +186,9 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
-        },
-        {
-            "key": "006py",
-            "name": "006-py[体]",
-            "type": 3,
-            "api": "./006.py",
-            "style": {
-                "type": "list",
-                "ratio": 1
-            },
-            "changeable": 0
         },
         {
             "key": "7zbpy",
@@ -236,7 +199,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -249,7 +212,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -262,7 +225,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -275,7 +238,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -288,7 +251,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -301,7 +264,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -314,7 +277,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -327,7 +290,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -340,7 +303,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -353,7 +316,7 @@
             "quickSearch": 1,
             "filterable": 1,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -367,7 +330,7 @@
             "filterable": 0,
             "playerType": 2,
             "style": {
-                "type": "list",
+                "type": "rect",
                 "ratio": 1
             }
         },
@@ -375,7 +338,7 @@
             "key": "hongguo",
             "name": "聚合短剧py[短]",
             "type": 3,
-            "api": "./hongguo.py",
+            "api": "./duanjujuhe.py",
             "searchable": 1,
             "quickSearch": 0,
             "filterable": 1
