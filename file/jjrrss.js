@@ -8,7 +8,7 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
- * @version V43
+ * @version V45
  */
 
 let host = 'https://m.sportsteam53.com';
@@ -702,11 +702,16 @@ function playHeaders() {
 
 async function play(flag, id, flags) {
     var raw = String(id || '');
+    try { raw = decodeURIComponent(raw); } catch (e) {}
+    if (/^\/\//.test(raw)) {
+        raw = 'https:' + raw;
+    }
     if (/\.(m3u8|mp4|flv)(\?|$)/i.test(raw)) {
-        // V42: 直链也带 header，否则 kinxie/8861ixnah 等防盗链CDN会拒流（主播解说类播不出的根因）
         return JSON.stringify({ parse: 0, url: raw, header: playHeaders() });
     }
-    // 相对路径兜底：detail传进来的若是站点相对地址，转绝对
+    if (/^https?:\/\//i.test(raw)) {
+        return JSON.stringify({ parse: 0, url: raw, header: playHeaders() });
+    }
     if (/^\//.test(raw)) {
         raw = (host || 'https://m.sportsteam53.com') + raw;
         return JSON.stringify({ parse: 0, url: raw, header: playHeaders() });
