@@ -48,11 +48,7 @@
             "searchable": 0,
             "quickSearch": 0,
             "filterable": 0,
-            "playerType": 2,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "playerType": 2
         },
         {
             "key": "doubaozhibopy",
@@ -62,11 +58,7 @@
             "searchable": 0,
             "quickSearch": 0,
             "filterable": 0,
-            "playerType": 2,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "playerType": 2
         },
         {
             "key": "zq200.js",
@@ -75,11 +67,7 @@
             "api": "./zq200.js",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
         {
             "key": "zq200.py",
@@ -88,11 +76,7 @@
             "api": "./zq200.py",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
         {
             "key": "qiuba_V6.js",
@@ -101,11 +85,7 @@
             "api": "./qiuba_V6.js",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
         {
             "key": "qiuba.py",
@@ -114,11 +94,7 @@
             "api": "./qiuba.py",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
         {
             "key": "310zhibojs",
@@ -128,11 +104,7 @@
             "searchable": 0,
             "quickSearch": 0,
             "filterable": 0,
-            "playerType": 2,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "playerType": 2
         },
         {
             "key": "310zhibopy",
@@ -142,11 +114,7 @@
             "searchable": 0,
             "quickSearch": 0,
             "filterable": 0,
-            "playerType": 2,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "playerType": 2
         },
         {
             "key": "zhizhu.js",
@@ -155,11 +123,7 @@
             "api": "./zhizhu.js",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
         {
             "key": "919.js",
@@ -168,11 +132,7 @@
             "api": "./919.js",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
         {
             "key": "7zbpy",
@@ -181,11 +141,7 @@
             "api": "./7zb.py",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
         {
             "key": "qbspy",
@@ -194,11 +150,7 @@
             "api": "./qbs.py",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
         {
             "key": "jjrrss",
@@ -216,11 +168,7 @@
             "api": "./88.js",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
        {
             "key": "jylive.js",
@@ -229,11 +177,7 @@
             "api": "./jylive.js",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
        {
             "key": "jinqiu.py",
@@ -255,11 +199,7 @@
             "api": "./kanqiu8.py",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
         {
             "key": "bszb.py",
@@ -268,11 +208,7 @@
             "api": "./bszb.py",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
         {
             "key": "longzhu.py",
@@ -281,11 +217,7 @@
             "api": "./longzhu.py",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
         {
             "key": "9939.py",
@@ -294,11 +226,7 @@
             "api": "./9939.py",
             "searchable": 1,
             "quickSearch": 1,
-            "filterable": 1,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "filterable": 1
         },
         {
             "key": "kafeizhibo",
@@ -308,11 +236,7 @@
             "searchable": 0,
             "quickSearch": 0,
             "filterable": 0,
-            "playerType": 2,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "playerType": 2
         },
         {
             "key": "hongguo",
@@ -376,11 +300,7 @@
             "searchable": 1,
             "quickSearch": 1,
             "filterable": 1,
-            "playerType": 2,
-            "style": {
-                "type": "rect",
-                "ratio": 0.63
-            }
+            "playerType": 2
         }
     ]
 }
