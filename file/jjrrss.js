@@ -8,7 +8,7 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
- * @version V50
+ * @version V51
  */
 
 let host = 'https://m.sportsteam53.com';
@@ -757,8 +757,12 @@ async function search(wd, quick, pg) {
         list: []
     });
 }
-// V42: 播放header统一（防盗链CDN必须带Referer/Origin）
-function playHeaders() {
+// V51: 按域名区分播放header（txSecret类CDN带Referer会403）
+function playHeaders(url) {
+    var u = String(url || '');
+    if (/txSecret=|njscwh\.com|trbkam\.cn/i.test(u)) {
+        return { 'User-Agent': UA };
+    }
     return {
         'User-Agent': UA,
         'Referer': host + '/',
@@ -774,22 +778,23 @@ async function play(flag, id, flags) {
         var playUrl = fixM3u8Domain(upgradeUrl(raw));
         var masterResolved = await resolveMasterM3u8(playUrl);
         if (masterResolved) playUrl = masterResolved;
-        return JSON.stringify({ parse: 0, url: playUrl, header: playHeaders() });
+        return JSON.stringify({ parse: 0, url: playUrl, header: playHeaders(playUrl) });
     }
     if (/^https?:\/\//i.test(raw)) {
         try {
             var r = await resolveSignal(raw, host + '/');
             if (r && /\.(m3u8|mp4|flv)(\?|$)/i.test(r)) {
-                return JSON.stringify({ parse: 0, url: fixM3u8Domain(upgradeUrl(r)), header: playHeaders() });
+                var ru = fixM3u8Domain(upgradeUrl(r));
+                return JSON.stringify({ parse: 0, url: ru, header: playHeaders(ru) });
             }
         } catch (e) {}
-        return JSON.stringify({ parse: 0, url: fixM3u8Domain(upgradeUrl(raw)), header: playHeaders() });
+        return JSON.stringify({ parse: 0, url: fixM3u8Domain(upgradeUrl(raw)), header: playHeaders(raw) });
     }
     if (/^\//.test(raw)) {
         raw = (host || 'https://m.sportsteam53.com') + raw;
-        return JSON.stringify({ parse: 0, url: fixM3u8Domain(upgradeUrl(raw)), header: playHeaders() });
+        return JSON.stringify({ parse: 0, url: fixM3u8Domain(upgradeUrl(raw)), header: playHeaders(raw) });
     }
-    return JSON.stringify({ parse: 1, url: raw, header: playHeaders() });
+    return JSON.stringify({ parse: 1, url: raw, header: playHeaders(raw) });
 }
 
 async function homeContent(filter) {
