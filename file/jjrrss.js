@@ -8,7 +8,7 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
- * @version V45
+ * @version V50
  */
 
 let host = 'https://m.sportsteam53.com';
@@ -109,23 +109,44 @@ function matchCategory(tid, league, name, stype, hot) {
 }
 
 async function fetchText(url, referer) {
+    url = upgradeUrl(url);
     const hd = {
         'User-Agent': UA,
         'Referer': referer || host + '/',
         'Accept': 'text/html,application/json,*/*',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'identity'
     };
+    var result = '';
     if (typeof Java !== 'undefined' && Java && Java.req) {
-        const r = await Java.req(url, {
-            headers: hd
-        });
-        if (typeof r === 'string') return r;
-        return String((r && (r.body || r.content || r.data)) || '');
+        try {
+            const r = await Java.req(url, { headers: hd, timeout: 10000 });
+            if (typeof r === 'string') return r;
+            result = String((r && (r.body || r.content || r.data || r.text || r.html || r.responseText || r._content)) || '');
+            if (result) return result;
+        } catch (e) {}
     }
-    const r2 = await req(url, {
-        headers: hd
-    });
-    return String((r2 && (r2.content || r2.body)) || '');
+    if (typeof req === 'function') {
+        try {
+            const r2 = await req(url, { headers: hd, timeout: 10000 });
+            if (typeof r2 === 'string') return r2;
+            if (r2) { result = String(r2.content || r2.body || r2.text || r2.data || r2.html || r2.responseText || r2._content || ''); if (result) return result; }
+        } catch (e) {}
+        try {
+            const r3 = await req(url);
+            if (typeof r3 === 'string') return r3;
+            if (r3) { result = String(r3.content || r3.body || r3.text || r3.data || r3.html || r3.responseText || r3._content || ''); if (result) return result; }
+        } catch (e) {}
+    }
+    if (typeof fetch === 'function') {
+        try {
+            const resp = await fetch(url, { headers: hd });
+            if (typeof resp === 'string') return resp;
+            if (resp && resp.text) { result = await resp.text(); if (result) return result; }
+            if (resp && resp.body) { result = await resp.body; if (result) return String(result); }
+        } catch (e) {}
+    }
+    return '';
 }
 
 var DEAD_HOSTS = ['jrs03.com'];
@@ -135,10 +156,29 @@ function isDeadUrl(url) {
     }
     return false;
 }
+var UPGRADE_HOSTS = {
+    'm.jw1104.com': 'play.sportsteam356.com'
+};
+function upgradeUrl(u) {
+    var s = String(u || '');
+    var m = s.match(/^http:\/\/([^\/]+)([\s\S]*)$/i);
+    if (!m) return s;
+    var h = m[1].toLowerCase().replace(/:\d+$/, '');
+    if (UPGRADE_HOSTS[h]) return 'https://' + UPGRADE_HOSTS[h] + m[2];
+    return s;
+}
+function decodeUrlSafe(u) {
+    var s = String(u || '');
+    try { s = decodeURIComponent(s); } catch (e) {}
+    if (/%[0-9a-fA-F]{2}/.test(s)) {
+        s = s.replace(/%([0-9a-fA-F]{2})/g, function(_, h) { return String.fromCharCode(parseInt(h, 16)); });
+    }
+    return s;
+}
 var PLAY_HOSTS = {
-    line1: 'http://m.jw1104.com',
-    line2: 'http://m.jw1104.com',
-    line3: 'http://play.sportsteam356.com'
+    line1: 'https://play.sportsteam356.com',
+    line2: 'https://play.sportsteam356.com',
+    line3: 'https://play.sportsteam356.com'
 };
 
 // ===== Pao link crypto (XXTEA + RC4) =====
@@ -243,8 +283,23 @@ async function resolvePao(paoUrl, referer) {
         }
         if (m3u8 && m3u8.indexOf('.m3u8') !== -1) {
             m3u8 = m3u8.replace(/\\\//g, '/');
-            return fixM3u8Domain(m3u8);
+            m3u8 = fixM3u8Domain(m3u8);
+            var resolved = await resolveMasterM3u8(m3u8);
+            return resolved || m3u8;
         }
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function resolveMasterM3u8(m3u8Url) {
+    try {
+        if (!/hello\.ooo0ooo\.top/i.test(m3u8Url)) return null;
+        var body = await fetchText(m3u8Url, host + '/');
+        if (!body || body.indexOf('#EXTM3U') === -1) return null;
+        var subMatch = body.match(/^(https?:\/\/[^\s]+)/im);
+        if (subMatch && subMatch[1].indexOf('.m3u8') !== -1) return subMatch[1].replace(/\\\//g, '/');
         return null;
     } catch (e) {
         return null;
@@ -407,7 +462,7 @@ function parseSignals(html, playPageUrl) {
         // 信号名优先取 strong 文本，否则取标签内文字
         var name = stripHtml(firstMatch(inner, /<strong>([^<]*)<\/strong>/i) || inner);
         if (!name || name.length < 1) name = '信号' + (signals.length + 1);
-        var fullUrl = absUrl(target, playPageUrl || host);
+        var fullUrl = upgradeUrl(absUrl(target, playPageUrl || host));
         if (seenUrls[fullUrl + name]) continue;
         seenUrls[fullUrl + name] = true;
         signals.push({ name: name, url: fullUrl });
@@ -424,7 +479,7 @@ function parseSignals(html, playPageUrl) {
             if (!t2 || t2 === 'javascript:void(0)') continue;
             t2 = t2.replace(/&amp;/g, '&');
             var nm2 = stripHtml(firstMatch(m2[2], /<strong>([^<]*)<\/strong>/i) || m2[2]) || ('信号' + (signals.length + 1));
-            var fu2 = absUrl(t2, playPageUrl || host);
+            var fu2 = upgradeUrl(absUrl(t2, playPageUrl || host));
             if (seenUrls[fu2 + nm2]) continue;
             seenUrls[fu2 + nm2] = true;
             signals.push({ name: nm2, url: fu2 });
@@ -453,7 +508,7 @@ function parseList(html, tid) {
             const dataPlay = firstMatch(attrs, /data-play=["']([^"']+)["']/i);
             const targetUrl = dataPlay || href;
             if (!targetUrl || targetUrl === 'javascript:void(0)') continue;
-            var fullUrl = absUrl(targetUrl, host);
+            var fullUrl = upgradeUrl(absUrl(targetUrl, host));
             if (isDeadUrl(fullUrl)) continue;
             if (lineSeen[fullUrl]) continue;
             lineSeen[fullUrl] = true;
@@ -589,9 +644,20 @@ async function detail(id) {
     return JSON.stringify({ code: 1, msg: '数据列表', page: 1, pagecount: 1, limit: 1, total: 1, list: [{ vod_id: id, vod_name: payload.name || '赛事直播', vod_pic: payload.pic || defaultPic, vod_remarks: '直播ing', vod_content: 'JRKAN 体育赛事直播。', vod_play_from: playFrom, vod_play_url: playUrl }] });
 }
 function fixM3u8Domain(url) {
-    var s = String(url || '').replace(/hdl\d+\.remmuszs\.cn/g, function(m) { return m.replace('remmuszs.cn', 'szsummer.cn'); });
+    var s = String(url || '');
+    if (/%[0-9a-fA-F]{2}/.test(s)) {
+        s = s.replace(/%([0-9a-fA-F]{2})/g, function(_, h) { return String.fromCharCode(parseInt(h, 16)); });
+    }
+    s = s.replace(/hdl\d+\.remmuszs\.cn/g, function(m) { return m.replace('remmuszs.cn', 'szsummer.cn'); });
     // V43: 主播解说真实可播域名为 hanxi1688.com，站点编码异常导致解出 8861ixnah.com，强制纠偏
     s = s.replace(/hdl\d+\.8861ixnah\.com/g, function(m) { return m.replace('8861ixnah.com', 'hanxi1688.com'); });
+    // V49: 源站把 CDN 域名倒写防盗链（gnimixuiq=qiuximing 反转），必须还原为正向域名才可播
+    s = s.replace(/(hdl\d+\.)gnimixuiq(\.com)/g, '$1qiuximing$2');
+    var rm = s.match(/^(https?:\/\/hdl\d+\.)([a-z0-9\-]+)(\.(?:com|cn|net|top))([\s\S]*)$/i);
+    if (rm && /gnimixuiq|remmuszs|8861ixnah/i.test(rm[2])) {
+        var rev = rm[2].split('').reverse().join('');
+        s = rm[1] + rev + rm[3] + rm[4];
+    }
     return s;
 }
 
@@ -702,19 +768,26 @@ function playHeaders() {
 
 async function play(flag, id, flags) {
     var raw = String(id || '');
-    try { raw = decodeURIComponent(raw); } catch (e) {}
-    if (/^\/\//.test(raw)) {
-        raw = 'https:' + raw;
-    }
+    raw = decodeUrlSafe(raw);
+    if (/^\/\//.test(raw)) raw = 'https:' + raw;
     if (/\.(m3u8|mp4|flv)(\?|$)/i.test(raw)) {
-        return JSON.stringify({ parse: 0, url: raw, header: playHeaders() });
+        var playUrl = fixM3u8Domain(upgradeUrl(raw));
+        var masterResolved = await resolveMasterM3u8(playUrl);
+        if (masterResolved) playUrl = masterResolved;
+        return JSON.stringify({ parse: 0, url: playUrl, header: playHeaders() });
     }
     if (/^https?:\/\//i.test(raw)) {
-        return JSON.stringify({ parse: 0, url: raw, header: playHeaders() });
+        try {
+            var r = await resolveSignal(raw, host + '/');
+            if (r && /\.(m3u8|mp4|flv)(\?|$)/i.test(r)) {
+                return JSON.stringify({ parse: 0, url: fixM3u8Domain(upgradeUrl(r)), header: playHeaders() });
+            }
+        } catch (e) {}
+        return JSON.stringify({ parse: 0, url: fixM3u8Domain(upgradeUrl(raw)), header: playHeaders() });
     }
     if (/^\//.test(raw)) {
         raw = (host || 'https://m.sportsteam53.com') + raw;
-        return JSON.stringify({ parse: 0, url: raw, header: playHeaders() });
+        return JSON.stringify({ parse: 0, url: fixM3u8Domain(upgradeUrl(raw)), header: playHeaders() });
     }
     return JSON.stringify({ parse: 1, url: raw, header: playHeaders() });
 }
