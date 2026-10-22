@@ -117,6 +117,26 @@
             "playerType": 2
         },
         {
+            "key": "006js",
+            "name": "006-js[体]",
+            "type": 3,
+            "api": "./006.js",
+            "searchable": 0,
+            "quickSearch": 0,
+            "filterable": 0,
+            "playerType": 2
+        },
+        {
+            "key": "006py",
+            "name": "006-py[体]",
+            "type": 3,
+            "api": "./006.py",
+            "searchable": 0,
+            "quickSearch": 0,
+            "filterable": 0,
+            "playerType": 2
+        },
+        {
             "key": "zhizhu.js",
             "name": "蜘蛛js[体]",
             "type": 3,
