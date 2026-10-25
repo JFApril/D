@@ -8,8 +8,7 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
- * @version V51
- */
+* @version V62 */
 
 let host = 'https://m.sportsteam53.com';
 const hosts = ['https://m.sportsteam53.com', 'https://m.jrskk.com', 'https://m.jrs21.com', 'https://www.jrs33.com', 'https://3.swjrzx.com', 'https://m.sportsteam356.com'];
@@ -185,6 +184,33 @@ var PLAY_HOSTS = {
 var XXTEA_D = 2654435769;
 var PAO_RC4_KEY = 'bjBa';
 var PAO_XXTEA_KEY = 'ABCDEFGHIJKLMNOPQRSTUVWX';
+var VXT_XXTEA_KEYS = ['HBpKyshHYy8lhh2r', 'O1FXemHJa7Rt1Jn3', 'O1@_PyCBMXGJEH_R'];
+
+async function getVxtLiveKey(html) {
+    try {
+        var m = String(html || '').match(/<script\s+src=["']([^"']+aliyuncs[^"']*\.js[^"']*)["']/i);
+        if (!m) m = String(html || '').match(/<script\s+src=["']([^"']+\.js[^"']*)["']/i);
+        if (!m) return '';
+        var jsUrl = absUrl(m[1], 'https://play.sportsteam356.com/');
+        var js = await fetchText(jsUrl, 'https://play.sportsteam356.com/');
+        var km = String(js || '').match(/\[([0-9a-fx, \n]+)\]\.map\(function\([^)]*\)\{return [^=]+\^0x([0-9a-f]+);?\}/i);
+        if (km) {
+            var bytes = km[1].split(',').map(function(x) { return parseInt(x.trim(), 16); }).filter(function(x) { return !isNaN(x); });
+            var xv = parseInt(km[2], 16);
+            var key = '';
+            for (var i = 0; i < bytes.length; i++) key += String.fromCharCode(bytes[i] ^ xv);
+            if (key.length === 16) return key;
+        }
+    } catch (e) {}
+    return '';
+}
+function xxteaTryAll(binary, keys) {
+    for (var ki = 0; ki < keys.length; ki++) {
+        var dec = xxteaDecrypt(binary, keys[ki]);
+        if (dec && (dec.charAt(0) === '{' || dec.indexOf('.m3u8') !== -1 || dec.indexOf('http') === 0)) return dec;
+    }
+    return null;
+}
 
 function _xxtea_tU32(r, e) {
     var t, n = r.length, o = n >> 2;
@@ -252,36 +278,72 @@ function _pao_rc4(data, key) {
     }
     return out;
 }
-
 async function resolvePao(paoUrl, referer) {
     try {
+        console.log('resolvePao start:', paoUrl);
         var paoHtml = await fetchText(paoUrl, referer || host + '/');
-        if (!paoHtml || paoHtml.length <= 5) return null;
+        if (!paoHtml || paoHtml.length <= 5) {
+            console.log('resolvePao empty html');
+            return null;
+        }
         var encMatch = paoHtml.match(/encodedStr\s*=\s*["']([^"']+)/i);
-        if (!encMatch) { return null; }
+        var isVxt = /\/play\/vxt\//i.test(paoUrl);
+        if (!encMatch) encMatch = paoHtml.match(/["']?en_str["']?\s*[:=]\s*["']([^"']+)/i);
+        if (!encMatch) {
+            console.log('resolvePao no encodedStr');
+            return null;
+        }
         var encodedStr = encMatch[1];
+        console.log('resolvePao encodedStr found');
         var encBinary = '';
         if (typeof Buffer !== 'undefined') {
             encBinary = Buffer.from(encodedStr, 'base64').toString('binary');
         } else {
             var b64 = encodedStr.replace(/=+$/, '');
             var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-            for (var bi = 0; bi < b64.length; bi += 4) {
-                var ba = chars.indexOf(b64[bi] || 'A'), bb = chars.indexOf(b64[bi+1] || 'A');
-                var bc = chars.indexOf(b64[bi+2] || 'A'), bd = chars.indexOf(b64[bi+3] || 'A');
-                var bn = (ba << 18) | (bb << 12) | ((bc < 0 ? 0 : bc) << 6) | (bd < 0 ? 0 : bd);
+            for (var bi = 0; bi + 4 <= b64.length; bi += 4) {
+                var ba = chars.indexOf(b64[bi]), bb = chars.indexOf(b64[bi + 1]);
+                var bc = chars.indexOf(b64[bi + 2]), bd = chars.indexOf(b64[bi + 3]);
+                if (ba < 0 || bb < 0 || bc < 0 || bd < 0) break;
+                var bn = (ba << 18) | (bb << 12) | ((bc << 6) | bd);
                 encBinary += String.fromCharCode((bn >> 16) & 255, (bn >> 8) & 255, bn & 255);
             }
-            var pad = (4 - b64.length % 4) % 4;
-            if (pad) encBinary = encBinary.substring(0, encBinary.length - pad);
+            var rem = b64.length % 4, tail = b64.slice(b64.length - rem);
+            if (tail.length === 2) {
+                var a1 = chars.indexOf(tail.charAt(0)), a2 = chars.indexOf(tail.charAt(1));
+                if (a1 >= 0 && a2 >= 0) encBinary += String.fromCharCode((a1 << 2) | (a2 >> 4));
+            } else if (tail.length === 3) {
+                var b1 = chars.indexOf(tail.charAt(0)), b2 = chars.indexOf(tail.charAt(1)), b3 = chars.indexOf(tail.charAt(2));
+                if (b1 >= 0 && b2 >= 0 && b3 >= 0) {
+                    encBinary += String.fromCharCode((b1 << 2) | (b2 >> 4));
+                    encBinary += String.fromCharCode(((b2 & 15) << 4) | (b3 >> 2));
+                }
+            }
         }
-        var m3u8raw = xxteaDecrypt(encBinary, PAO_XXTEA_KEY);
+        var teakeys = isVxt ? [VXT_XXTEA_KEYS[0], PAO_XXTEA_KEY, VXT_XXTEA_KEYS[1], VXT_XXTEA_KEYS[2]] : [PAO_XXTEA_KEY, VXT_XXTEA_KEYS[0], VXT_XXTEA_KEYS[1], VXT_XXTEA_KEYS[2]];
+        if (isVxt) {
+            var liveKey = await getVxtLiveKey(paoHtml);
+            if (liveKey && teakeys.indexOf(liveKey) === -1) teakeys.unshift(liveKey);
+        }
+        var m3u8raw = xxteaTryAll(encBinary, teakeys);
+        if (!m3u8raw) {
+            if (!isVxt) m3u8raw = xxteaDecrypt(encBinary, PAO_XXTEA_KEY);
+        }
         if (!m3u8raw) return null;
         var m3u8 = m3u8raw;
         if (m3u8raw.charAt(0) === '{') {
-            try { m3u8 = JSON.parse(m3u8raw).url || m3u8raw; } catch(e) {}
+            try {
+                var parsed = JSON.parse(m3u8raw);
+                if (parsed.url && String(parsed.url).indexOf('://') !== -1) {
+                    m3u8 = parsed.url;
+                } else if (parsed.ckey && parsed.cnlid && parsed.pid) {
+                    var txfM3u8 = await resolveTxfApi(parsed);
+                    if (txfM3u8) return fixM3u8Domain(txfM3u8);
+                    return null;
+                }
+            } catch(e) {}
         }
-        if (m3u8 && m3u8.indexOf('.m3u8') !== -1) {
+        if (m3u8 && m3u8.indexOf('http') === 0) {
             m3u8 = m3u8.replace(/\\\//g, '/');
             m3u8 = fixM3u8Domain(m3u8);
             var resolved = await resolveMasterM3u8(m3u8);
@@ -293,17 +355,74 @@ async function resolvePao(paoUrl, referer) {
     }
 }
 
+async function resolveTxfApi(cfg) {
+    try {
+        if (console.log) console.log('resolveTxfApi input:', JSON.stringify(cfg));
+        var p = 'defnswitch=0&flowid=cba2e14bd08c365f82faa2206260b142&cmd=2&pid='+encodeURIComponent(cfg.pid)+'&chid=&defn=shd&ufps=auto&playbacktime=0&ckey='+encodeURIComponent(cfg.ckey)+'&appver=1.70.2&encrypt_ver=7.3&platform=40201&tm='+cfg.tm+'&cnlid='+cfg.cnlid+'&host=sports.qq.com&sdtfrom=10201&logintoken=%7B%22access_token%22%3A%2278B6EFF47A1209550825A440AF2D6E6F%22%2C%22appid%22%3A%22101481799%22%2C%22vusession%22%3Anull%2C%22openid%22%3A%224D2FA8DD4C31FDB84668A204EA6ADDEC%22%2C%22vuserid%22%3Anull%2C%22main_login%22%3A%22qq%22%2C%22video_guid%22%3A%22%22%7D';
+        var apiUrl = 'https://infozb6.video.qq.com/cgi-bin/getliveinfo?' + p;
+        if (console.log) console.log('resolveTxfApi url:', apiUrl);
+        var body = await fetchText(apiUrl, 'https://play.sportsteam356.com/');
+        if (!body) {
+            if (console.log) console.log('resolveTxfApi body empty');
+            return null;
+        }
+        if (console.log) console.log('resolveTxfApi body len:', String(body).length);
+        var jd = safeJson(body, null);
+        if (jd && jd.play_list && jd.play_list.length > 0) {
+            var firstPlay = jd.play_list[0];
+            if (firstPlay.urls && firstPlay.urls.length > 0) {
+                var m3u8 = firstPlay.urls[0];
+                if (console.log) console.log('resolveTxfApi m3u8 ok:', m3u8.slice(0, 100));
+                return m3u8;
+            }
+        }
+        return null;
+    } catch (e) {
+        if (console.log) console.log('resolveTxfApi err:', String(e && e.message || e).slice(0, 120));
+        return null;
+    }
+}
+
+function extractSubM3u8(body) {
+    if (!body || body.indexOf('#EXT-X-STREAM-INF') === -1) return null;
+    var m = String(body).match(/#EXT-X-STREAM-INF[^\r\n]*\r?\n\s*(https?:\/\/[^\s]+)/i);
+    return m ? m[1].replace(/\\\//g, '/') : null;
+}
 async function resolveMasterM3u8(m3u8Url) {
     try {
-        if (!/hello\.ooo0ooo\.top/i.test(m3u8Url)) return null;
         var body = await fetchText(m3u8Url, host + '/');
         if (!body || body.indexOf('#EXTM3U') === -1) return null;
-        var subMatch = body.match(/^(https?:\/\/[^\s]+)/im);
-        if (subMatch && subMatch[1].indexOf('.m3u8') !== -1) return subMatch[1].replace(/\\\//g, '/');
-        return null;
+        return extractSubM3u8(body);
     } catch (e) {
         return null;
     }
+}
+// V62: 播放前探活——原 m3u8 不可达（如反转域名 DNS 失效）时自动反转还原第二段域名重试；master 播放列表自动降到 sub
+async function ensureM3u8(u) {
+    var s = fixM3u8Domain(String(u || ''));
+    if (s.indexOf('//') === 0) s = 'https:' + s;
+    if (!/^https?:\/\//i.test(s) || !/\.(m3u8|mp4|flv)(\?|$)/i.test(s)) return s;
+    var body = '';
+    try { body = await fetchText(s, host + '/'); } catch (e) {}
+    if (body && body.indexOf('#EXTM3U') !== -1) {
+        var sub = extractSubM3u8(body);
+        return sub || s;
+    }
+    var rm = s.match(/^(https?:\/\/)([a-z0-9\-]+)\.([a-z0-9\-]+)\.([a-z]{2,})(\.[a-z]{2,})?([\s\S]*)$/i);
+    if (rm) {
+        var rev = rm[3].split('').reverse().join('');
+        if (rev !== rm[3]) {
+            var alt = rm[1] + rm[2] + '.' + rev + '.' + rm[4] + (rm[5] || '') + rm[6];
+            try {
+                var b2 = await fetchText(alt, host + '/');
+                if (b2 && b2.indexOf('#EXTM3U') !== -1) {
+                    var sub2 = extractSubM3u8(b2);
+                    return sub2 || alt;
+                }
+            } catch (e) {}
+        }
+    }
+    return s;
 }
 
 function resolveGetPlayUrl(jsContent) {
@@ -619,10 +738,8 @@ async function detail(id) {
         } catch (e) {}
         for (var si = 0; si < signals.length; si++) {
             var sig = signals[si];
-            var resolved = await resolveSignal(sig.url, playPageUrl);
-            // V41: 解析失败时仍保留按钮名+原始链接，不再直接跳过，保证8路全显示
-            var finalUrl = resolved || sig.url;
-            allParts.push(sig.name + '$' + finalUrl);
+            // V62: 存 signal 页 URL 不预解析 m3u8（预解析的 m3u8 带时效 auth_key 会过期致不能播），play 点击时实时解析
+            allParts.push(sig.name + '$' + sig.url);
         }
     }
     // 若整场无信号页，回退到原始 url 解析
@@ -653,6 +770,8 @@ function fixM3u8Domain(url) {
     s = s.replace(/hdl\d+\.8861ixnah\.com/g, function(m) { return m.replace('8861ixnah.com', 'hanxi1688.com'); });
     // V49: 源站把 CDN 域名倒写防盗链（gnimixuiq=qiuximing 反转），必须还原为正向域名才可播
     s = s.replace(/(hdl\d+\.)gnimixuiq(\.com)/g, '$1qiuximing$2');
+    // V62: 主播解说 m3u8 域名 ylfxxm=mxxfly 倒写，实测 ylfxxm DNS 不可解析、mxxfly 200 真 m3u8
+    s = s.replace(/(hdl\d+\.)ylfxxm(\.com)/g, '$1mxxfly$2');
     var rm = s.match(/^(https?:\/\/hdl\d+\.)([a-z0-9\-]+)(\.(?:com|cn|net|top))([\s\S]*)$/i);
     if (rm && /gnimixuiq|remmuszs|8861ixnah/i.test(rm[2])) {
         var rev = rm[2].split('').reverse().join('');
@@ -662,21 +781,53 @@ function fixM3u8Domain(url) {
 }
 
 async function resolveSignal(sigUrl, referer) {
-    if (/\/play\/(?:pao|kbs)\/\?/i.test(sigUrl)) {
+    if (/\/play\/txf\//i.test(sigUrl)) {
+        var paoHtml = await fetchText(sigUrl, referer || host + '/');
+        if (paoHtml) {
+            var encMatch = paoHtml.match(/en_str\s*[:=]\s*["']([^"']+)/i);
+            if (encMatch) {
+                var encodedStr = encMatch[1];
+                var encBinary = typeof Buffer !== 'undefined' ? Buffer.from(encodedStr, 'base64').toString('binary') : _pao_customB64(encodedStr);
+                var m3u8raw = xxteaDecrypt(encBinary, PAO_XXTEA_KEY);
+                if (m3u8raw) {
+                    if (m3u8raw.indexOf('http') === 0) {
+                        var tDirect = fixM3u8Domain(m3u8raw.replace(/\\\//g, '/'));
+                        if (tDirect.indexOf('hello.ooo0ooo.top') === -1) return tDirect;
+                    }
+                    if (m3u8raw.charAt(0) === '{') {
+                        try {
+                            var parsed = JSON.parse(m3u8raw);
+                            if (parsed.url && String(parsed.url).indexOf('://') !== -1) {
+                                var tUrl = fixM3u8Domain(String(parsed.url));
+                                if (tUrl.indexOf('hello.ooo0ooo.top') === -1) return tUrl;
+                            } else if (parsed.ckey && parsed.cnlid && parsed.pid) {
+                                var txfM3u8 = await resolveTxfApi(parsed);
+                                if (txfM3u8 && txfM3u8.indexOf('hello.ooo0ooo.top') === -1) return fixM3u8Domain(txfM3u8);
+                            }
+                        } catch(e) {}
+                    }
+                }
+            }
+        }
+        return '';
+    }
+    if (/\/play\/(?:pao|kbs|vl|vxt)\//i.test(sigUrl)) {
         var paoResult = await resolvePao(sigUrl, referer);
-        if (paoResult) return paoResult;
+        if (paoResult && paoResult.indexOf('hello.ooo0ooo.top') === -1) return paoResult;
         // V41: pao 页未命中 encodedStr 时，直接取页内 m3u8 / iframe 兜底
         try {
             var pUrl = sigUrl;
             var pHtml = await fetchText(pUrl, referer || host + '/');
             if (pHtml) {
                 var pdu = extractM3u8FromPage(pHtml, pUrl);
-                if (pdu && looksLikePlayable(pdu)) { pdu = fixM3u8Domain(pdu); return pdu; }
+                if (pdu && looksLikePlayable(pdu) && pdu.indexOf('hello.ooo0ooo.top') === -1) { pdu = fixM3u8Domain(pdu); return pdu; }
                 var pif = firstMatch(pHtml, /<iframe[^>]+src=["']([^"']+)["']/i);
                 if (pif) {
                     if (pif.indexOf('http') !== 0) pif = absUrl(pif, pUrl);
-                    var pifH = await fetchText(pif, pUrl);
-                    if (pifH) { var pdu2 = extractM3u8FromPage(pifH, pif); if (pdu2 && looksLikePlayable(pdu2)) { pdu2 = fixM3u8Domain(pdu2); return pdu2; } }
+                    if (pif.indexOf('hello.ooo0ooo.top') === -1) {
+                        var pifH = await fetchText(pif, pUrl);
+                        if (pifH) { var pdu2 = extractM3u8FromPage(pifH, pif); if (pdu2 && looksLikePlayable(pdu2) && pdu2.indexOf('hello.ooo0ooo.top') === -1) { pdu2 = fixM3u8Domain(pdu2); return pdu2; } }
+                    }
                 }
             }
         } catch (e) {}
@@ -775,16 +926,14 @@ async function play(flag, id, flags) {
     raw = decodeUrlSafe(raw);
     if (/^\/\//.test(raw)) raw = 'https:' + raw;
     if (/\.(m3u8|mp4|flv)(\?|$)/i.test(raw)) {
-        var playUrl = fixM3u8Domain(upgradeUrl(raw));
-        var masterResolved = await resolveMasterM3u8(playUrl);
-        if (masterResolved) playUrl = masterResolved;
+        var playUrl = await ensureM3u8(raw);
         return JSON.stringify({ parse: 0, url: playUrl, header: playHeaders(playUrl) });
     }
     if (/^https?:\/\//i.test(raw)) {
         try {
             var r = await resolveSignal(raw, host + '/');
-            if (r && /\.(m3u8|mp4|flv)(\?|$)/i.test(r)) {
-                var ru = fixM3u8Domain(upgradeUrl(r));
+            if (r) {
+                var ru = await ensureM3u8(r);
                 return JSON.stringify({ parse: 0, url: ru, header: playHeaders(ru) });
             }
         } catch (e) {}
