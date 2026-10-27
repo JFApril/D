@@ -8,7 +8,7 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
-* @version V62 */
+ * @version V63 */
 
 let host = 'https://m.sportsteam53.com';
 const hosts = ['https://m.sportsteam53.com', 'https://m.jrskk.com', 'https://m.jrs21.com', 'https://www.jrs33.com', 'https://3.swjrzx.com', 'https://m.sportsteam356.com'];
@@ -811,7 +811,16 @@ async function resolveSignal(sigUrl, referer) {
         }
         return '';
     }
-    if (/\/play\/(?:pao|kbs|vl|vxt)\//i.test(sigUrl)) {
+    // V63: vxt 独立处理——腾讯 getliveinfo 偶发 retcode:32 空 play_list（kbs 同 pid 可播），失败自动降级 kbs
+    if (/\/play\/vxt\//i.test(sigUrl)) {
+        var vxtR = await resolvePao(sigUrl, referer);
+        if (vxtR && vxtR.indexOf('hello.ooo0ooo.top') === -1) return vxtR;
+        var vxb = sigUrl.replace(/\/play\/vxt\//i, '/play/kbs/');
+        var kbsR = await resolvePao(vxb, referer);
+        if (kbsR && kbsR.indexOf('hello.ooo0ooo.top') === -1) return kbsR;
+        return '';
+    }
+    if (/\/play\/(pao|kbs|vl)\//i.test(sigUrl)) {
         var paoResult = await resolvePao(sigUrl, referer);
         if (paoResult && paoResult.indexOf('hello.ooo0ooo.top') === -1) return paoResult;
         // V41: pao 页未命中 encodedStr 时，直接取页内 m3u8 / iframe 兜底
@@ -932,12 +941,12 @@ async function play(flag, id, flags) {
     if (/^https?:\/\//i.test(raw)) {
         try {
             var r = await resolveSignal(raw, host + '/');
-            if (r) {
+            if (r && /\.(m3u8|mp4|flv)(\?|$)/i.test(r)) {
                 var ru = await ensureM3u8(r);
                 return JSON.stringify({ parse: 0, url: ru, header: playHeaders(ru) });
             }
         } catch (e) {}
-        return JSON.stringify({ parse: 0, url: fixM3u8Domain(upgradeUrl(raw)), header: playHeaders(raw) });
+        return JSON.stringify({ parse: 1, url: raw, header: playHeaders(raw) });
     }
     if (/^\//.test(raw)) {
         raw = (host || 'https://m.sportsteam53.com') + raw;
