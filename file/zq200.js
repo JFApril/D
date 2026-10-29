@@ -1,6 +1,7 @@
 // ============================================================
-// zuqiu200直播爬虫 v1 (CatVod格式)
-// 将Python版本转换为TVBox兼容的JS格式
+// zuqiu200直播爬虫 v3 (CatVod格式)
+// v3: 修复队徽路径 足球/篮球前缀改回 football|basketball/team (v2 误用 team/ 致404)
+// v2: 数据源切换 c5 livehouse -> c7 match/list (官方流videoUrl+主播解说)
 // ============================================================
 
 const API_HOST = 'https://enskweeseey8kp2frvb06.k8v4dh4.app';
@@ -53,10 +54,10 @@ function fmtTime(tsSec) {
 
 function getLogoUrl(sportId, logo) {
     if (!logo) return '';
-    if (logo.startsWith('http')) return logo;
-    if (logo.includes('/')) return 'https://img0.aiscore.com/' + logo;
-    const prefix = {1: 'football', 2: 'basketball', 3: 'v2', 4: 'volleyball'};
-    return 'https://img0.aiscore.com/' + (prefix[sportId] || 'football') + '/team/' + logo;
+    if (logo.indexOf('http') === 0) return logo;
+    if (logo.indexOf('/') > -1) return 'https://img0.aiscore.com/' + logo;
+    const prefix = {1: 'football/team/', 2: 'basketball/team/', 3: 'v2/team/', 4: 'volleyball/team/', 5: 'v2/team/'};
+    return 'https://img0.aiscore.com/' + (prefix[sportId] || 'football/team/') + logo;
 }
 
 // ========== 分类 ==========
@@ -70,173 +71,117 @@ function getClasses() {
     ];
 }
 
-// ========== 获取直播数据 ==========
+// ========== 获取赛程数据 ==========
+function todayStr(offsetDays) {
+    const d = new Date(Date.now() + (offsetDays || 0) * 86400000);
+    const pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
+async function fetchMatchList(dateStr) {
+    const json = await fetchJson(API_HOST + '/api/c7/business/match/list?lang=zh&date=' + dateStr);
+    if (json && json.success && json.data && json.data.records) return json.data.records;
+    return [];
+}
+
+async function getMatchRecords() {
+    let records = await fetchMatchList(todayStr(0));
+    if (!records.length) records = await fetchMatchList(todayStr(1));
+    if (!records.length) records = await fetchMatchList(todayStr(-1));
+    return records;
+}
+
+function fmtScore(m) {
+    if (m.sportId === 5) {
+        const inn = (m.ckScores && m.ckScores.innings) || [];
+        const p1 = inn[0] ? inn[0].runs + '/' + inn[0].wickets : '';
+        const p2 = inn[1] ? inn[1].runs + '/' + inn[1].wickets : '';
+        return p1 || p2 ? p1 + ' ' + p2 : '';
+    }
+    const h = m.homeScores || [], a = m.awayScores || [];
+    const hs = h.length ? h[h.length - 1] : 0;
+    const as = a.length ? a[a.length - 1] : 0;
+    return (h.length || a.length) ? hs + '-' + as : '';
+}
+
 async function getLivestreams() {
-    const ts = Date.now();
-    const url = API_HOST + '/api/c5/business/livehouse/index?lang=zh&timestamp=' + ts;
-    const json = await fetchJson(url);
-    if (!json || !json.success) return [];
-    
+    const records = await getMatchRecords();
+    const now = Math.floor(Date.now() / 1000);
     const result = [];
     const seen = new Set();
-    const sportPrefix = {1: 'football', 2: 'basketball', 3: 'v2', 4: 'volleyball'};
-    
-    const matchStreams = (json.data && json.data.matchLivestreams) || [];
-    const houseTimeMap = {};
-    const houseStreamMap = {};
-    
-    // 构建houseId到比赛时间和流的映射
-    for (let i = 0; i < matchStreams.length; i++) {
-        const item = matchStreams[i];
-        const matchData = item.result && item.result.match;
-        if (!matchData) continue;
-        const matchTime = matchData.matchTime || 0;
-        const statusId = matchData.statusId || 0;
-        const anchors = item.reservedAnchors || [];
-        for (let j = 0; j < anchors.length; j++) {
-            const hId = anchors[j].houseId;
-            if (hId) houseTimeMap[hId] = [matchTime, statusId];
+    for (let i = 0; i < records.length; i++) {
+        const m = records[i];
+        const home = (m.homeTeam && m.homeTeam.teamName) || '';
+        const away = (m.awayTeam && m.awayTeam.teamName) || '';
+        if (!home || !away) continue;
+        const league = (m.competition && m.competition.competitionName) || '';
+        const matchId = m.matchId || '';
+        const mt = m.matchTime || 0;
+        const anchors = m.anchorAppointmentVoList || [];
+        let url = '';
+        const vu = m.videoUrl || '';
+        if (vu.indexOf('http') === 0) url = vu;
+        for (let j = 0; !url && j < anchors.length; j++) {
+            const s1 = anchors[j].playStreamAddress || '', s2 = anchors[j].playStreamAddress2 || '';
+            if (s1.indexOf('.m3u8') > -1) { url = s1; break; }
+            if (s2.indexOf('.m3u8') > -1) { url = s2; break; }
         }
-    }
-    
-    // 处理正在进行的直播流
-    const ongoing = (json.data && json.data.ongoingLivestreams) || [];
-    for (let i = 0; i < ongoing.length; i++) {
-        const item = ongoing[i];
-        const houseId = item.houseId;
-        const streamUrl = item.playStreamAddress;
-        const streamM3u8 = item.playStreamAddress2;
-        let validStream = '';
-        if (streamUrl && streamUrl.startsWith('http') && streamUrl !== 'www') validStream = streamUrl;
-        else if (streamM3u8 && streamM3u8.startsWith('http') && streamM3u8 !== 'www') validStream = streamM3u8;
-        if (houseId && validStream) houseStreamMap[houseId] = validStream;
-    }
-    
-    // 处理主播直播流
-    const anchorStreams = (json.data && json.data.anchorLivestreams) || [];
-    for (let i = 0; i < anchorStreams.length; i++) {
-        const item = anchorStreams[i];
-        const houseId = item.houseId;
-        const streamUrl = item.playStreamAddress;
-        const streamM3u8 = item.playStreamAddress2;
-        let validStream = '';
-        if (streamUrl && streamUrl.startsWith('http') && streamUrl !== 'www') validStream = streamUrl;
-        else if (streamM3u8 && streamM3u8.startsWith('http') && streamM3u8 !== 'www') validStream = streamM3u8;
-        if (houseId && validStream) houseStreamMap[houseId] = validStream;
-    }
-    
-    // 处理比赛流
-    for (let i = 0; i < matchStreams.length; i++) {
-        const item = matchStreams[i];
-        const matchData = item.result && item.result.match;
-        if (!matchData) continue;
-        const competition = matchData.competition || {};
-        const homeTeamData = matchData.homeTeam || {};
-        const awayTeamData = matchData.awayTeam || {};
-        const homeTeam = homeTeamData.name || '';
-        const awayTeam = awayTeamData.name || '';
-        const league = competition.name || '';
-        const videoUrl = matchData.videoUrl || '';
-        const sportId = matchData.sportId;
-        const statusId = matchData.statusId || 0;
-        const matchName = homeTeam && awayTeam ? homeTeam + ' vs ' + awayTeam : '';
-        if (!matchName) continue;
-        
-        let effectiveVideoUrl = '';
-        if (videoUrl && videoUrl.startsWith('http') && videoUrl !== 'https') {
-            effectiveVideoUrl = videoUrl;
-        } else {
-            const anchors = item.reservedAnchors || [];
-            for (let j = 0; j < anchors.length; j++) {
-                const anchorStream = anchors[j].playStreamAddress || '';
-                const anchorStream2 = anchors[j].playStreamAddress2 || '';
-                if (anchorStream && anchorStream.startsWith('http') && anchorStream !== 'www') {
-                    effectiveVideoUrl = anchorStream;
-                    break;
-                } else if (anchorStream2 && anchorStream2.startsWith('http') && anchorStream2 !== 'www') {
-                    effectiveVideoUrl = anchorStream2;
-                    break;
-                }
-            }
-            if (!effectiveVideoUrl) {
-                for (let j = 0; j < anchors.length; j++) {
-                    const hId = anchors[j].houseId;
-                    if (hId && houseStreamMap[hId]) {
-                        effectiveVideoUrl = houseStreamMap[hId];
-                        break;
-                    }
-                }
-            }
+        for (let j = 0; !url && j < anchors.length; j++) {
+            const s1 = anchors[j].playStreamAddress || '', s2 = anchors[j].playStreamAddress2 || '';
+            if (s1.indexOf('http') === 0) { url = s1; break; }
+            if (s2.indexOf('http') === 0) { url = s2; break; }
         }
-        
-        const matchId = matchData.id || '';
-        const matchTime = matchData.matchTime || 0;
-        const timeStr = fmtTime(matchTime);
-        const isLive = effectiveVideoUrl && (statusId === 2 || statusId === 4);
-        const isUpcoming = !effectiveVideoUrl && (statusId === 1 || statusId === 2 || statusId === 3);
-        const prefix = isLive ? '🟢 ' : isUpcoming ? '⏳ ' : '';
-        const remarks = timeStr && league ? prefix + timeStr + ' ' + league : timeStr ? prefix + timeStr : league ? prefix + league : '';
-        const homeLogo = homeTeamData.logo || '';
-        const homeLogoUrl = getLogoUrl(sportId, homeLogo);
-        const key = matchName + '_' + league;
+        const isLive = !!url;
+        const isSoon = !url && Math.abs(mt - now) <= 1800;
+        if (!isLive && !isSoon) continue;
+        const timeStr = fmtTime(mt);
+        const score = fmtScore(m);
+        const prefix = isLive ? '🔴 ' : '⏳ ';
+        const parts = [];
+        if (timeStr) parts.push(timeStr);
+        if (league) parts.push(league);
+        if (score) parts.push(score);
+        parts.unshift(prefix);
+        const key = matchId || (home + away + league);
         if (seen.has(key)) continue;
         seen.add(key);
-        const finalUrl = effectiveVideoUrl ? effectiveVideoUrl : (matchId ? 'https://zuqiu200.app/match/' + matchId : '');
-        
         result.push({
             vod_id: matchId,
-            vod_name: matchName,
-            vod_pic: homeLogoUrl,
+            vod_name: home + ' vs ' + away,
+            vod_pic: getLogoUrl(m.sportId, (m.homeTeam && m.homeTeam.logo) || ''),
             vod_play_from: league || '直播',
-            vod_play_url: finalUrl,
-            vod_remarks: remarks,
-            sport_id: String(sportId || '')
+            vod_play_url: url || '',
+            vod_remarks: parts.join(' '),
+            sport_id: String(m.sportId || ''),
+            _mt: mt,
+            _live: isLive ? 1 : 0
         });
     }
-    
-    // 处理进行中的直播
-    for (let i = 0; i < ongoing.length; i++) {
-        const item = ongoing[i];
-        const houseId = item.houseId;
-        const houseName = item.houseName || '';
-        const streamUrl = item.playStreamAddress;
-        const streamM3u8 = item.playStreamAddress2;
-        const raceTypeId = item.raceTypeId;
-        const houseImage = item.houseImage || '';
-        
-        let validStream = '';
-        if (streamUrl && streamUrl.startsWith('http') && streamUrl !== 'www') validStream = streamUrl;
-        else if (streamM3u8 && streamM3u8.startsWith('http') && streamM3u8 !== 'www') validStream = streamM3u8;
-        
-        if (houseId && houseName && validStream) {
-            const parts = houseName.split('|');
-            const league = parts.length > 0 ? parts[0].trim() : '';
-            const matchInfo = parts.length > 1 ? parts[1].trim() : houseName;
-            let teamParts = matchInfo.split('VS');
-            if (teamParts.length < 2) teamParts = matchInfo.split('vs');
-            const homeTeam = teamParts.length > 0 ? teamParts[0].trim() : '';
-            const awayTeam = teamParts.length > 1 ? teamParts[1].trim() : '';
-            const matchName = homeTeam && awayTeam ? homeTeam + ' vs ' + awayTeam : houseName;
-            const mt = houseTimeMap[houseId] || [0, 0];
-            const timeStr = fmtTime(mt[0]);
-            const remarks = timeStr && league ? '🟢 ' + timeStr + ' ' + league : timeStr ? '🟢 ' + timeStr : league ? '🟢 ' + league : '🟢 直播中';
-            const key = matchName + '_' + league;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            
-            result.push({
-                vod_id: houseId,
-                vod_name: matchName,
-                vod_pic: houseImage,
-                vod_play_from: league || '直播',
-                vod_play_url: validStream,
-                vod_remarks: remarks,
-                sport_id: String(raceTypeId || '')
-            });
-        }
-    }
-    
+    result.sort((x, y) => (y._live - x._live) || (x._mt - y._mt));
     return result;
+}
+
+async function resolveStream(matchId) {
+    const records = await getMatchRecords();
+    for (let i = 0; i < records.length; i++) {
+        const m = records[i];
+        if (m.matchId !== matchId) continue;
+        const vu = m.videoUrl || '';
+        if (vu.indexOf('http') === 0) return vu;
+        const anchors = m.anchorAppointmentVoList || [];
+        for (let j = 0; j < anchors.length; j++) {
+            const s1 = anchors[j].playStreamAddress || '', s2 = anchors[j].playStreamAddress2 || '';
+            if (s1.indexOf('.m3u8') > -1) return s1;
+            if (s2.indexOf('.m3u8') > -1) return s2;
+        }
+        for (let j = 0; j < anchors.length; j++) {
+            const s1 = anchors[j].playStreamAddress || '', s2 = anchors[j].playStreamAddress2 || '';
+            if (s1.indexOf('http') === 0) return s1;
+            if (s2.indexOf('http') === 0) return s2;
+        }
+        break;
+    }
+    return '';
 }
 
 // ========== 公开接口 ==========
@@ -257,19 +202,14 @@ async function category(tid, pg, filter, extend) {
     tid = String((extend && extend.cateId) || tid || 'all');
     pg = parseInt(pg) || 1;
     let list = [];
+    let total = 0;
     
     try {
         const allVideos = await getLivestreams();
-        if (tid === 'all') {
-            list = allVideos;
-        } else {
-            list = allVideos.filter(v => v.sport_id === tid);
-        }
-        
-        const pageSize = 20;
-        const start = (pg - 1) * pageSize;
-        const end = start + pageSize;
-        list = list.slice(start, end);
+        const filtered = tid === 'all' ? allVideos : allVideos.filter(v => v.sport_id === tid);
+        total = filtered.length;
+        const start = (pg - 1) * 20;
+        list = filtered.slice(start, start + 20);
     } catch (e) {
         list = [];
     }
@@ -278,9 +218,9 @@ async function category(tid, pg, filter, extend) {
         code: 1,
         msg: '数据列表',
         page: pg,
-        pagecount: Math.ceil(list.length / 20) || 1,
+        pagecount: Math.ceil(total / 20) || 1,
         limit: 20,
-        total: list.length,
+        total: total,
         list: list
     });
 }
@@ -308,23 +248,21 @@ async function detail(ids) {
 async function search(wd, quick, pg) {
     pg = parseInt(pg) || 1;
     let results = [];
+    let total = 0;
     
     try {
         const allVideos = await getLivestreams();
-        const keywordLower = wd.toLowerCase();
+        const keywordLower = String(wd || '').toLowerCase();
         
         for (let i = 0; i < allVideos.length; i++) {
             const video = allVideos[i];
-            const name = video.vod_name.toLowerCase();
-            if (name.includes(keywordLower) || video.vod_play_from.includes(wd)) {
+            if (video.vod_name.toLowerCase().includes(keywordLower) || video.vod_play_from.includes(String(wd || ''))) {
                 results.push(video);
             }
         }
-        
-        const pageSize = 20;
-        const start = (pg - 1) * pageSize;
-        const end = start + pageSize;
-        results = results.slice(start, end);
+        total = results.length;
+        const start = (pg - 1) * 20;
+        results = results.slice(start, start + 20);
     } catch (e) {
         results = [];
     }
@@ -333,23 +271,21 @@ async function search(wd, quick, pg) {
         code: 1,
         msg: '搜索结果',
         page: pg,
-        pagecount: Math.ceil(results.length / 20) || 1,
+        pagecount: Math.ceil(total / 20) || 1,
         limit: 20,
-        total: results.length,
+        total: total,
         list: results
     });
 }
 
 async function play(flag, id, flags) {
-    const url = String(id || '');
-    if (!url) {
-        return JSON.stringify({
-            parse: 0,
-            url: '',
-            header: ''
-        });
+    let url = String(id || '');
+    if (url) {
+        try {
+            const fresh = await resolveStream(url);
+            if (fresh) url = fresh;
+        } catch (e) {}
     }
-    
     return JSON.stringify({
         parse: 0,
         url: url,
