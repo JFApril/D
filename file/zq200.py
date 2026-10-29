@@ -1,20 +1,20 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# Version: V12 - 无外部依赖版本，使用urllib替代requests
-# 适用于TVBox/T4/海阔等平台，无需pip安装任何依赖,过滤主播
-import json, time, re
+# Version: V14 - 修复队徽路径 足球前缀改回 football/team (v13 误用 team/ 致404)
+# 适用于TVBox/T4/海阔，无外部依赖
+import json, time
 from urllib.request import urlopen, Request
 
 try:
     from base.spider import Spider
 except ImportError:
-    # 独立运行时的备用Spider类
     class Spider:
         def getName(self): return ""
         def init(self, extend=""): pass
 
 class Spider(Spider):
     def getName(self): return "zuqiu200直播"
+
     def init(self, extend=""):
         self.host = "https://zuqiu200.app"
         self.api_host = "https://enskweeseey8kp2frvb06.k8v4dh4.app"
@@ -26,273 +26,177 @@ class Spider(Spider):
             {"type_id": "4", "type_name": "排球"},
             {"type_id": "all", "type_name": "全部"}
         ]
-    
+        self.cache = {}
+
     def _api_get(self, path):
-        url = f"{self.api_host}{path}"
+        url = self.api_host + path
         try:
             req = Request(url, headers=self.headers)
             with urlopen(req, timeout=15) as resp:
                 if resp.getcode() == 200:
-                    data = resp.read().decode()
-                    return json.loads(data)
-            return None
-        except: return None
-    
+                    return json.loads(resp.read().decode())
+        except Exception:
+            pass
+        return None
+
+    def _date_str(self, offset):
+        t = time.time() + offset * 86400
+        return time.strftime("%Y-%m-%d", time.localtime(t))
+
+    def _fetch_records(self, ds):
+        if ds in self.cache:
+            return self.cache[ds]
+        data = self._api_get(f"/api/c7/business/match/list?lang=zh&date={ds}")
+        records = []
+        if data and data.get("success") and isinstance(data.get("data"), dict):
+            records = data["data"].get("records", []) or []
+        self.cache[ds] = records
+        return records
+
+    def _get_records(self):
+        for off in (0, 1, -1):
+            records = self._fetch_records(self._date_str(off))
+            if records:
+                return records
+        return []
+
+    def _get_logo_url(self, sport_id, logo):
+        if not logo:
+            return ""
+        if logo.startswith("http"):
+            return logo
+        if "/" in logo:
+            return f"https://img0.aiscore.com/{logo}"
+        prefix = {1: "football/team/", 2: "basketball/team/", 3: "v2/team/", 4: "volleyball/team/", 5: "v2/team/"}
+        return f"https://img0.aiscore.com/{prefix.get(sport_id, 'football/team/')}{logo}"
+
+    def _fmt_time(self, ts_sec):
+        if not ts_sec:
+            return ""
+        return time.strftime("%m-%d %H:%M", time.localtime(ts_sec))
+
+    def _fmt_score(self, m):
+        if m.get("sportId") == 5:
+            innings = (m.get("ckScores") or {}).get("innings") or []
+            p1 = f"{innings[0].get('runs')}/{innings[0].get('wickets')}" if len(innings) >= 1 and innings[0] else ""
+            p2 = f"{innings[1].get('runs')}/{innings[1].get('wickets')}" if len(innings) >= 2 and innings[1] else ""
+            return " ".join(x for x in (p1, p2) if x)
+        h, a = m.get("homeScores") or [], m.get("awayScores") or []
+        if not h and not a:
+            return ""
+        return f"{h[-1] if h else 0}-{a[-1] if a else 0}"
+
+    def _extract_url(self, m):
+        vu = m.get("videoUrl") or ""
+        if vu.startswith("http"):
+            return vu
+        anchors = m.get("anchorAppointmentVoList") or []
+        for a in anchors:
+            s1, s2 = a.get("playStreamAddress") or "", a.get("playStreamAddress2") or ""
+            if ".m3u8" in s1:
+                return s1
+            if ".m3u8" in s2:
+                return s2
+        for a in anchors:
+            s1, s2 = a.get("playStreamAddress") or "", a.get("playStreamAddress2") or ""
+            if s1.startswith("http"):
+                return s1
+            if s2.startswith("http"):
+                return s2
+        return ""
+
     def _get_livestreams(self):
-        ts = int(time.time() * 1000)
-        data = self._api_get(f"/api/c5/business/livehouse/index?lang=zh&timestamp={ts}")
-        if not data or not data.get("success"): return []
+        records = self._get_records()
+        now = int(time.time())
         result = []
         seen = set()
-        sport_prefix = {1: "football", 2: "basketball", 3: "v2", 4: "volleyball"}
-        
-        def get_logo_url(sport_id, logo):
-            if logo:
-                if not logo.startswith("http"):
-                    if "/" in logo:
-                        return f"https://img0.aiscore.com/{logo}"
-                    else:
-                        prefix = sport_prefix.get(sport_id, "football")
-                        return f"https://img0.aiscore.com/{prefix}/team/{logo}"
-            return logo or ""
-        
-        def fmt_time(ts_sec):
-            if not ts_sec: return ""
-            return time.strftime('%m-%d %H:%M', time.localtime(ts_sec))
-        
-        match_streams = data.get("data", {}).get("matchLivestreams", [])
-        house_time_map = {}
-        house_stream_map = {}
-        for item in match_streams:
-            match_data = item.get("result", {}).get("match", {})
-            if not match_data: continue
-            match_time = match_data.get("matchTime", 0)
-            status_id = match_data.get("statusId", 0)
-            for anchor in item.get("reservedAnchors", []):
-                h_id = anchor.get("houseId", "")
-                if h_id: house_time_map[h_id] = (match_time, status_id)
-        
-        ongoing = data.get("data", {}).get("ongoingLivestreams", [])
-        for item in ongoing:
-            house_id = item.get("houseId", "")
-            stream_url = item.get("playStreamAddress", "")
-            stream_m3u8 = item.get("playStreamAddress2", "")
-            valid_stream = ""
-            if stream_url and stream_url.startswith("http") and stream_url != "www":
-                valid_stream = stream_url
-            elif stream_m3u8 and stream_m3u8.startswith("http") and stream_m3u8 != "www":
-                valid_stream = stream_m3u8
-            if house_id and valid_stream:
-                house_stream_map[house_id] = valid_stream
-        
-        anchor_streams = data.get("data", {}).get("anchorLivestreams", [])
-        for item in anchor_streams:
-            house_id = item.get("houseId", "")
-            stream_url = item.get("playStreamAddress", "")
-            stream_m3u8 = item.get("playStreamAddress2", "")
-            valid_stream = ""
-            if stream_url and stream_url.startswith("http") and stream_url != "www":
-                valid_stream = stream_url
-            elif stream_m3u8 and stream_m3u8.startswith("http") and stream_m3u8 != "www":
-                valid_stream = stream_m3u8
-            if house_id and valid_stream:
-                house_stream_map[house_id] = valid_stream
-        
-        for item in match_streams:
-            match_data = item.get("result", {}).get("match", {})
-            if not match_data: continue
-            competition = match_data.get("competition", {})
-            home_team_data = match_data.get("homeTeam", {})
-            away_team_data = match_data.get("awayTeam", {})
-            home_team = home_team_data.get("name", "")
-            away_team = away_team_data.get("name", "")
-            league = competition.get("name", "")
-            video_url = match_data.get("videoUrl", "")
-            sport_id = match_data.get("sportId")
-            status_id = match_data.get("statusId", 0)
-            match_name = f"{home_team} vs {away_team}" if home_team and away_team else ""
-            if not match_name: continue
-            
-            effective_video_url = ""
-            if video_url and video_url.startswith("http") and video_url != "https":
-                effective_video_url = video_url
-            else:
-                for anchor in item.get("reservedAnchors", []):
-                    anchor_stream = anchor.get("playStreamAddress", "")
-                    anchor_stream2 = anchor.get("playStreamAddress2", "")
-                    if anchor_stream and anchor_stream.startswith("http") and anchor_stream != "www":
-                        effective_video_url = anchor_stream
-                        break
-                    elif anchor_stream2 and anchor_stream2.startswith("http") and anchor_stream2 != "www":
-                        effective_video_url = anchor_stream2
-                        break
-                
-                if not effective_video_url:
-                    for anchor in item.get("reservedAnchors", []):
-                        h_id = anchor.get("houseId", "")
-                        if h_id and h_id in house_stream_map:
-                            effective_video_url = house_stream_map[h_id]
-                            break
-            
-            match_id = match_data.get("id", "")
-            match_time = match_data.get("matchTime", 0)
-            time_str = fmt_time(match_time)
-            is_live = effective_video_url and status_id in (2, 4)
-            is_upcoming = not effective_video_url and status_id in (1, 2, 3)
-            if is_live:
-                prefix = "🔴 "
-            elif is_upcoming:
-                prefix = "⏳ "
-            else:
-                prefix = ""
-            if time_str and league:
-                remarks = f"{prefix}{time_str} {league}"
-            elif time_str:
-                remarks = f"{prefix}{time_str}"
-            else:
-                remarks = f"{prefix}{league}" if league else ""
-            home_logo = home_team_data.get("logo", "")
-            home_logo_url = get_logo_url(sport_id, home_logo)
-            key = f"{match_name}_{league}"
-            if key in seen: continue
+        for m in records:
+            home = (m.get("homeTeam") or {}).get("teamName") or ""
+            away = (m.get("awayTeam") or {}).get("teamName") or ""
+            if not home or not away:
+                continue
+            league = (m.get("competition") or {}).get("competitionName") or ""
+            match_id = m.get("matchId") or ""
+            mt = m.get("matchTime") or 0
+            url = self._extract_url(m)
+            is_live = bool(url)
+            is_soon = (not url) and abs(mt - now) <= 1800
+            if not is_live and not is_soon:
+                continue
+            time_str = self._fmt_time(mt)
+            score = self._fmt_score(m)
+            prefix = "🔴 " if is_live else "⏳ "
+            parts = [prefix]
+            parts.extend(x for x in (time_str, league, score) if x)
+            key = match_id or (home + away + league)
+            if key in seen:
+                continue
             seen.add(key)
-            if effective_video_url:
-                final_url = effective_video_url
-            else:
-                final_url = f"https://zuqiu200.app/match/{match_id}" if match_id else ""
             result.append({
                 "vod_id": match_id,
-                "vod_name": match_name,
-                "vod_pic": home_logo_url,
+                "vod_name": f"{home} vs {away}",
+                "vod_pic": self._get_logo_url(m.get("sportId"), (m.get("homeTeam") or {}).get("logo") or ""),
                 "vod_play_from": league or "直播",
-                "vod_play_url": final_url,
-                "vod_remarks": remarks,
-                "sport_id": str(sport_id) if sport_id else ""
+                "vod_play_url": url or "",
+                "vod_remarks": " ".join(parts),
+                "sport_id": str(m.get("sportId") or ""),
+                "_mt": mt,
+                "_live": 1 if is_live else 0
             })
-        
-        for item in ongoing:
-            house_id = item.get("houseId", "")
-            house_name = item.get("houseName", "")
-            stream_url = item.get("playStreamAddress", "")
-            stream_m3u8 = item.get("playStreamAddress2", "")
-            race_type_id = item.get("raceTypeId")
-            house_image = item.get("houseImage", "")
-            
-            valid_stream = ""
-            if stream_url and stream_url.startswith("http") and stream_url != "www":
-                valid_stream = stream_url
-            elif stream_m3u8 and stream_m3u8.startswith("http") and stream_m3u8 != "www":
-                valid_stream = stream_m3u8
-            
-            if house_id and house_name and valid_stream:
-                parts = house_name.split("|")
-                league = parts[0].strip() if len(parts) > 0 else ""
-                match_info = parts[1].strip() if len(parts) > 1 else house_name
-                team_parts = match_info.split("VS")
-                if len(team_parts) < 2: team_parts = match_info.split("vs")
-                home_team = team_parts[0].strip() if len(team_parts) > 0 else ""
-                away_team = team_parts[1].strip() if len(team_parts) > 1 else ""
-                match_name = f"{home_team} vs {away_team}" if home_team and away_team else house_name
-                mt = house_time_map.get(house_id, (0, 0))
-                time_str = fmt_time(mt[0])
-                if time_str and league:
-                    remarks = f"🔴 {time_str} {league}"
-                elif time_str:
-                    remarks = f"🔴 {time_str}"
-                else:
-                    remarks = f"🔴 {league}" if league else "🔴 直播中"
-                key = f"{match_name}_{league}"
-                if key in seen: continue
-                seen.add(key)
-                result.append({
-                    "vod_id": house_id,
-                    "vod_name": match_name,
-                    "vod_pic": house_image,
-                    "vod_play_from": league or "直播",
-                    "vod_play_url": valid_stream,
-                    "vod_remarks": remarks,
-                    "sport_id": str(race_type_id) if race_type_id else ""
-                })
-        
+        result.sort(key=lambda x: (-x["_live"], x["_mt"]))
         return result
-    
+
     def homeVideoContent(self, extend=""):
         return self.homeContent(extend)
-    
+
     def homeContent(self, extend=""):
+        classes = [{"type_id": c["type_id"], "type_name": c["type_name"], "type_extend": "", "type_url": ""} for c in self.categories]
         try:
-            classes = []
-            for cat in self.categories:
-                classes.append({
-                    "type_id": cat["type_id"],
-                    "type_name": cat["type_name"],
-                    "type_extend": "",
-                    "type_url": ""
-                })
-            
-            videos = self._get_livestreams()
-            return {"class": classes, "list": videos, "filter": {}}
-        except Exception as e:
-            return {"class": [], "list": [], "filter": {}}
-    
+            return {"class": classes, "list": self._get_livestreams(), "filter": {}}
+        except Exception:
+            return {"class": classes, "list": [], "filter": {}}
+
     def categoryContent(self, tid, pg, filterable, extend):
         try:
-            all_videos = self._get_livestreams()
-            if tid == "all":
-                videos = all_videos
-            else:
-                videos = [v for v in all_videos if v.get("sport_id") == tid]
-            
+            videos = self._get_livestreams()
+            filtered = videos if tid == "all" else [v for v in videos if v.get("sport_id") == str(tid)]
+            total = len(filtered)
             page_size = 20
             start = (int(pg) - 1) * page_size
-            end = start + page_size
-            page_videos = videos[start:end]
-            
-            return {"list": page_videos, "page": pg, "pagecount": (len(videos) + page_size - 1) // page_size, "limit": page_size, "total": len(videos)}
-        except Exception as e:
+            page_videos = filtered[start:start + page_size]
+            return {"list": page_videos, "page": pg, "pagecount": (total + page_size - 1) // page_size or 1, "limit": page_size, "total": total}
+        except Exception:
             return {"list": [], "page": pg, "pagecount": 1, "limit": 20, "total": 0}
-    
+
     def detailContent(self, ids):
         try:
-            all_videos = self._get_livestreams()
-            for video in all_videos:
-                if video["vod_id"] == ids[0]:
-                    detail = video.copy()
-                    detail["vod_play_from"] = video["vod_play_from"]
-                    detail["vod_play_url"] = video["vod_play_url"]
-                    return {"list": [detail]}
+            target = str(ids[0]) if isinstance(ids, (list, tuple)) and ids else str(ids)
+            for v in self._get_livestreams():
+                if v["vod_id"] == target:
+                    return {"list": [v]}
             return {"list": []}
-        except Exception as e:
+        except Exception:
             return {"list": []}
-    
+
     def searchContent(self, keyword, quick, pg):
         try:
-            all_videos = self._get_livestreams()
-            results = []
-            keyword_lower = keyword.lower()
-            
-            for video in all_videos:
-                name = video["vod_name"].lower()
-                if keyword_lower in name or keyword in video["vod_play_from"]:
-                    results.append(video)
-            
+            keyword_lower = (keyword or "").lower()
+            results = [v for v in self._get_livestreams() if keyword_lower in v["vod_name"].lower() or (keyword or "") in v["vod_play_from"]]
+            total = len(results)
             page_size = 20
             start = (int(pg) - 1) * page_size
-            end = start + page_size
-            page_results = results[start:end]
-            
-            return {"list": page_results, "page": pg, "pagecount": (len(results) + page_size - 1) // page_size, "limit": page_size, "total": len(results)}
-        except Exception as e:
+            page_results = results[start:start + page_size]
+            return {"list": page_results, "page": pg, "pagecount": (total + page_size - 1) // page_size or 1, "limit": page_size, "total": total}
+        except Exception:
             return {"list": [], "page": pg, "pagecount": 1, "limit": 20, "total": 0}
-    
+
     def playerContent(self, flag, id, vipFlags):
-        try:
-            parse = 0
-            url = id
-            
-            if not url:
-                url = ""
-            
-            return {"parse": parse, "url": url, "header": ""}
-        except Exception as e:
-            return {"parse": 0, "url": "", "header": ""}
+        url = str(id or "")
+        if url:
+            try:
+                fresh = self._extract_url(next((m for m in self._get_records() if m.get("matchId") == url), {}))
+                if fresh:
+                    url = fresh
+            except Exception:
+                pass
+        return {"parse": 0, "url": url, "header": {"User-Agent": self.headers["User-Agent"], "Referer": self.host + "/"}}
