@@ -8,7 +8,8 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
- * @version V63 */
+ * @version V75 - 10:42日志钉死:isolate实际跑V72代码(V73/V74从未被加载——888rrtt反转重试+同host双resolvePao+probe后body丢失三连特征),导致4个主播解说全fallback到vl。本版:①版本戳日志(isolate启动+每次play打[V75]——下次日志一眼看出加载是否生效)②probe对200空body加诊断(Java.req偶发body读空→误判坏)③ensureM3u8遇200空body改bypass-cache新鲜重探,替代盲目反转域重试(省无效DNS)（2026-11-01 看日志升版） */
+const JRS_VER = 'V75';
 
 let host = 'https://m.sportsteam53.com';
 const hosts = ['https://m.sportsteam53.com', 'https://m.jrskk.com', 'https://m.jrs21.com', 'https://www.jrs33.com', 'https://3.swjrzx.com', 'https://m.sportsteam356.com'];
@@ -16,6 +17,12 @@ const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/6
 const defaultPic = 'https://im-imgs-bucket.oss-accelerate.aliyuncs.com/icon-192.png';
 let cacheTime = 0;
 let cacheHtml = '';
+let m3u8ProbeCache = {};
+let probeInflight = {};
+let evFallbackCache = {};
+// V74: 页面缓存+inflight——并发play各抓各的同一信号页是日志里的风暴源,30s内同URL只抓一次,在途的其它调用共享同一promise
+let pageCache = {};
+let pageInflight = {};
 
 const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
@@ -107,7 +114,7 @@ function matchCategory(tid, league, name, stype, hot) {
     return true;
 }
 
-async function fetchText(url, referer) {
+async function fetchTextRaw(url, referer) {
     url = upgradeUrl(url);
     const hd = {
         'User-Agent': UA,
@@ -147,7 +154,22 @@ async function fetchText(url, referer) {
     }
     return '';
 }
-
+// V74: 统一入口——30s页面缓存+inflight去重。token是数十天级,页面里encodedStr/iframe同窗口内不变;缓存命中=0网络,在途=共享同一请求
+async function fetchText(url, referer) {
+    var ck = pageCache[url];
+    if (ck && Date.now() - ck.t < 30000) return ck.v;
+    if (pageInflight[url]) return pageInflight[url];
+    var p = (async function() {
+        var v = await fetchTextRaw(url, referer);
+        if (v) {
+            if (Object.keys(pageCache).length > 80) { var ks = Object.keys(pageCache); for (var ci = 0; ci < ks.length; ci++) { var o = pageCache[ks[ci]]; if (o && Date.now() - o.t > 60000) delete pageCache[ks[ci]]; } }
+            pageCache[url] = { t: Date.now(), v: v };
+        }
+        return v;
+    })().then(function(v) { delete pageInflight[url]; return v; }, function(e) { delete pageInflight[url]; throw e; });
+    pageInflight[url] = p;
+    return p;
+}
 var DEAD_HOSTS = ['jrs03.com'];
 function isDeadUrl(url) {
     for (var i = 0; i < DEAD_HOSTS.length; i++) {
@@ -155,9 +177,8 @@ function isDeadUrl(url) {
     }
     return false;
 }
-var UPGRADE_HOSTS = {
-    'm.jw1104.com': 'play.sportsteam356.com'
-};
+// V64: 清空——源站三条线路均为 http 且分属不同 host，强制升 https/换域会把可用线路打到死端点
+var UPGRADE_HOSTS = {};
 function upgradeUrl(u) {
     var s = String(u || '');
     var m = s.match(/^http:\/\/([^\/]+)([\s\S]*)$/i);
@@ -174,11 +195,39 @@ function decodeUrlSafe(u) {
     }
     return s;
 }
+// V64: 源站 window.PLAY_HOSTS 真实值（浏览器实测 dump，全部 http）；mm.js 混淆内定义会随 ver 轮换，取不到就靠探活降级
 var PLAY_HOSTS = {
-    line1: 'https://play.sportsteam356.com',
-    line2: 'https://play.sportsteam356.com',
-    line3: 'https://play.sportsteam356.com'
+    line1: 'http://play.sportsteam53.com',
+    line2: 'http://m.jw1104.com',
+    line3: 'http://play.sportsteam356.com'
 };
+var playHostChecked = 0;
+function probePlayHost(u) {
+    try {
+        if (typeof req === 'function') {
+            return Promise.resolve().then(function() { return req(u, { headers: { 'User-Agent': UA, 'Referer': host + '/', 'Accept-Encoding': 'identity' }, timeout: 8000 }); }).then(function(r) {
+                return String((r && (r.content || r.body || r.text || (typeof r === 'string' ? r : ''))) || '');
+            }).catch(function() { return ''; });
+        }
+    } catch (e) {}
+    return Promise.resolve('');
+}
+async function checkPlayHosts() {
+    if (Date.now() - playHostChecked < 10 * 60 * 1000) return;
+    playHostChecked = Date.now();
+    var ids = [];
+    try {
+        var hm = (cacheHtml || '').match(/getPlayUrl\(["']line[123]["'],\s*["'](\d+)["']\)/);
+        if (hm) ids.push(hm[1]);
+    } catch (e) {}
+    var probe = ids.length ? ids[0] : '825268';
+    var order = ['line1', 'line2', 'line3'];
+    var res = await Promise.all(order.map(function(l) { return probePlayHost(PLAY_HOSTS[l] + '/play/steam' + probe + '.html'); }));
+    var alive = [];
+    for (var i = 0; i < order.length; i++) if (res[i] && res[i].indexOf('data-play') !== -1) alive.push(PLAY_HOSTS[order[i]]);
+    if (alive.length === 3) return;
+    if (alive.length) { for (var j = 0; j < order.length; j++) PLAY_HOSTS[order[j]] = alive[Math.min(j, alive.length - 1)]; }
+}
 
 // ===== Pao link crypto (XXTEA + RC4) =====
 var XXTEA_D = 2654435769;
@@ -402,10 +451,16 @@ async function ensureM3u8(u) {
     var s = fixM3u8Domain(String(u || ''));
     if (s.indexOf('//') === 0) s = 'https:' + s;
     if (!/^https?:\/\//i.test(s) || !/\.(m3u8|mp4|flv)(\?|$)/i.test(s)) return s;
-    var body = '';
-    try { body = await fetchText(s, host + '/'); } catch (e) {}
-    if (body && body.indexOf('#EXTM3U') !== -1) {
-        var sub = extractSubM3u8(body);
+    // V74: 探活body复用probeM3u8Status(走pageCache/probeCache,免重复网络),master自动降sub
+    var st = { body: '' };
+    try { st = await probeM3u8Status(s); } catch (e) {}
+    // V75: 200但body空=probe传输偶发读空(日志实测contentLength=233却body丢失),bypass-cache新鲜重探一次,替代盲目反转域
+    if (st && st.code === 200 && !st.body) {
+        delete m3u8ProbeCache[s];
+        try { st = await probeM3u8Status(s); } catch (e) {}
+    }
+    if (st && st.body && st.body.indexOf('#EXTM3U') !== -1) {
+        var sub = extractSubM3u8(st.body);
         return sub || s;
     }
     var rm = s.match(/^(https?:\/\/)([a-z0-9\-]+)\.([a-z0-9\-]+)\.([a-z]{2,})(\.[a-z]{2,})?([\s\S]*)$/i);
@@ -414,15 +469,138 @@ async function ensureM3u8(u) {
         if (rev !== rm[3]) {
             var alt = rm[1] + rm[2] + '.' + rev + '.' + rm[4] + (rm[5] || '') + rm[6];
             try {
-                var b2 = await fetchText(alt, host + '/');
-                if (b2 && b2.indexOf('#EXTM3U') !== -1) {
-                    var sub2 = extractSubM3u8(b2);
+                var st2 = await probeM3u8Status(alt);
+                if (st2 && st2.body && st2.body.indexOf('#EXTM3U') !== -1) {
+                    var sub2 = extractSubM3u8(st2.body);
                     return sub2 || alt;
                 }
             } catch (e) {}
         }
     }
     return s;
+}
+// V65: m3u8 鉴权预检——区分 200(#EXTM3U) / 401(auth failed) / 网络错误
+// V68: req 传输拿真实状态码，9s 总护栏防挂起
+// V69: 45s 同 URL 缓存——并发 storm 里同一 m3u8 被 5 个调用重复探活，互相挤占 req 通道致超时误判
+function probeM3u8Status(u) {
+    var ck = m3u8ProbeCache[u];
+    if (ck && ck.st && Date.now() - ck.t < 45000) return Promise.resolve(ck.st);
+    // V74: ensureM3u8/resolveMasterM3u8刚抓过的body在pageCache里,直接复用免第三次网络
+    var pc = pageCache[u];
+    if (pc && pc.v && pc.v.indexOf('#EXTM3U') !== -1 && Date.now() - pc.t < 45000) {
+        var gst = { code: 200, body: pc.v };
+        if (!m3u8ProbeCache[u] || Date.now() - m3u8ProbeCache[u].t >= 45000) m3u8ProbeCache[u] = { t: Date.now(), st: gst };
+        return Promise.resolve(gst);
+    }
+    if (probeInflight[u]) return probeInflight[u];
+    var p = new Promise(function(resolve) {
+        var done = false;
+        var fin = function(code, body) {
+            if (done) return; done = true;
+            delete probeInflight[u];
+            var st = { code: code, body: String(body || '') };
+            if (code === 200 && st.body.indexOf('#EXTM3U') === -1 && console.log) console.log('[V75] probe 200 but no #EXTM3U, bodyLen=' + st.body.length + ' bodyHead=' + st.body.slice(0, 60).replace(/\n/g, '|') + ' url=' + String(u).slice(0, 70));
+            if (!isM3u8Bad(st) || Date.now() - (m3u8ProbeCache[u] ? m3u8ProbeCache[u].t : 0) > 15000) {
+                if (Object.keys(m3u8ProbeCache).length > 60) { var ok = Object.keys(m3u8ProbeCache); for (var ki = 0; ki < ok.length; ki++) { var o = m3u8ProbeCache[ok[ki]]; if (o && Date.now() - o.t > 60000) delete m3u8ProbeCache[ok[ki]]; } }
+                m3u8ProbeCache[u] = { t: Date.now(), st: st };
+            }
+            resolve(st);
+        };
+        var timer = (typeof setTimeout === 'function') ? setTimeout(function() { fin(0, 'timeout'); }, 9000) : 0;
+        var stop = function() { if (timer && typeof clearTimeout === 'function') clearTimeout(timer); };
+        var go = function(p) {
+            try {
+                p.then(function(r) {
+                    stop();
+                    if (typeof r === 'string') { fin(r.indexOf('#EXTM3U') !== -1 ? 200 : 0, r); return; }
+                    if (!r) { fin(0, ''); return; }
+                    var code = r.status || r.statusCode || r.code || 0;
+                    var body = String(r.content || r.body || r.text || r.data || r.html || r.responseText || r._content || '');
+                    if (!code && body.indexOf('#EXTM3U') !== -1) code = 200;
+                    fin(code, body);
+                })
+                  .catch(function(e) { stop(); fin(0, String(e && e.message || e)); });
+            } catch (e) { stop(); fin(0, String(e)); }
+        };
+        var hd = playHeaders(u);
+        hd['Accept-Encoding'] = 'identity';
+        if (typeof Java !== 'undefined' && Java && Java.req) { go(Java.req(u, { headers: hd, timeout: 8000 })); return; }
+        if (typeof req === 'function') { go(req(u, { headers: hd, timeout: 8000 })); return; }
+        if (typeof fetch === 'function') { go(fetch(u, { headers: hd }).then(function(r) { return r.text().then(function(t) { return { status: r.status, text: t }; }); })); return; }
+        fin(0, '');
+    });
+    probeInflight[u] = p;
+    return p;
+}
+function isM3u8Bad(st) {
+    if (!st) return true;
+    return st.body.indexOf('#EXTM3U') === -1;
+}
+function altSignalHosts(sigUrl) {
+    var m = String(sigUrl || '').match(/^(https?:\/\/)([^/]+)(\/[\s\S]*)$/i);
+    if (!m) return [];
+    var seen = {};
+    var out = [];
+    for (var k in PLAY_HOSTS) {
+        var h = PLAY_HOSTS[k];
+        if (!h || seen[h] || h === m[2]) continue;
+        seen[h] = true;
+        out.push(h + m[3]);
+    }
+    return out;
+}
+// V71: 串行重签——sm.html页3镜像同内容同死token,重签无效直接跳过;其余信号原信号+2镜像依次重解,逐条预检
+async function reissueSignalM3u8(sigUrl) {
+    var tries = /sm\.html/i.test(String(sigUrl || '')) ? [sigUrl] : [sigUrl].concat(altSignalHosts(sigUrl));
+    for (var i = 0; i < tries.length; i++) {
+        try {
+            var m3u8 = await resolveSignal(tries[i], host + '/');
+            if (!m3u8 || !/\.(m3u8|mp4|flv)(\?|$)/i.test(m3u8)) continue;
+            m3u8 = fixM3u8Domain(m3u8);
+            var st = await probeM3u8Status(m3u8);
+            if (!isM3u8Bad(st)) return m3u8;
+        } catch (e) {}
+    }
+    return '';
+}
+// V71: 赛事级兜底——非sm信号优先(sm页token死),跳过当前信号,命中90s缓存/空结果仅15s缓存(防毒化),20s墙钟封顶
+async function fallbackToWorkingSignal(sigUrl) {
+    var u = String(sigUrl || '');
+    var cur = u.replace(/[?&]ev=\d+(&|$)/i, '$1');
+    var evm = u.match(/[?&]ev=(\d+)/i);
+    var evId = evm ? evm[1] : '';
+    if (!evId) { var dm = u.match(/\/play\/steam(\d+)\.html/i); if (dm) evId = dm[1]; }
+    if (!evId) return '';
+    var c = evFallbackCache[evId];
+    var ttl = (c && c.v) ? 90000 : 15000;
+    if (c && Date.now() - c.t < ttl) return c.v || '';
+    var out = '';
+    try {
+        var t0 = Date.now();
+        var evUrl = (PLAY_HOSTS.line1 || host) + '/play/steam' + evId + '.html';
+        var h = await fetchText(evUrl, host + '/');
+        var sigs = h ? parseSignals(h, evUrl) : [];
+        var ord = [];
+        for (var i = 0; i < sigs.length; i++) {
+            var cu = sigs[i].url.replace(/[?&]ev=\d+(&|$)/i, '$1');
+            if (cu !== cur && !/sm\.html/i.test(cu)) ord.push(sigs[i]);
+        }
+        for (var j = 0; j < sigs.length; j++) {
+            var cj = sigs[j].url.replace(/[?&]ev=\d+(&|$)/i, '$1');
+            if (cj !== cur && /sm\.html/i.test(cj)) ord.push(sigs[j]);
+        }
+        for (var k = 0; k < ord.length && Date.now() - t0 < 20000; k++) {
+            try {
+                var m3u8 = await resolveSignal(ord[k].url, host + '/');
+                if (!m3u8 || !/\.(m3u8|mp4|flv)(\?|$)/i.test(m3u8)) continue;
+                m3u8 = fixM3u8Domain(m3u8);
+                var st = await probeM3u8Status(m3u8);
+                if (!isM3u8Bad(st)) { out = m3u8; if (console.log) console.log('fallbackSignal hit: ' + ord[k].name + ' -> ' + m3u8.slice(0, 80)); break; }
+            } catch (e) {}
+        }
+    } catch (e) {}
+    evFallbackCache[evId] = { t: Date.now(), v: out };
+    return out;
 }
 
 function resolveGetPlayUrl(jsContent) {
@@ -528,6 +706,13 @@ function extractM3u8FromPage(html, pageUrl) {
     return null;
 }
 
+// V73: msss.html?id= 双层编码值只解一层(对齐浏览器J_get)——双层会把token的%2B%2F解成裸+/→+被当空格→401
+function decodeMsssId(v) {
+    v = String(v || '').replace(/&amp;/g, '&');
+    if (/%[0-9a-fA-F]{2}/i.test(v)) { try { v = decodeURIComponent(v); } catch (e) {} }
+    if (v.indexOf('//') === 0) v = 'https:' + v;
+    return v;
+}
 async function resolveSmM3u8(smUrl) {
     try {
         var html = await fetchText(smUrl, host + '/');
@@ -681,6 +866,7 @@ function getClasses() {
 }
 
 async function init(cfg) {
+    if (console.log) console.log('[JRS_VER ' + JRS_VER + '] init - isolate 已加载此版本');
     if (cfg && cfg.ext && String(cfg.ext).indexOf('http') === 0) host = String(cfg.ext).replace(/\/$/, '');
 }
 async function home(filter) {
@@ -713,11 +899,16 @@ async function detail(id) {
     if (!payload && /^https?:\/\//i.test(id)) payload = { name: '赛事直播', pic: defaultPic, urls: [id] };
     if (!payload) return JSON.stringify({ code: 1, list: [], page: 1, pagecount: 1, total: 0 });
     var urls = payload.urls || (payload.url ? [payload.url] : []);
-    var playPageUrls = [];
-    for (var i = 0; i < urls.length; i++) {
-        var u = urls[i];
-        if (!u || u.indexOf('http') !== 0) continue;
-        var urlPath = u.replace(/^https?:\/\/[^/]+/i, '');
+// V64: 列表缓存/旧 payload 可能带已下线的线路 host，替换为探活后的存活 host
+var liveHosts = {};
+for (var lkh in PLAY_HOSTS) liveHosts[PLAY_HOSTS[lkh]] = true;
+var playPageUrls = [];
+for (var i = 0; i < urls.length; i++) {
+    var u = urls[i];
+    if (!u || u.indexOf('http') !== 0) continue;
+    var um = u.match(/^(https?:\/\/)([^/]+)(\/play\/steam[\s\S]*)$/i);
+    if (um && !liveHosts[um[2]]) u = (PLAY_HOSTS.line1 || um[1] + um[2]) + um[3];
+    var urlPath = u.replace(/^https?:\/\/[^/]+/i, '');
         if (urlPath === '/.html' || urlPath.length < 3) continue;
         playPageUrls.push(u);
     }
@@ -726,20 +917,36 @@ async function detail(id) {
         var fPath = fallback.replace(/^https?:\/\/[^/]+/i, '');
         if (fPath !== '/.html' && fPath.length >= 3 && !/pao/i.test(fallback)) playPageUrls.push(fallback);
     }
+    // V64: 先探活三条线路（10分钟缓存），源站换域/停服时自动降级，避免全线指向死端点
+    try { await checkPlayHosts(); } catch (e) {}
     // V41: 合并所有线路页的信号为单场一行（最多取前6个线路页，每个页内全部信号），去掉硬限3路
     var allParts = [];
+    var sigSeen = {};
     var maxPages = Math.min(playPageUrls.length, 6);
-    for (var pi = 0; pi < maxPages; pi++) {
-        var playPageUrl = playPageUrls[pi];
-        var signals = [];
-        try {
-            var ph = await fetchText(playPageUrl, host + '/');
-            if (ph) signals = parseSignals(ph, playPageUrl);
-        } catch (e) {}
+        // V67: 线路页并发抓（串行6页×8s超时=详情页38s卡死）
+        var pageSignals = await Promise.all(playPageUrls.slice(0, maxPages).map(function(playPageUrl) {
+            return (async function() {
+                // V65: 附加赛事页ID(ev=)，信号页URL本身只有信号号，播放预检发现坏token时靠它回源同场赛事页切其它可播信号
+                var evm = String(playPageUrl).match(/steam(\d+)\.html/i);
+                var signals = [];
+                try {
+                    var ph = await fetchText(playPageUrl, host + '/');
+                    if (ph) signals = parseSignals(ph, playPageUrl);
+                } catch (e) {}
+                return { evm: evm, signals: signals };
+            })();
+        }));
+        for (var pi = 0; pi < pageSignals.length; pi++) {
+            var evm = pageSignals[pi].evm;
+            var signals = pageSignals[pi].signals;
         for (var si = 0; si < signals.length; si++) {
             var sig = signals[si];
-            // V62: 存 signal 页 URL 不预解析 m3u8（预解析的 m3u8 带时效 auth_key 会过期致不能播），play 点击时实时解析
-            allParts.push(sig.name + '$' + sig.url);
+            // V64: 多线路镜像页 host 不同但信号相同，按 名称+相对路径 去重（否则同一信号出多个按钮）
+            var sKey = sig.name + '|' + String(sig.url).replace(/^https?:\/\/[^/]+/i, '');
+            if (sigSeen[sKey]) continue;
+            sigSeen[sKey] = true;
+            // V62: 存 signal 页 URL 不预解析 m3u8（预解析的 m3u8 带时效 auth_key 会过期致不能播），play 点击时实时解析；V65: 附赛事ID(ev=)供坏token时回源切同场信号
+            allParts.push(sig.name + '$' + (evm ? sig.url + '&ev=' + evm[1] : sig.url));
         }
     }
     // 若整场无信号页，回退到原始 url 解析
@@ -760,11 +967,9 @@ async function detail(id) {
     if (!playUrl) return JSON.stringify({ code: 1, list: [], page: 1, pagecount: 1, total: 0 });
     return JSON.stringify({ code: 1, msg: '数据列表', page: 1, pagecount: 1, limit: 1, total: 1, list: [{ vod_id: id, vod_name: payload.name || '赛事直播', vod_pic: payload.pic || defaultPic, vod_remarks: '直播ing', vod_content: 'JRKAN 体育赛事直播。', vod_play_from: playFrom, vod_play_url: playUrl }] });
 }
+// V73: 删整URL decode——域名修正纯字符串替换不需要,且会把query里token的%2B%2F解成裸+/→+被当空格→签名401(实测同token编码版200/裸版401)
 function fixM3u8Domain(url) {
     var s = String(url || '');
-    if (/%[0-9a-fA-F]{2}/.test(s)) {
-        s = s.replace(/%([0-9a-fA-F]{2})/g, function(_, h) { return String.fromCharCode(parseInt(h, 16)); });
-    }
     s = s.replace(/hdl\d+\.remmuszs\.cn/g, function(m) { return m.replace('remmuszs.cn', 'szsummer.cn'); });
     // V43: 主播解说真实可播域名为 hanxi1688.com，站点编码异常导致解出 8861ixnah.com，强制纠偏
     s = s.replace(/hdl\d+\.8861ixnah\.com/g, function(m) { return m.replace('8861ixnah.com', 'hanxi1688.com'); });
@@ -772,6 +977,8 @@ function fixM3u8Domain(url) {
     s = s.replace(/(hdl\d+\.)gnimixuiq(\.com)/g, '$1qiuximing$2');
     // V62: 主播解说 m3u8 域名 ylfxxm=mxxfly 倒写，实测 ylfxxm DNS 不可解析、mxxfly 200 真 m3u8
     s = s.replace(/(hdl\d+\.)ylfxxm(\.com)/g, '$1mxxfly$2');
+    // V64: 主播解说域名 888rrtt 倒写，实测 888rrtt DNS 不存在、ttrr888 解析正常（2026-10-31 曼联vs切尔西）
+    s = s.replace(/(hdl\d+\.)888rrtt(\.com)/g, '$1ttrr888$2');
     var rm = s.match(/^(https?:\/\/hdl\d+\.)([a-z0-9\-]+)(\.(?:com|cn|net|top))([\s\S]*)$/i);
     if (rm && /gnimixuiq|remmuszs|8861ixnah/i.test(rm[2])) {
         var rev = rm[2].split('').reverse().join('');
@@ -849,19 +1056,26 @@ async function resolveSignal(sigUrl, referer) {
     if (/sm\.html/i.test(sigUrl)) {
         var smId = firstMatch(sigUrl, /(?:^|[?&])id=([^&]+)/i);
         if (smId) {
-            try {
-                var iUrl = absUrl('/play/' + smId + '.html', sigUrl);
-                var iHtml = await fetchText(iUrl, sigUrl);
-                if (iHtml) {
-                    // V43: 主播解说真实页用 encodedStr/XXTEA，复用 resolvePao 解码（之前漏调导致解出坏域名8861ixnah）
-                    var paoFromInner = await resolvePao(iUrl, sigUrl);
-                    if (paoFromInner) { paoFromInner = fixM3u8Domain(paoFromInner); return paoFromInner; }
-                    var mm = iHtml.match(/src=["']([^"']*\/msss\.html\?id=([^"']+))["']/i);
-                    if (mm) { var st = mm[2]; if (st.indexOf('//') === 0) st = 'https:' + st; st = fixM3u8Domain(st); return st; }
-                    var du = extractM3u8FromPage(iHtml, iUrl);
-                    if (du && looksLikePlayable(du)) { du = fixM3u8Domain(du); return du; }
+            // V66: 镜像线路依次重抓内页（源站换格式/签坏token时另一线路可能是新格式）
+            var smHostM = String(sigUrl).match(/^(https?:\/\/[^/]+)/i);
+            var smTries = [smHostM ? smHostM[1] : (host || 'https://m.sportsteam53.com')];
+            for (var sk in PLAY_HOSTS) { var sh = PLAY_HOSTS[sk]; if (sh && smTries.indexOf(sh) === -1) smTries.push(sh); }
+            for (var si2 = 0; si2 < smTries.length; si2++) {
+                var iUrl = smTries[si2] + '/play/' + smId + '.html';
+                var iHtml = '';
+                try { iHtml = await fetchText(iUrl, sigUrl); } catch (e) {}
+                if (!iHtml) continue;
+                var paoFromInner = await resolvePao(iUrl, sigUrl);
+                if (paoFromInner) { paoFromInner = fixM3u8Domain(paoFromInner); return paoFromInner; }
+                // V66: 纯iframe格式——msss.html?id=<双重编码m3u8>（424.html实测demo.songzenet.com格式,无encodedStr）
+                var mm = iHtml.match(/msss\.html\?id=([^"'\s&]+)/i);
+                if (mm) {
+                    var st = decodeMsssId(mm[1]);
+                    if (st && /\.(m3u8|mp4|flv)(\?|$)/i.test(st)) { st = fixM3u8Domain(st); return st; }
                 }
-            } catch (e) {}
+                var du = extractM3u8FromPage(iHtml, iUrl);
+                if (du && looksLikePlayable(du)) { du = fixM3u8Domain(du); return du; }
+            }
         }
         try { var sr = await resolveSmM3u8(sigUrl); if (sr) { sr = fixM3u8Domain(sr); return sr; } } catch (e) {}
         return '';
@@ -874,7 +1088,7 @@ async function resolveSignal(sigUrl, referer) {
             var wHtml = await fetchText(sigUrl, referer || host + '/');
             if (wHtml) {
                 var wmm = wHtml.match(/src=["']([^"']*\/msss\.html\?id=([^"']+))["']/i);
-                if (wmm) { var wst = wmm[2]; if (wst.indexOf('//') === 0) wst = 'https:' + wst; wst = fixM3u8Domain(wst); return wst; }
+                if (wmm) { var wst = decodeMsssId(wmm[2]); if (wst && /\.(m3u8|mp4|flv)(\?|$)/i.test(wst)) return fixM3u8Domain(wst); }
                 var wdu = extractM3u8FromPage(wHtml, sigUrl);
                 if (wdu && looksLikePlayable(wdu)) { wdu = fixM3u8Domain(wdu); return wdu; }
                 var wif = firstMatch(wHtml, /<iframe[^>]+src=["']([^"']+)["']/i);
@@ -891,7 +1105,7 @@ async function resolveSignal(sigUrl, referer) {
         var sHtml = await fetchText(sigUrl, referer || host + '/');
         if (sHtml) {
             var mm2 = sHtml.match(/src=["']([^"']*\/msss\.html\?id=([^"']+))["']/i);
-            if (mm2) { var st2 = mm2[2]; if (st2.indexOf('//') === 0) st2 = 'https:' + st2; st2 = fixM3u8Domain(st2); return st2; }
+            if (mm2) { var st2 = decodeMsssId(mm2[2]); if (st2 && /\.(m3u8|mp4|flv)(\?|$)/i.test(st2)) return fixM3u8Domain(st2); }
             var du2 = extractM3u8FromPage(sHtml, sigUrl);
             if (du2 && looksLikePlayable(du2)) { du2 = fixM3u8Domain(du2); return du2; }
             var ifSrc = firstMatch(sHtml, /<iframe[^>]+src=["']([^"']+)["']/i);
@@ -931,6 +1145,7 @@ function playHeaders(url) {
 }
 
 async function play(flag, id, flags) {
+    if (console.log) console.log('[V75] play start id=' + String(id || '').slice(0, 80));
     var raw = String(id || '');
     raw = decodeUrlSafe(raw);
     if (/^\/\//.test(raw)) raw = 'https:' + raw;
@@ -939,14 +1154,35 @@ async function play(flag, id, flags) {
         return JSON.stringify({ parse: 0, url: playUrl, header: playHeaders(playUrl) });
     }
     if (/^https?:\/\//i.test(raw)) {
+        var best = '';
         try {
             var r = await resolveSignal(raw, host + '/');
             if (r && /\.(m3u8|mp4|flv)(\?|$)/i.test(r)) {
                 var ru = await ensureM3u8(r);
-                return JSON.stringify({ parse: 0, url: ru, header: playHeaders(ru) });
+                // V66: 统一预检——鉴权失败(401 auth failed)即触发重签+同场全信号兜底
+                var chk = await probeM3u8Status(ru);
+                if (!isM3u8Bad(chk)) { return JSON.stringify({ parse: 0, url: ru, header: playHeaders(ru) }); }
+                best = ru;
+            }
+            // V70: 串行兜底链——重签(3线路) → 同场其它信号(90s缓存+20s墙钟)，各自有界，总耗时最坏 ~25s（旧引擎无 Promise.any 风险）
+            var t = await reissueSignalM3u8(raw);
+            if (t) {
+                var t2 = await ensureM3u8(t);
+                var c2 = await probeM3u8Status(t2);
+                if (!isM3u8Bad(c2)) return JSON.stringify({ parse: 0, url: t2, header: playHeaders(t2) });
+                if (!best) best = t2;
+            }
+            var f = await fallbackToWorkingSignal(raw);
+            if (f) {
+                var f2 = await ensureM3u8(f);
+                var c3 = await probeM3u8Status(f2);
+                if (!isM3u8Bad(c3)) return JSON.stringify({ parse: 0, url: f2, header: playHeaders(f2) });
+                if (!best) best = f2;
             }
         } catch (e) {}
-        return JSON.stringify({ parse: 1, url: raw, header: playHeaders(raw) });
+        // V66: 全链路失败也恒 parse:0 返回最优候选（parse:1 会让 T4 把信号页当媒体直接播放必失败）
+        if (best) return JSON.stringify({ parse: 0, url: best, header: playHeaders(best) });
+        return JSON.stringify({ parse: 0, url: raw, header: playHeaders(raw) });
     }
     if (/^\//.test(raw)) {
         raw = (host || 'https://m.sportsteam53.com') + raw;
