@@ -8,8 +8,8 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
- * @version V75 - 10:42日志钉死:isolate实际跑V72代码(V73/V74从未被加载——888rrtt反转重试+同host双resolvePao+probe后body丢失三连特征),导致4个主播解说全fallback到vl。本版:①版本戳日志(isolate启动+每次play打[V75]——下次日志一眼看出加载是否生效)②probe对200空body加诊断(Java.req偶发body读空→误判坏)③ensureM3u8遇200空body改bypass-cache新鲜重探,替代盲目反转域重试(省无效DNS)（2026-11-01 看日志升版） */
-const JRS_VER = 'V75';
+ * @version V77 - 按用户要求彻底移除同场信号兜底(fallbackToWorkingSignal/evFallbackCache):只用原信号——解析+reissue新鲜重试(purgeSignalCache清缓存强制重抓新token),仍失败则原样返回原候选/原URL,不切别的信号伪装有效。版本戳/200空body诊断/新鲜重探维持V75（2026-11-01 看日志升版） */
+const JRS_VER = 'V77';
 
 let host = 'https://m.sportsteam53.com';
 const hosts = ['https://m.sportsteam53.com', 'https://m.jrskk.com', 'https://m.jrs21.com', 'https://www.jrs33.com', 'https://3.swjrzx.com', 'https://m.sportsteam356.com'];
@@ -19,7 +19,6 @@ let cacheTime = 0;
 let cacheHtml = '';
 let m3u8ProbeCache = {};
 let probeInflight = {};
-let evFallbackCache = {};
 // V74: 页面缓存+inflight——并发play各抓各的同一信号页是日志里的风暴源,30s内同URL只抓一次,在途的其它调用共享同一promise
 let pageCache = {};
 let pageInflight = {};
@@ -499,7 +498,7 @@ function probeM3u8Status(u) {
             if (done) return; done = true;
             delete probeInflight[u];
             var st = { code: code, body: String(body || '') };
-            if (code === 200 && st.body.indexOf('#EXTM3U') === -1 && console.log) console.log('[V75] probe 200 but no #EXTM3U, bodyLen=' + st.body.length + ' bodyHead=' + st.body.slice(0, 60).replace(/\n/g, '|') + ' url=' + String(u).slice(0, 70));
+            if (code === 200 && st.body.indexOf('#EXTM3U') === -1 && console.log) console.log('[V76] probe 200 but no #EXTM3U, bodyLen=' + st.body.length + ' bodyHead=' + st.body.slice(0, 60).replace(/\n/g, '|') + ' url=' + String(u).slice(0, 70));
             if (!isM3u8Bad(st) || Date.now() - (m3u8ProbeCache[u] ? m3u8ProbeCache[u].t : 0) > 15000) {
                 if (Object.keys(m3u8ProbeCache).length > 60) { var ok = Object.keys(m3u8ProbeCache); for (var ki = 0; ki < ok.length; ki++) { var o = m3u8ProbeCache[ok[ki]]; if (o && Date.now() - o.t > 60000) delete m3u8ProbeCache[ok[ki]]; } }
                 m3u8ProbeCache[u] = { t: Date.now(), st: st };
@@ -549,8 +548,23 @@ function altSignalHosts(sigUrl) {
     }
     return out;
 }
+// V76: 原信号新鲜重试前置——清该信号的页面缓存,否则30s缓存内重解读的是旧页旧token,重试=空转
+function purgeSignalCache(sigUrl) {
+    try {
+        var s = String(sigUrl || '');
+        var hosts2 = [s].concat(altSignalHosts(s));
+        for (var i = 0; i < hosts2.length; i++) delete pageCache[hosts2[i]];
+        var idm = s.match(/(?:^|[?&])id=([^&]+)/i);
+        if (idm) {
+            for (var hk in PLAY_HOSTS) delete pageCache[PLAY_HOSTS[hk] + '/play/' + idm[1] + '.html'];
+            delete pageCache[(host || '') + '/play/' + idm[1] + '.html'];
+        }
+    } catch (e) {}
+}
 // V71: 串行重签——sm.html页3镜像同内容同死token,重签无效直接跳过;其余信号原信号+2镜像依次重解,逐条预检
+// V76: 重签前清缓存真实重抓;V77: 原信号全候选失败后不再切同场其它信号,play直接原样返回
 async function reissueSignalM3u8(sigUrl) {
+    purgeSignalCache(sigUrl);
     var tries = /sm\.html/i.test(String(sigUrl || '')) ? [sigUrl] : [sigUrl].concat(altSignalHosts(sigUrl));
     for (var i = 0; i < tries.length; i++) {
         try {
@@ -562,45 +576,6 @@ async function reissueSignalM3u8(sigUrl) {
         } catch (e) {}
     }
     return '';
-}
-// V71: 赛事级兜底——非sm信号优先(sm页token死),跳过当前信号,命中90s缓存/空结果仅15s缓存(防毒化),20s墙钟封顶
-async function fallbackToWorkingSignal(sigUrl) {
-    var u = String(sigUrl || '');
-    var cur = u.replace(/[?&]ev=\d+(&|$)/i, '$1');
-    var evm = u.match(/[?&]ev=(\d+)/i);
-    var evId = evm ? evm[1] : '';
-    if (!evId) { var dm = u.match(/\/play\/steam(\d+)\.html/i); if (dm) evId = dm[1]; }
-    if (!evId) return '';
-    var c = evFallbackCache[evId];
-    var ttl = (c && c.v) ? 90000 : 15000;
-    if (c && Date.now() - c.t < ttl) return c.v || '';
-    var out = '';
-    try {
-        var t0 = Date.now();
-        var evUrl = (PLAY_HOSTS.line1 || host) + '/play/steam' + evId + '.html';
-        var h = await fetchText(evUrl, host + '/');
-        var sigs = h ? parseSignals(h, evUrl) : [];
-        var ord = [];
-        for (var i = 0; i < sigs.length; i++) {
-            var cu = sigs[i].url.replace(/[?&]ev=\d+(&|$)/i, '$1');
-            if (cu !== cur && !/sm\.html/i.test(cu)) ord.push(sigs[i]);
-        }
-        for (var j = 0; j < sigs.length; j++) {
-            var cj = sigs[j].url.replace(/[?&]ev=\d+(&|$)/i, '$1');
-            if (cj !== cur && /sm\.html/i.test(cj)) ord.push(sigs[j]);
-        }
-        for (var k = 0; k < ord.length && Date.now() - t0 < 20000; k++) {
-            try {
-                var m3u8 = await resolveSignal(ord[k].url, host + '/');
-                if (!m3u8 || !/\.(m3u8|mp4|flv)(\?|$)/i.test(m3u8)) continue;
-                m3u8 = fixM3u8Domain(m3u8);
-                var st = await probeM3u8Status(m3u8);
-                if (!isM3u8Bad(st)) { out = m3u8; if (console.log) console.log('fallbackSignal hit: ' + ord[k].name + ' -> ' + m3u8.slice(0, 80)); break; }
-            } catch (e) {}
-        }
-    } catch (e) {}
-    evFallbackCache[evId] = { t: Date.now(), v: out };
-    return out;
 }
 
 function resolveGetPlayUrl(jsContent) {
@@ -1145,7 +1120,7 @@ function playHeaders(url) {
 }
 
 async function play(flag, id, flags) {
-    if (console.log) console.log('[V75] play start id=' + String(id || '').slice(0, 80));
+    if (console.log) console.log('[V77] play start id=' + String(id || '').slice(0, 80));
     var raw = String(id || '');
     raw = decodeUrlSafe(raw);
     if (/^\/\//.test(raw)) raw = 'https:' + raw;
@@ -1159,12 +1134,12 @@ async function play(flag, id, flags) {
             var r = await resolveSignal(raw, host + '/');
             if (r && /\.(m3u8|mp4|flv)(\?|$)/i.test(r)) {
                 var ru = await ensureM3u8(r);
-                // V66: 统一预检——鉴权失败(401 auth failed)即触发重签+同场全信号兜底
+                // V66: 统一预检——鉴权失败(401 auth failed)即触发原信号重签
                 var chk = await probeM3u8Status(ru);
                 if (!isM3u8Bad(chk)) { return JSON.stringify({ parse: 0, url: ru, header: playHeaders(ru) }); }
                 best = ru;
             }
-            // V70: 串行兜底链——重签(3线路) → 同场其它信号(90s缓存+20s墙钟)，各自有界，总耗时最坏 ~25s（旧引擎无 Promise.any 风险）
+            // V77: 只用原信号——reissue新鲜重试(清缓存强制重抓新token),仍失败原样返回,不切同场其它信号
             var t = await reissueSignalM3u8(raw);
             if (t) {
                 var t2 = await ensureM3u8(t);
@@ -1172,13 +1147,7 @@ async function play(flag, id, flags) {
                 if (!isM3u8Bad(c2)) return JSON.stringify({ parse: 0, url: t2, header: playHeaders(t2) });
                 if (!best) best = t2;
             }
-            var f = await fallbackToWorkingSignal(raw);
-            if (f) {
-                var f2 = await ensureM3u8(f);
-                var c3 = await probeM3u8Status(f2);
-                if (!isM3u8Bad(c3)) return JSON.stringify({ parse: 0, url: f2, header: playHeaders(f2) });
-                if (!best) best = f2;
-            }
+            if (console.log) console.log('[V77] signal dead, return as-is: ' + String(raw).slice(0, 90));
         } catch (e) {}
         // V66: 全链路失败也恒 parse:0 返回最优候选（parse:1 会让 T4 把信号页当媒体直接播放必失败）
         if (best) return JSON.stringify({ parse: 0, url: best, header: playHeaders(best) });
