@@ -8,9 +8,7 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
- * @version V77 - 按用户要求彻底移除同场信号兜底(fallbackToWorkingSignal/evFallbackCache):只用原信号——解析+reissue新鲜重试(purgeSignalCache清缓存强制重抓新token),仍失败则原样返回原候选/原URL,不切别的信号伪装有效。版本戳/200空body诊断/新鲜重探维持V75（2026-11-01 看日志升版） */
-const JRS_VER = 'V77';
-
+ * @version V77 - 按用户要求彻底移除同场信号兜底(fallbackToWorkingSignal/evFallbackCache):只用原信号——解析+reissue新鲜重试(purgeSignalCache清缓存强制重抓新token),仍失败则原样返回原候选/原URL,不切别的信号伪装有效。日志输出全部注释（2026-11-01 看日志升版） */
 let host = 'https://m.sportsteam53.com';
 const hosts = ['https://m.sportsteam53.com', 'https://m.jrskk.com', 'https://m.jrs21.com', 'https://www.jrs33.com', 'https://3.swjrzx.com', 'https://m.sportsteam356.com'];
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
@@ -328,21 +326,21 @@ function _pao_rc4(data, key) {
 }
 async function resolvePao(paoUrl, referer) {
     try {
-        console.log('resolvePao start:', paoUrl);
+        // console.log('resolvePao start:', paoUrl);
         var paoHtml = await fetchText(paoUrl, referer || host + '/');
         if (!paoHtml || paoHtml.length <= 5) {
-            console.log('resolvePao empty html');
+            // console.log('resolvePao empty html');
             return null;
         }
         var encMatch = paoHtml.match(/encodedStr\s*=\s*["']([^"']+)/i);
         var isVxt = /\/play\/vxt\//i.test(paoUrl);
         if (!encMatch) encMatch = paoHtml.match(/["']?en_str["']?\s*[:=]\s*["']([^"']+)/i);
         if (!encMatch) {
-            console.log('resolvePao no encodedStr');
+            // console.log('resolvePao no encodedStr');
             return null;
         }
         var encodedStr = encMatch[1];
-        console.log('resolvePao encodedStr found');
+        // console.log('resolvePao encodedStr found');
         var encBinary = '';
         if (typeof Buffer !== 'undefined') {
             encBinary = Buffer.from(encodedStr, 'base64').toString('binary');
@@ -405,28 +403,28 @@ async function resolvePao(paoUrl, referer) {
 
 async function resolveTxfApi(cfg) {
     try {
-        if (console.log) console.log('resolveTxfApi input:', JSON.stringify(cfg));
+        // if (console.log) console.log('resolveTxfApi input:', JSON.stringify(cfg));
         var p = 'defnswitch=0&flowid=cba2e14bd08c365f82faa2206260b142&cmd=2&pid='+encodeURIComponent(cfg.pid)+'&chid=&defn=shd&ufps=auto&playbacktime=0&ckey='+encodeURIComponent(cfg.ckey)+'&appver=1.70.2&encrypt_ver=7.3&platform=40201&tm='+cfg.tm+'&cnlid='+cfg.cnlid+'&host=sports.qq.com&sdtfrom=10201&logintoken=%7B%22access_token%22%3A%2278B6EFF47A1209550825A440AF2D6E6F%22%2C%22appid%22%3A%22101481799%22%2C%22vusession%22%3Anull%2C%22openid%22%3A%224D2FA8DD4C31FDB84668A204EA6ADDEC%22%2C%22vuserid%22%3Anull%2C%22main_login%22%3A%22qq%22%2C%22video_guid%22%3A%22%22%7D';
         var apiUrl = 'https://infozb6.video.qq.com/cgi-bin/getliveinfo?' + p;
-        if (console.log) console.log('resolveTxfApi url:', apiUrl);
+        // if (console.log) console.log('resolveTxfApi url:', apiUrl);
         var body = await fetchText(apiUrl, 'https://play.sportsteam356.com/');
         if (!body) {
-            if (console.log) console.log('resolveTxfApi body empty');
+            // if (console.log) console.log('resolveTxfApi body empty');
             return null;
         }
-        if (console.log) console.log('resolveTxfApi body len:', String(body).length);
+        // if (console.log) console.log('resolveTxfApi body len:', String(body).length);
         var jd = safeJson(body, null);
         if (jd && jd.play_list && jd.play_list.length > 0) {
             var firstPlay = jd.play_list[0];
             if (firstPlay.urls && firstPlay.urls.length > 0) {
                 var m3u8 = firstPlay.urls[0];
-                if (console.log) console.log('resolveTxfApi m3u8 ok:', m3u8.slice(0, 100));
+                // if (console.log) console.log('resolveTxfApi m3u8 ok:', m3u8.slice(0, 100));
                 return m3u8;
             }
         }
         return null;
     } catch (e) {
-        if (console.log) console.log('resolveTxfApi err:', String(e && e.message || e).slice(0, 120));
+        // if (console.log) console.log('resolveTxfApi err:', String(e && e.message || e).slice(0, 120));
         return null;
     }
 }
@@ -498,7 +496,7 @@ function probeM3u8Status(u) {
             if (done) return; done = true;
             delete probeInflight[u];
             var st = { code: code, body: String(body || '') };
-            if (code === 200 && st.body.indexOf('#EXTM3U') === -1 && console.log) console.log('[V76] probe 200 but no #EXTM3U, bodyLen=' + st.body.length + ' bodyHead=' + st.body.slice(0, 60).replace(/\n/g, '|') + ' url=' + String(u).slice(0, 70));
+            // if (code === 200 && st.body.indexOf('#EXTM3U') === -1 && console.log) console.log('[V76] probe 200 but no #EXTM3U, bodyLen=' + st.body.length + ' bodyHead=' + st.body.slice(0, 60).replace(/\n/g, '|') + ' url=' + String(u).slice(0, 70));
             if (!isM3u8Bad(st) || Date.now() - (m3u8ProbeCache[u] ? m3u8ProbeCache[u].t : 0) > 15000) {
                 if (Object.keys(m3u8ProbeCache).length > 60) { var ok = Object.keys(m3u8ProbeCache); for (var ki = 0; ki < ok.length; ki++) { var o = m3u8ProbeCache[ok[ki]]; if (o && Date.now() - o.t > 60000) delete m3u8ProbeCache[ok[ki]]; } }
                 m3u8ProbeCache[u] = { t: Date.now(), st: st };
@@ -841,7 +839,6 @@ function getClasses() {
 }
 
 async function init(cfg) {
-    if (console.log) console.log('[JRS_VER ' + JRS_VER + '] init - isolate 已加载此版本');
     if (cfg && cfg.ext && String(cfg.ext).indexOf('http') === 0) host = String(cfg.ext).replace(/\/$/, '');
 }
 async function home(filter) {
@@ -1120,7 +1117,7 @@ function playHeaders(url) {
 }
 
 async function play(flag, id, flags) {
-    if (console.log) console.log('[V77] play start id=' + String(id || '').slice(0, 80));
+    // if (console.log) console.log('[V77] play start id=' + String(id || '').slice(0, 80));
     var raw = String(id || '');
     raw = decodeUrlSafe(raw);
     if (/^\/\//.test(raw)) raw = 'https:' + raw;
@@ -1147,7 +1144,7 @@ async function play(flag, id, flags) {
                 if (!isM3u8Bad(c2)) return JSON.stringify({ parse: 0, url: t2, header: playHeaders(t2) });
                 if (!best) best = t2;
             }
-            if (console.log) console.log('[V77] signal dead, return as-is: ' + String(raw).slice(0, 90));
+            // if (console.log) console.log('[V77] signal dead, return as-is: ' + String(raw).slice(0, 90));
         } catch (e) {}
         // V66: 全链路失败也恒 parse:0 返回最优候选（parse:1 会让 T4 把信号页当媒体直接播放必失败）
         if (best) return JSON.stringify({ parse: 0, url: best, header: playHeaders(best) });
