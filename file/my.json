@@ -339,6 +339,26 @@
             "quickSearch": 1,
             "filterable": 1,
             "playerType": 2
+        },
+        {
+            "key": "kuwo",
+            "name": "酷我音乐py[音]",
+            "type": 3,
+            "api": "./kuwo.py",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "playerType": 2
+        },
+        {
+            "key": "qingting",
+            "name": "蜻蜓播客py[听]",
+            "type": 3,
+            "api": "./qingting.py",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "playerType": 2
         }
     ]
 }
