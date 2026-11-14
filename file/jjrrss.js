@@ -8,7 +8,7 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
- * @version V77 - 按用户要求彻底移除同场信号兜底(fallbackToWorkingSignal/evFallbackCache):只用原信号——解析+reissue新鲜重试(purgeSignalCache清缓存强制重抓新token),仍失败则原样返回原候选/原URL,不切别的信号伪装有效。日志输出全部注释（2026-11-01 看日志升版） */
+ * @version V78 - 按用户要求彻底移除同场信号兜底(fallbackToWorkingSignal/evFallbackCache):只用原信号——解析+reissue新鲜重试(purgeSignalCache清缓存强制重抓新token),仍失败则原样返回原候选/原URL,不切别的信号伪装有效。日志输出全部注释（2026-11-01 看日志升版） */
 let host = 'https://m.sportsteam53.com';
 const hosts = ['https://m.sportsteam53.com', 'https://m.jrskk.com', 'https://m.jrs21.com', 'https://www.jrs33.com', 'https://3.swjrzx.com', 'https://m.sportsteam356.com'];
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
@@ -951,6 +951,8 @@ function fixM3u8Domain(url) {
     s = s.replace(/(hdl\d+\.)ylfxxm(\.com)/g, '$1mxxfly$2');
     // V64: 主播解说域名 888rrtt 倒写，实测 888rrtt DNS 不存在、ttrr888 解析正常（2026-10-31 曼联vs切尔西）
     s = s.replace(/(hdl\d+\.)888rrtt(\.com)/g, '$1ttrr888$2');
+    // V78: 主播解说域名 hwshb 倒写，实测 hdl*.hwshb DNS 不存在、bhswh 解析正常（2026-11-14 日本vs巴西）
+    s = s.replace(/(hdl\d+\.)hwshb(\.com)/g, '$1bhswh$2');
     var rm = s.match(/^(https?:\/\/hdl\d+\.)([a-z0-9\-]+)(\.(?:com|cn|net|top))([\s\S]*)$/i);
     if (rm && /gnimixuiq|remmuszs|8861ixnah/i.test(rm[2])) {
         var rev = rm[2].split('').reverse().join('');
