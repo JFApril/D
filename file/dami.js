@@ -1,4 +1,30 @@
-//toastlog("damizhibo")
+/**
+ * 大米直播🏟 爬虫源
+ * @version V2.4
+ * @author AiBox
+ * @date 2025-06-26
+ * @header({searchable:1,filterable:1,quickSearch:1})
+ * 
+ * @description 基于 QuickJS 直接导出模式（与 74直播/豆包直播相同格式）
+ * 
+ * 数据来源：
+ *   list.json → 比赛列表（含 signals 直播信号）
+ *   首页HTML  → 球队Logo、直播状态、分类
+ * 
+ * 更新记录：
+ *   V2.6 - 缺路信号修复：信号真源是每场独立接口 /api/live/{id}.json(网页3-4路全在这), list.json的signals只是子集(1-2路); detail优先取该接口, on8on8包装页url解包出liveUrl真流, vivo线配真实Referer防热链
+ *   V2.5 - 第一个信号(高清K=hello master)播不出修复：play()现场解析master→aarray变体真流(壳exo不做HLS变体选择, master直透传必死); 完整浏览器头(Accept-Language)过CloudFront风控; detail保持原样透传不探测
+ *   V2.4 - buildVod() 增加🟢已开赛标记（比赛时间≤当前时间）
+ *   V2.3 - 修复首页分类可用
+ *   V2.1 - 修复导出格式：改用全局 __jsEvalReturn 
+ *   V2.0 - 修复导出格式：export function __jsEvalReturn
+ *   V1.1 - 修复home()返回值，恢复列表Logo功能
+ *   V1.0 - 初始版本
+ */
+
+/* ============================================================================
+ *   常量
+ * ============================================================================ */
 const HOST = 'https://www.damizhibo.com';
 const LIST_URL = 'https://www.damizhibo.com/list.json';
 const LOGO = 'https://www.damizhibo.com/favicon.ico';
@@ -183,7 +209,7 @@ function buildVod(match) {
     const matchTime = new Date(cleanTime);
     const now = new Date();
     if (!isNaN(matchTime.getTime()) && matchTime <= now) {
-      remark = '●' + remark;
+      remark = '🔴 ' + remark;
     }
   }
 
@@ -279,18 +305,21 @@ async function detail(ids) {
     const homeTeam = target.home_team || target.home || target.team1 || target.team_a || '';
     const awayTeam = target.away_team || target.away || target.team2 || target.team_b || '';
     const leagueName = target.league_name || target.league || target.tournament || target.series || '';
-    const signals = target.signals || target.live_signals || [];
+    let signals = target.signals || target.live_signals || [];
+    // V2.6: 信号真源 /api/live/{id}.json(list.json的signals是子集会少路), 取不到回退list.json
+    const lj = await fetchJson(HOST + '/api/live/' + namiId + '.json');
+    if (lj && Array.isArray(lj.signals) && lj.signals.length > 0) signals = lj.signals;
 
     // 构建播放列表
     let playUrls = [];
-    if (signals.length > 0) {
-      for (let si = 0; si < signals.length; si++) {
-        const sig = signals[si];
-        const name = sig.label || sig.name || sig.title || '线路' + (si + 1);
-        const url = sig.url || sig.link || sig.src || '';
-        if (url) {
-          playUrls.push(name + '$' + url);
-        }
+    const seenUrl = {};
+    for (let si = 0; si < signals.length; si++) {
+      const sig = signals[si];
+      const name = sig.label || sig.name || sig.title || '线路' + (si + 1);
+      const url = unwrapSignalUrl(sig.url || sig.link || sig.src || '');
+      if (url && !seenUrl[url]) {
+        seenUrl[url] = true;
+        playUrls.push(name + '$' + url);
       }
     }
 
@@ -345,26 +374,51 @@ async function search(wd, quick, pg) {
   }
 }
 
-async function play(flag, id, flags) {
-  const url = String(id || '');
-  if (/\.(m3u8|flv|mp4)(\?|$)/i.test(url)) {
-    return JSON.stringify({
-      parse: 0, url: url,
-      header: {
-        'User-Agent': UA,
-        'Referer': HOST + '/',
-        'Origin': HOST
-      }
-    });
+function unwrapSignalUrl(url) {
+  url = String(url || '').trim();
+  if (url.indexOf('liveUrl=') !== -1) {
+    let rest = url.slice(url.indexOf('liveUrl=') + 8);
+    const amp = rest.indexOf('&');
+    if (amp !== -1) rest = rest.slice(0, amp);
+    try {
+      const d = decodeURIComponent(rest);
+      if (d.indexOf('http') === 0) return d;
+    } catch (e) {}
   }
-  return JSON.stringify({
-    parse: 1, url: url,
-    header: {
-      'User-Agent': UA,
-      'Referer': HOST + '/',
-      'Origin': HOST
+  return url;
+}
+
+async function resolveStreamUrl(url) {
+  if (!url || !/\.m3u8(\?|$)/i.test(url)) return url;
+  const t = await fetchText(url, 8000);
+  if (!t) return url;
+  if (t.indexOf('#EXT-X-STREAM-INF') !== -1) {
+    const lines = t.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line || line[0] === '#') continue;
+      const v = line.indexOf('http') === 0 ? line : url.split('?')[0].replace(/\/[^/]*$/, '/') + line;
+      console.log('[dami Debug] master→变体: ' + v);
+      return v;
     }
-  });
+  }
+  return url;
+}
+
+async function play(flag, id, flags) {
+  let url = String(id || '').trim();
+  if (url) url = await resolveStreamUrl(url);
+  const isVivo = url.indexOf('vivo155.com') !== -1;
+  const hd = {
+    'User-Agent': UA,
+    'Referer': isVivo ? 'https://player.on8on8.com/' : HOST + '/',
+    'Origin': isVivo ? 'https://player.on8on8.com' : HOST,
+    'Accept-Language': 'zh-CN,zh;q=0.9'
+  };
+  if (/\.(m3u8|flv|mp4)(\?|$)/i.test(url)) {
+    return JSON.stringify({ parse: 0, url: url, header: hd });
+  }
+  return JSON.stringify({ parse: 1, url: url, header: hd });
 }
 
 /* ============================================================================
