@@ -1,3 +1,8 @@
+// ============================================================
+// 豆包直播🏟  v21（播放修复：走public API取真流地址）
+// v21: play改调 /api/v1/public/signals/{playId}/play 取m3u8（原正则抓SPA页面永远落空→parse:1播不出；2026-11-15 看日志升版）
+// v20: 列表显示 🔴直播中 ✅已结束 状态标记，写入JS文件
+// ============================================================
 
 const DB_HOST = 'https://www.doubaozhibo.com';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -595,7 +600,47 @@ async function play(flag, id, flags) {
             }
         });
     }
-    // 是 play 页面 URL，需要解析
+    // 直播 play 页：调 public API 取真流地址（SPA 页面 HTML 里无 m3u8）
+    const pm = url.match(/\/play\/([0-9A-Za-z-]+)/);
+    if (pm) {
+        const playId = pm[1];
+        const ck = 'sigplay_' + playId;
+        const cached = getCached(ck);
+        if (cached) {
+            return JSON.stringify({
+                parse: 0,
+                url: cached,
+                header: {
+                    'User-Agent': UA,
+                    'Referer': DB_HOST + '/'
+                }
+            });
+        }
+        const j = await fetchJson(DB_HOST + '/api/v1/public/signals/' + playId + '/play', url);
+        const d = j && j.data;
+        if (d && d.playable && d.url) {
+            const su = absUrl(d.url, DB_HOST);
+            setCache(ck, su);
+            return JSON.stringify({
+                parse: 0,
+                url: su,
+                header: {
+                    'User-Agent': UA,
+                    'Referer': DB_HOST + '/'
+                }
+            });
+        }
+        // 信号不可用（已下播/赛事结束）：不伪装
+        return JSON.stringify({
+            parse: 1,
+            url: '',
+            header: {
+                'User-Agent': UA,
+                'Referer': DB_HOST + '/'
+            }
+        });
+    }
+    // 其他（回放等）：走页面解析
     let m3u8 = getCached('m3u8_' + url);
     if (!m3u8) {
         m3u8 = await resolveM3u8(url);
