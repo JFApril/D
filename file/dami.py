@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 大米直播 V2.6 - 对齐js版: 信号真源/每场/api/live/{id}.json(list.json的signals是子集会少路,无条件补全); on8on8包装页解包liveUrl真流; playerContent现场解析master→aarray变体(高清K线纯透传壳exo不做变体选择必死); Accept-Language过CloudFront指纹风控; vivo155线配on8on8真实Referer防热链
+# 大米直播 V2.6  - 对齐js版: 信号真源/每场/api/live/{id}.json(list.json的signals是子集会少路,无条件补全); on8on8包装页解包liveUrl真流; playerContent现场解析master→aarray变体(高清K线纯透传壳exo不做变体选择必死); Accept-Language过CloudFront指纹风控; vivo155线配on8on8真实Referer防热链
 # V2.5 - 修复: 信号路数(live-scores.json实时比分+detail API信号补全)
 import re, json, time, requests
 from urllib.parse import unquote
