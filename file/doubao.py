@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# 豆包直播 py v1.1 (2026-11-15 看日志升版): playerContent 改调 /api/v1/public/signals/{playId}/play 取真流地址
+# (原正则抓SPA页面永远落空→下发播放页URL播不出；端点逆向自前端 MatchLive 组件 y(t+'/play'))
 import re, json, time, requests
 from urllib.parse import quote
 from base.spider import Spider as BaseSpider
@@ -179,6 +181,15 @@ class Spider(BaseSpider):
         if re.search(r'\.(m3u8|flv|mp4)(\?|$)', play_url, re.I): return play_url
         cached = self._get_cache('m3u8_' + play_url)
         if cached: return cached
+        pm = re.search(r'/play/([0-9A-Za-z-]+)', play_url)
+        if pm:
+            j = self._get_json(HOST + '/api/v1/public/signals/' + pm.group(1) + '/play', play_url)
+            d = (j or {}).get('data') or {}
+            if d.get('playable') and d.get('url'):
+                su = self._abs_url(d['url'], self.host)
+                self._set_cache('m3u8_' + play_url, su)
+                return su
+            return ''
         html = self._get(play_url, self.host + '/')
         m3u8 = self._parse_play_page(html)
         if m3u8 and m3u8 != play_url:
@@ -252,11 +263,11 @@ class Spider(BaseSpider):
                     'User-Agent': self.ua, 'Referer': HOST + '/', 'Origin': HOST
                 }}
             m3u8 = self._resolve_m3u8(url)
-            if m3u8 and re.search(r'\.(m3u8|flv|mp4)(\?|$)', m3u8, re.I):
+            if m3u8 and m3u8 != url and re.search(r'\.(m3u8|flv|mp4)(\?|$)', m3u8, re.I):
                 return {'parse': 0, 'url': m3u8, 'header': {
                     'User-Agent': self.ua, 'Referer': HOST + '/', 'Origin': HOST
                 }}
-            return {'parse': 0, 'url': url, 'header': {'User-Agent': self.ua, 'Referer': HOST + '/'}}
+            return {'parse': 0, 'url': '', 'header': {'User-Agent': self.ua, 'Referer': HOST + '/'}}
         except:
             return {'parse': 0, 'url': str(id or '')}
 
