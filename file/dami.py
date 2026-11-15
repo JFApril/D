@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-# 大米直播 V2.5 - 修复: 信号路数(live-scores.json实时比分+detail API信号补全)
+# 大米直播 V2.6 - 对齐js版: 信号真源/每场/api/live/{id}.json(list.json的signals是子集会少路,无条件补全); on8on8包装页解包liveUrl真流; playerContent现场解析master→aarray变体(高清K线纯透传壳exo不做变体选择必死); Accept-Language过CloudFront指纹风控; vivo155线配on8on8真实Referer防热链
+# V2.5 - 修复: 信号路数(live-scores.json实时比分+detail API信号补全)
 import re, json, time, requests
+from urllib.parse import unquote
 from datetime import datetime, timezone, timedelta
 from base.spider import Spider as BaseSpider
 
@@ -47,7 +49,7 @@ class Spider(BaseSpider):
         self._cache[key] = {'v': val, 't': time.time()}
 
     def _headers(self):
-        return {'User-Agent': UA, 'Referer': self.host + '/', 'Accept': '*/*'}
+        return {'User-Agent': UA, 'Referer': self.host + '/', 'Accept': '*/*', 'Accept-Language': 'zh-CN,zh;q=0.9'}
 
     def _html_headers(self):
         return {'User-Agent': UA, 'Referer': self.host + '/', 'Accept': 'text/html,application/xhtml+xml'}
@@ -234,6 +236,45 @@ class Spider(BaseSpider):
             pass
         return None
 
+    def _unwrap_signal_url(self, url):
+        url = str(url or '').strip()
+        i = url.find('liveUrl=')
+        if i != -1:
+            rest = url[i + 8:]
+            amp = rest.find('&')
+            if amp != -1:
+                rest = rest[:amp]
+            try:
+                d = unquote(rest)
+                if d.startswith('http'):
+                    return d
+            except:
+                pass
+        return url
+
+    def _resolve_stream_url(self, url):
+        url = str(url or '').strip()
+        if not url or not re.search(r'\.m3u8(\?|$)', url, re.I):
+            return url
+        try:
+            r = requests.get(url, headers=self._headers(), timeout=8)
+            t = r.text or ''
+        except:
+            return url
+        if '#EXT-X-STREAM-INF' in t:
+            for line in t.splitlines():
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if line.startswith('http'):
+                    print(f'[dami Debug] master→变体: {line}')
+                    return line
+                base = url.split('?')[0]
+                base = base[:base.rfind('/')] + '/'
+                print(f'[dami Debug] master→变体(相对): {base}{line}')
+                return base + line
+        return url
+
     def _build_name(self, home, away, score):
         if score and score != '-':
             return f'{home} {score} {away}'
@@ -309,15 +350,18 @@ class Spider(BaseSpider):
             away = target['away']
             league = target.get('league', '')
             signals = target.get('signals', [])
-            if nid and len(signals) < 3:
-                detail_sigs = self._fetch_detail_signals(nid)
-                if detail_sigs and len(detail_sigs) > len(signals):
-                    signals = detail_sigs
+            # V2.6: 信号真源 /api/live/{id}.json 无条件取(list.json的signals是子集会少路), 失败回退
+            detail_sigs = self._fetch_detail_signals(nid) if nid else None
+            if detail_sigs:
+                signals = detail_sigs
             play_urls = []
+            seen_urls = set()
             for sig in signals:
                 label = sig.get('label') or sig.get('name') or sig.get('title') or ''
-                url = sig.get('url') or sig.get('link') or sig.get('src') or ''
-                if url: play_urls.append(f'{label}${url}')
+                url = self._unwrap_signal_url(sig.get('url') or sig.get('link') or sig.get('src') or '')
+                if url and url not in seen_urls:
+                    seen_urls.add(url)
+                    play_urls.append(f'{label}${url}')
             if not play_urls:
                 play_urls.append(f'暂无信号${HOST}')
             pic = target.get('home_logo', '') or target.get('away_logo', '') or LOGO
@@ -360,9 +404,19 @@ class Spider(BaseSpider):
     def playerContent(self, flag, id, vipFlags):
         try:
             url = str(id or '')
-            return {'parse': 0, 'url': url, 'header': {
-                'User-Agent': UA, 'Referer': HOST + '/', 'Origin': HOST
-            }}
+            if not url:
+                return {'parse': 0, 'url': ''}
+            # vivo155线有热链保护，按网页真实Referer走on8on8包装页
+            hd = {'User-Agent': UA,
+                  'Referer': HOST + '/',
+                  'Origin': HOST,
+                  'Accept-Language': 'zh-CN,zh;q=0.9'}
+            if 'vivo155.com' in url:
+                hd['Referer'] = 'https://player.on8on8.com/'
+                hd['Origin'] = 'https://player.on8on8.com'
+            # 壳exo不做变体选择：master必须现场解析为单码率变体
+            url = self._resolve_stream_url(url)
+            return {'parse': 0, 'url': url, 'header': hd}
         except:
             return {'parse': 0, 'url': str(id or '')}
 
