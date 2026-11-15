@@ -208,7 +208,7 @@ class Spider(BaseSpider):
         ]
 
     def homeContent(self, filter):
-        return {'class': self._get_classes(), 'filters': {}}
+        return {'class': self._get_classes(), 'filters': {}, 'list': self._get_recommend_list()}
 
     def categoryContent(self, tid, pg, filter, extend):
         try:
@@ -222,6 +222,34 @@ class Spider(BaseSpider):
             }
         except:
             return {'page': 1, 'pagecount': 1, 'limit': 30, 'total': 0, 'list': []}
+
+    def _get_recommend_list(self):
+        try:
+            json_data = self._get_json(HOST + '/api/v1/schedules/public/local', HOST + '/')
+            days = json_data.get('data', {}).get('days', []) if json_data else []
+            list_items = []
+            recommended = []
+            fallback = []
+            for day in days:
+                for item in (day.get('live') or []):
+                    if not item.get('signals'): continue
+                    if item.get('status') == 1:
+                        recommended.append(item)
+                    else:
+                        fallback.append(item)
+            pool = recommended or fallback
+            for item in pool[:30]:
+                name = f"{self._clean(item.get('teamA',''))} vs {self._clean(item.get('teamB',''))}"
+                pic = item.get('teamAImage') or item.get('teamBImage') or ''
+                list_items.append({
+                    'vod_id': f"live_{item.get('id')}",
+                    'vod_name': name,
+                    'vod_pic': pic,
+                    'vod_remarks': self._clean(item.get('league', '')) or '直播',
+                })
+            return list_items
+        except:
+            return []
 
     def detailContent(self, ids):
         try:
