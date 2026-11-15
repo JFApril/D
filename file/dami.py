@@ -302,7 +302,7 @@ class Spider(BaseSpider):
         ]
 
     def homeContent(self, filter):
-        return {'class': self._get_classes(), 'filters': {}}
+        return {'class': self._get_classes(), 'filters': {}, 'list': self._get_recommend_list()}
 
     def categoryContent(self, tid, pg, filter, extend):
         try:
@@ -332,6 +332,25 @@ class Spider(BaseSpider):
             }
         except:
             return {'page': 1, 'pagecount': 1, 'limit': 30, 'total': 0, 'list': []}
+
+    def _get_recommend_list(self):
+        try:
+            all_data = self._load_all_data()
+            list_items = []
+            for m in all_data:
+                nid = m.get('nami_id', '')
+                vod_id = f'dmz|{nid}' if nid else f'dmz|{m["home"]}_{m["away"]}'
+                pic = m.get('home_logo', '') or m.get('away_logo', '') or LOGO
+                list_items.append({
+                    'vod_id': vod_id,
+                    'vod_name': self._build_name(m['home'], m['away'], m.get('score', '')),
+                    'vod_pic': pic,
+                    'vod_remarks': self._build_remarks(m),
+                    'type_name': m.get('league', '') or '体育直播',
+                })
+            return list_items[:30]
+        except:
+            return []
 
     def detailContent(self, ids):
         try:
