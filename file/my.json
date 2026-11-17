@@ -371,6 +371,16 @@
             "playerType": 2
         },
         {
+            "key": "yunzhenxiang",
+            "name": "云帧享py[影]",
+            "type": 3,
+            "api": "./yunzhenxiang.py",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 1,
+            "playerType": 2
+        },
+        {
             "key": "qingting",
             "name": "蜻蜓播客py[听]",
             "type": 3,
