@@ -8,7 +8,7 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
- * @version V86 -  */
+ * @version V88 - txf en_str正则修复(页面改版为var playerData={en_str:...}带引号包裹,cat txf老正则要求en_str外无引号→新格式恒MISS→encMatch=null→return原样下发sigUrl播不出,且服务端新旧模板混跑故间歇性偶发成功;V88对齐dr3兼容正则允许en_str外带引号,叠加V87标准base64+V86 TryAll key,三层全修;node实证文件L1009真实正则+当前页面解出pid/cnlid JSON) */
 let host = 'https://m.sportsteam53.com';
 const hosts = ['https://m.sportsteam53.com', 'https://m.jrskk.com', 'https://m.jrs21.com', 'https://www.jrs33.com', 'https://3.swjrzx.com', 'https://m.sportsteam356.com'];
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
@@ -293,6 +293,31 @@ function xxteaDecrypt(binary, key) {
     return _xxtea_fU32(r, true);
 }
 
+function jrsB64bin(str) {
+    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    str = String(str || '').replace(/[^A-Za-z0-9+\/]/g, '');
+    var out = '';
+    for (var i = 0; i + 4 <= str.length; i += 4) {
+        var e1 = chars.indexOf(str.charAt(i)); var e2 = chars.indexOf(str.charAt(i + 1));
+        var e3 = chars.indexOf(str.charAt(i + 2)); var e4 = chars.indexOf(str.charAt(i + 3));
+        if (e1 < 0 || e2 < 0 || e3 < 0 || e4 < 0) break;
+        out += String.fromCharCode((e1 << 2) | (e2 >> 4));
+        out += String.fromCharCode(((e2 & 15) << 4) | (e3 >> 2));
+        out += String.fromCharCode(((e3 & 3) << 6) | e4);
+    }
+    var rem = str.length % 4, tail = str.slice(str.length - rem);
+    if (tail.length === 2) {
+        var a1 = chars.indexOf(tail.charAt(0)), a2 = chars.indexOf(tail.charAt(1));
+        if (a1 >= 0 && a2 >= 0) out += String.fromCharCode((a1 << 2) | (a2 >> 4));
+    } else if (tail.length === 3) {
+        var b1 = chars.indexOf(tail.charAt(0)), b2 = chars.indexOf(tail.charAt(1)), b3 = chars.indexOf(tail.charAt(2));
+        if (b1 >= 0 && b2 >= 0 && b3 >= 0) {
+            out += String.fromCharCode((b1 << 2) | (b2 >> 4));
+            out += String.fromCharCode(((b2 & 15) << 4) | (b3 >> 2));
+        }
+    }
+    return out;
+}
 function _pao_customB64(str) {
     var alpha = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=';
     str = String(str || '').replace(/=+$/, '');
@@ -981,10 +1006,10 @@ async function resolveSignal(sigUrl, referer) {
     if (/\/play\/txf\//i.test(sigUrl)) {
         var paoHtml = await fetchText(sigUrl, referer || host + '/');
         if (paoHtml) {
-            var encMatch = paoHtml.match(/en_str\s*[:=]\s*["']([^"']+)/i);
+            var encMatch = paoHtml.match(/["']?en_str["']?\s*[:=]\s*["']([^"']+)/i);
             if (encMatch) {
                 var encodedStr = encMatch[1];
-                var encBinary = typeof Buffer !== 'undefined' ? Buffer.from(encodedStr, 'base64').toString('binary') : _pao_customB64(encodedStr);
+                var encBinary = jrsB64bin(encodedStr);
                 var m3u8raw = xxteaTryAll(encBinary, [PAO_XXTEA_KEY, VXT_XXTEA_KEYS[0], VXT_XXTEA_KEYS[1], VXT_XXTEA_KEYS[2]]);
                 if (m3u8raw) {
                     if (m3u8raw.indexOf('http') === 0) {
