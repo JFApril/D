@@ -8,7 +8,7 @@
   lang: 'cat',
   style: { type: 'rect', ratio: 1.5 }
 })
- * @version V78 - 按用户要求彻底移除同场信号兜底(fallbackToWorkingSignal/evFallbackCache):只用原信号——解析+reissue新鲜重试(purgeSignalCache清缓存强制重抓新token),仍失败则原样返回原候选/原URL,不切别的信号伪装有效。日志输出全部注释（2026-11-01 看日志升版） */
+ * @version V86 -  */
 let host = 'https://m.sportsteam53.com';
 const hosts = ['https://m.sportsteam53.com', 'https://m.jrskk.com', 'https://m.jrs21.com', 'https://www.jrs33.com', 'https://3.swjrzx.com', 'https://m.sportsteam356.com'];
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
@@ -392,6 +392,14 @@ async function resolvePao(paoUrl, referer) {
         if (m3u8 && m3u8.indexOf('http') === 0) {
             m3u8 = m3u8.replace(/\\\//g, '/');
             m3u8 = fixM3u8Domain(m3u8);
+            // V79: 单次token禁resolveMasterM3u8(fetchText会烧token),直返
+            if (isOneShotToken(m3u8)) return m3u8;
+            // V84: 恢复V78原通道——ooo0ooo只认fetchText完整请求头(Accept: text/html...),probeM3u8Status探针头(无Accept)恒404(V80误判TLS指纹,V82重试3次全miss);V78的resolveMasterM3u8(fetchText)→master 200→extractSubM3u8→aarray子清单(实测200/SEQ滚动可播);取不到原样下发master,不跨线路
+            if (m3u8.indexOf('hello.ooo0ooo.top') !== -1) {
+                var aSub78 = await resolveMasterM3u8(m3u8);
+                if (aSub78) return fixM3u8Domain(aSub78);
+                return m3u8;
+            }
             var resolved = await resolveMasterM3u8(m3u8);
             return resolved || m3u8;
         }
@@ -448,6 +456,8 @@ async function ensureM3u8(u) {
     var s = fixM3u8Domain(String(u || ''));
     if (s.indexOf('//') === 0) s = 'https:' + s;
     if (!/^https?:\/\//i.test(s) || !/\.(m3u8|mp4|flv)(\?|$)/i.test(s)) return s;
+    // V79: 单次token零预检——任何probe都会烧掉token,壳exo二次请求必401,直接下发master(实测sub/TS免token永活)
+    if (isOneShotToken(s)) return s;
     // V74: 探活body复用probeM3u8Status(走pageCache/probeCache,免重复网络),master自动降sub
     var st = { body: '' };
     try { st = await probeM3u8Status(s); } catch (e) {}
@@ -533,6 +543,10 @@ function isM3u8Bad(st) {
     if (!st) return true;
     return st.body.indexOf('#EXTM3U') === -1;
 }
+// V79: 单次token签名识别——bhswh系CDN token首GET即消费(实测1次200/后续401),lts=+userUid=是其签名
+function isOneShotToken(u) {
+    return /[?&]token=[A-Za-z0-9+/=%_-]{20,}/i.test(String(u || '')) && /([?&]lts=|userUid=)/i.test(String(u || ''));
+}
 function altSignalHosts(sigUrl) {
     var m = String(sigUrl || '').match(/^(https?:\/\/)([^/]+)(\/[\s\S]*)$/i);
     if (!m) return [];
@@ -569,6 +583,8 @@ async function reissueSignalM3u8(sigUrl) {
             var m3u8 = await resolveSignal(tries[i], host + '/');
             if (!m3u8 || !/\.(m3u8|mp4|flv)(\?|$)/i.test(m3u8)) continue;
             m3u8 = fixM3u8Domain(m3u8);
+            // V79: 单次token直返新鲜链(未消费),probe会烧掉
+            if (isOneShotToken(m3u8)) return m3u8;
             var st = await probeM3u8Status(m3u8);
             if (!isM3u8Bad(st)) return m3u8;
         } catch (e) {}
@@ -969,11 +985,13 @@ async function resolveSignal(sigUrl, referer) {
             if (encMatch) {
                 var encodedStr = encMatch[1];
                 var encBinary = typeof Buffer !== 'undefined' ? Buffer.from(encodedStr, 'base64').toString('binary') : _pao_customB64(encodedStr);
-                var m3u8raw = xxteaDecrypt(encBinary, PAO_XXTEA_KEY);
+                var m3u8raw = xxteaTryAll(encBinary, [PAO_XXTEA_KEY, VXT_XXTEA_KEYS[0], VXT_XXTEA_KEYS[1], VXT_XXTEA_KEYS[2]]);
                 if (m3u8raw) {
                     if (m3u8raw.indexOf('http') === 0) {
                         var tDirect = fixM3u8Domain(m3u8raw.replace(/\\\//g, '/'));
                         if (tDirect.indexOf('hello.ooo0ooo.top') === -1) return tDirect;
+                        var tSubD = await resolveMasterM3u8(tDirect);
+                        return tSubD ? fixM3u8Domain(tSubD) : tDirect;
                     }
                     if (m3u8raw.charAt(0) === '{') {
                         try {
@@ -981,6 +999,8 @@ async function resolveSignal(sigUrl, referer) {
                             if (parsed.url && String(parsed.url).indexOf('://') !== -1) {
                                 var tUrl = fixM3u8Domain(String(parsed.url));
                                 if (tUrl.indexOf('hello.ooo0ooo.top') === -1) return tUrl;
+                                var tSubU = await resolveMasterM3u8(tUrl);
+                                return tSubU ? fixM3u8Domain(tSubU) : tUrl;
                             } else if (parsed.ckey && parsed.cnlid && parsed.pid) {
                                 var txfM3u8 = await resolveTxfApi(parsed);
                                 if (txfM3u8 && txfM3u8.indexOf('hello.ooo0ooo.top') === -1) return fixM3u8Domain(txfM3u8);
@@ -992,13 +1012,32 @@ async function resolveSignal(sigUrl, referer) {
         }
         return '';
     }
-    // V63: vxt 独立处理——腾讯 getliveinfo 偶发 retcode:32 空 play_list（kbs 同 pid 可播），失败自动降级 kbs
+    // V63: vxt 独立处理——腾讯 getliveinfo 偶发 retcode:32 空 play_list; V81: 移除vxt→kbs回退,解析不出即失败,不跨线路替代
     if (/\/play\/vxt\//i.test(sigUrl)) {
         var vxtR = await resolvePao(sigUrl, referer);
         if (vxtR && vxtR.indexOf('hello.ooo0ooo.top') === -1) return vxtR;
-        var vxb = sigUrl.replace(/\/play\/vxt\//i, '/play/kbs/');
-        var kbsR = await resolvePao(vxb, referer);
-        if (kbsR && kbsR.indexOf('hello.ooo0ooo.top') === -1) return kbsR;
+        return '';
+    }
+    // V80: oo线路(高清直播⑦)——encodedStr同XXTEA结构,resolvePao解出ooo0ooo调度层(TLS指纹源侧取不到); V83: 恢复V78兼容——ooo0ooo取不到时回落V78式页面扫描(msss/扫m3u8/追iframe)取本路自带播放器出口,不跨线路
+    if (/\/play\/oo\//i.test(sigUrl)) {
+        var ooR = await resolvePao(sigUrl, referer || host + '/');
+        if (ooR && ooR.indexOf('hello.ooo0ooo.top') === -1) { ooR = fixM3u8Domain(ooR); return ooR; }
+        try {
+            var ooHtml = await fetchText(sigUrl, referer || host + '/');
+            if (ooHtml) {
+                var omm = ooHtml.match(/src=["']([^"']*\/msss\.html\?id=([^"']+))["']/i);
+                if (omm) { var ost = decodeMsssId(omm[2]); if (ost && /\.(m3u8|mp4|flv)(\?|$)/i.test(ost)) return fixM3u8Domain(ost); }
+                var odu = extractM3u8FromPage(ooHtml, sigUrl);
+                if (odu && looksLikePlayable(odu)) return fixM3u8Domain(odu);
+                var oif = firstMatch(ooHtml, /<iframe[^>]+src=["']([^"']+)["']/i);
+                if (oif) {
+                    if (oif.indexOf('http') !== 0) oif = absUrl(oif, sigUrl);
+                    var oifH = await fetchText(oif, sigUrl);
+                    if (oifH) { var odu2 = extractM3u8FromPage(oifH, oif); if (odu2 && looksLikePlayable(odu2)) return fixM3u8Domain(odu2); }
+                }
+            }
+        } catch (e) {}
+        if (ooR) { ooR = fixM3u8Domain(ooR); return ooR; }
         return '';
     }
     if (/\/play\/(pao|kbs|vl)\//i.test(sigUrl)) {
@@ -1133,6 +1172,8 @@ async function play(flag, id, flags) {
             var r = await resolveSignal(raw, host + '/');
             if (r && /\.(m3u8|mp4|flv)(\?|$)/i.test(r)) {
                 var ru = await ensureM3u8(r);
+                // V79: 单次token跳过probeM3u8Status(烧token),直接下发,壳exo首消费
+                if (isOneShotToken(ru)) { return JSON.stringify({ parse: 0, url: ru, header: playHeaders(ru) }); }
                 // V66: 统一预检——鉴权失败(401 auth failed)即触发原信号重签
                 var chk = await probeM3u8Status(ru);
                 if (!isM3u8Bad(chk)) { return JSON.stringify({ parse: 0, url: ru, header: playHeaders(ru) }); }
@@ -1142,6 +1183,8 @@ async function play(flag, id, flags) {
             var t = await reissueSignalM3u8(raw);
             if (t) {
                 var t2 = await ensureM3u8(t);
+                // V79: 重签出的单次token新鲜链直接下发(未消费),probe会烧掉
+                if (isOneShotToken(t2)) return JSON.stringify({ parse: 0, url: t2, header: playHeaders(t2) });
                 var c2 = await probeM3u8Status(t2);
                 if (!isM3u8Bad(c2)) return JSON.stringify({ parse: 0, url: t2, header: playHeaders(t2) });
                 if (!best) best = t2;
